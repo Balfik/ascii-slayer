@@ -4,6 +4,29 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>ASCII SLAYER</title>
+<meta name="description" content="Free browser idle-runner: auto-battle, build a castle by hand, fight scaling bosses, and climb a live public leaderboard. No install — just open and play." />
+<!-- Іконка вкладки — інлайн SVG як data: URI, свідомо НЕ окремий файл: уся
+     гра лишається одним HTML-файлом без жодного build-кроку, і фавікон не
+     повинен бути винятком. ">_" — термінальний курсор, той самий шрифт і
+     та сама палітра (--bg/--border/--accent), що й у самій грі. -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTMiIGZpbGw9IiMwYTBmMGEiLz4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHJ4PSIxMSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMjU0MDI1IiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSIzMiIgeT0iNDUiIGZvbnQtZmFtaWx5PSInQ291cmllciBOZXcnLCBDb25zb2xhcywgbW9ub3NwYWNlIiBmb250LXNpemU9IjMyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iIzRkZmZiOCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Jmd0O188L3RleHQ+Cjwvc3ZnPgo=" />
+<!-- Open Graph / Twitter-картка — щоб посилання в Telegram/Discord/X
+     показувало нормальну картку (назва + опис + картинка), а не голий
+     URL. og-image.png — окремий файл поряд із index.html у ЦЬОМУ ж
+     репозиторії (соцмережі тягнуть og:image окремим HTTP-запитом за
+     абсолютним URL, data: URI тут не спрацював би). Якщо колись
+     переносиш гру на інший домен — онови og:url/og:image на новий. -->
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://balfik.github.io/ascii-slayer/" />
+<meta property="og:title" content="ASCII SLAYER" />
+<meta property="og:description" content="Free browser idle-runner: auto-battle, build a castle by hand, fight scaling bosses, and climb a live public leaderboard. No install — just open and play." />
+<meta property="og:image" content="https://balfik.github.io/ascii-slayer/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="ASCII SLAYER" />
+<meta name="twitter:description" content="Free browser idle-runner: auto-battle, build a castle by hand, fight scaling bosses, and climb a live public leaderboard. No install — just open and play." />
+<meta name="twitter:image" content="https://balfik.github.io/ascii-slayer/og-image.png" />
 <style>
   :root{
     --bg:#0a0f0a;
@@ -521,7 +544,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.41';
+const GAME_VERSION = '0.42';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й

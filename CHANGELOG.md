@@ -5,6 +5,16 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.42] — Favicon, meta description, Open Graph card
+
+### Added
+- A proper `<meta name="description">`, a favicon (an inline terminal-
+  cursor icon matching the game's own palette and font — no extra file,
+  the game stays a single HTML file), and Open Graph / Twitter Card tags
+  with a dedicated 1200×630 preview image. Links to the game shared on
+  Telegram, Discord, or social media now show a real title, description,
+  and image instead of a bare URL.
+
 ## [0.41] — Player counter now reads from our own database
 
 ### Changed
