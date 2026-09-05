@@ -5,6 +5,12 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.43] — Code cleanup
+
+No player-facing changes. Trimmed development-process notes out of the
+source's code comments (kept internally instead), so the shipped file
+reads as documentation rather than a dev diary.
+
 ## [0.42] — Favicon, meta description, Open Graph card
 
 ### Added
