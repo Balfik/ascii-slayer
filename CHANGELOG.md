@@ -5,6 +5,17 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.40] — Fix: cursor flickering on every level-up
+
+### Fixed
+- With a modal open (most noticeably the Skill Tree), the mouse cursor
+  would visibly flicker to a "wait" spinner every time you leveled up,
+  because the tree re-renders itself live so newly-affordable skills
+  unlock immediately — and that harmless background re-render was
+  wrongly treated the same as a real click removing a button under the
+  cursor (a separate, legitimate fix for a stuck-hover bug). Background
+  re-renders no longer touch the cursor; only actual clicks do.
+
 ## [0.39] — Fix: log filters were still losing rare messages
 
 ### Fixed

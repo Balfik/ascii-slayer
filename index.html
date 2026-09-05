@@ -521,7 +521,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.39';
+const GAME_VERSION = '0.40';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -4341,7 +4341,33 @@ function forceCursorRefresh(){
   document.body.style.cursor = 'wait';
   requestAnimationFrame(()=>{ document.body.style.cursor = ''; });
 }
-new MutationObserver(forceCursorRefresh).observe(modalBody, {childList:true, subtree:true});
+// modalClickPending: ставиться в true на pointerdown усередині модалки,
+// знімається (спожито) щойно MutationObserver нижче реально скористався
+// ним. НАВМИСНО не скидається на pointerup (на відміну від
+// modalPointerDown вище/нижче, у якого своя, окрема мета) — дія кнопки
+// (Прийняти/Продати/Заточити) міняє DOM на 'click', а 'click' завжди
+// стається ПІСЛЯ pointerup, тож на момент реальної мутації pointerup уже
+// відбувся й будь-який прапорець, що скидається на pointerup, був би вже
+// false.
+//
+// Навіщо це взагалі: MutationObserver нижче раніше смикав курсор
+// (forceCursorRefresh) на КОЖНУ зміну DOM у модалці без розбору — а деякі
+// модалки (Дерево навичок) перемальовують себе повністю ще й у фоні,
+// без жодного кліку, просто щоб кнопки одразу розблокувались при
+// levelUp (див. gainXp(), `if(modalKind==='skills') renderSkillTree();`).
+// На великій швидкості гри рівні можуть іти по кілька на секунду — і
+// курсор помітно "блимав" у стан 'wait' щоразу, гравець це підмітив і
+// повідомив. Фікс лікуємо, а не той рідкісний баг (зникнення кнопки під
+// натисканням), заради якого forceCursorRefresh узагалі існує: смикаємо
+// курсор ЛИШЕ якщо мутація стала наслідком нещодавнього реального
+// натискання в модалці, а не фонового авто-перемальовку.
+let modalClickPending = false;
+modalBody.addEventListener('pointerdown', ()=>{ modalClickPending = true; }, true);
+new MutationObserver(()=>{
+  if(!modalClickPending) return; // фоновий перемальовок (напр. levelUp) — курсор не чіпаємо
+  modalClickPending = false;
+  forceCursorRefresh();
+}).observe(modalBody, {childList:true, subtree:true});
 document.addEventListener('pointerup', forceCursorRefresh, true);
 
 // Той САМИЙ клас багу, що forceCursorRefresh лікує косметично (курсор) —
