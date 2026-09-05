@@ -91,6 +91,7 @@
   #bestiaryBtn{color:var(--text);}
   #bossPortalBtn{color:#ff6b6b;}
   #worldMapHudBtn{color:var(--accent);}
+  #leaderboardBtn{color:var(--crystal);}
   .zone-tag{font-size:11px;padding:1px 6px;border-radius:3px;cursor:pointer;letter-spacing:0.5px;}
   .zone-tag-fixed{color:var(--gold);background:#2a230f;border:1px solid var(--gold);}
   .zone-tag-frontier{color:var(--accent);background:#0f2a1f;border:1px solid var(--accent);}
@@ -346,6 +347,16 @@
   .title-btn.secondary{border-color:var(--border);color:var(--text);}
   .title-btn.secondary:hover{background:#1a1a1a;}
   .title-btn[hidden]{display:none;}
+  .title-nickname{
+    display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:8px;
+    margin:2px 0 16px;font-size:13px;color:var(--dim);
+  }
+  .title-nickname b{color:var(--accent);letter-spacing:.5px;}
+  .title-nickname button{
+    font-family:inherit;font-size:11px;padding:4px 9px;border-radius:4px;cursor:pointer;
+    background:#122417;border:1px solid var(--border);color:var(--text);
+  }
+  .title-nickname button:hover{background:#1a1a1a;}
 </style>
 </head>
 <body>
@@ -354,6 +365,10 @@
   <div class="title-content">
     <h1 class="title-logo">ASCII SLAYER</h1>
     <p class="title-tagline" data-i18n="title.tagline">ASCII-раннер: біжи, бий, качайся, стань легендою</p>
+    <div class="title-nickname">
+      <span data-i18n="title.nicknameLabel">Твій нікнейм:</span> <b id="titleNickname">—</b>
+      <button id="rerollNicknameBtn" type="button" data-i18n="title.rerollBtn">🎲 Перегенерувати</button>
+    </div>
     <div class="title-buttons">
       <button id="continueBtn" class="title-btn" data-i18n="title.continueBtn">▶ Продовжити</button>
       <button id="newGameBtn" class="title-btn secondary" data-i18n="title.newGameBtn">✦ Нова гра</button>
@@ -406,6 +421,7 @@
     <button id="bestiaryBtn" data-i18n="btn.bestiary">📖 Бестіарій</button>
     <button id="bossPortalBtn" data-i18n="btn.bossPortal">👹 Портал Босів</button>
     <button id="worldMapHudBtn" data-i18n="btn.worldMap">🗺 Карта Світу</button>
+    <button id="leaderboardBtn" data-i18n="btn.leaderboard">🌍 Лідерборд</button>
   </div>
   <div id="fightBar"></div>
 
@@ -478,6 +494,10 @@
   </div>
 </div>
 
+<!-- Лідерборд/нікнейми (Supabase) — пінований UMD-білд, версію звірено з
+     data.jsdelivr.com на момент підключення. Якщо colись знадобиться
+     оновити — там само перевірити нову версію перед заміною номера. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0/dist/umd/supabase.js"></script>
 <script>
 (function(){
 "use strict";
@@ -486,7 +506,108 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.34';
+const GAME_VERSION = '0.35';
+
+/* =====================================================================
+   ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
+   запису ВЛАСНОГО рядка гравця (RLS-політики на боці бази вирішують,
+   хто що може писати; publishable-ключ навмисно публічний, це нормально
+   для Supabase, доки RLS увімкнено — і воно увімкнено).
+   ===================================================================== */
+const SUPABASE_URL = 'https://vfaveuenkublhxgatbcn.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_PkeJBe1KSw0ZWUSgcAIZFA_SuG8Ilyo';
+let sbClient = null;
+let sbPlayerId = null;
+let sbReady = false; // true лише після успішного анонімного входу — усі виклики нижче тихо ігнорують себе, поки це false
+function initSupabase(){
+  try{
+    if(!window.supabase || !window.supabase.createClient) return; // CDN не завантажився — гра й далі працює без лідерборду
+    sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }catch(e){ sbClient = null; }
+}
+// Анонімний вхід — стабільний auth.uid(), що переживає перезавантаження
+// сторінки (сесію зберігає сама supabase-js у своєму localStorage-ключі,
+// окремо від SAVE_KEY гри). Саме auth.uid() (не будь-яке значення, яке
+// шле клієнт) RLS-політики звіряють як "чий це рядок" — це не можна
+// підмінити просто відредагувавши локальний стан.
+async function ensureSupabaseSession(){
+  if(!sbClient) return null;
+  try{
+    const got = await sbClient.auth.getSession();
+    let session = got.data && got.data.session;
+    if(!session){
+      const signIn = await sbClient.auth.signInAnonymously();
+      if(signIn.error || !signIn.data.user) return null;
+      sbPlayerId = signIn.data.user.id;
+    } else {
+      sbPlayerId = session.user.id;
+    }
+    sbReady = true;
+    return sbPlayerId;
+  }catch(e){ return null; }
+}
+// Синхронізація власного рядка лідерборду — навмисно НЕ частіше раз на
+// хвилину (див. setInterval у init()) + одразу після помітних подій;
+// сама база додатково блокує оновлення частіше ніж раз на 10с
+// (players_validate тригер) — цей клієнтський троттлінг лише щоб не
+// смітити мережевими запитами й не наштовхуватись на цю відмову дарма.
+async function syncLeaderboard(){
+  if(!sbReady || !sbClient || !sbPlayerId) return;
+  try{
+    await sbClient.from('players').upsert({
+      id: sbPlayerId,
+      nickname: state.nickname,
+      best_level: state.lifetime.bestLevel,
+      prestige_count: state.lifetime.prestigeCount,
+      castle_level: state.castleLevel
+    });
+  }catch(e){ /* мережа/rate-limit — не критично для гри, спробуємо наступного разу */ }
+}
+// Готові фрази для стрічки подій — навмисно НЕ через t()/i18n-ключі: це
+// СПІЛЬНІ дані для всіх гравців (лідерборд бачать усі, незалежно від
+// того, якою мовою грає той, хто задав подію), тож форматуємо рядок ОДРАЗУ
+// мовою автора події в момент, коли вона стається, а не зберігаємо ключ.
+function eventMessage(kind, p){
+  const uk = {
+    level_milestone: `${p.nick} досяг ${p.lvl} рівня!`,
+    boss_defeat: `${p.nick} переміг боса «${p.boss}»!`,
+    enchant_10: `${p.nick} заточив «${p.item}» на +10!`,
+    prestige: `${p.nick} здійснив Переродження (№${p.count})!`,
+    castle_complete: `${p.nick} добудував Замок до кінця!`,
+    game_completed: `${p.nick} переміг Стража Вічності — гру пройдено!`
+  };
+  const en = {
+    level_milestone: `${p.nick} reached level ${p.lvl}!`,
+    boss_defeat: `${p.nick} defeated "${p.boss}"!`,
+    enchant_10: `${p.nick} enchanted "${p.item}" to +10!`,
+    prestige: `${p.nick} performed a Prestige (#${p.count})!`,
+    castle_complete: `${p.nick} finished building the Castle!`,
+    game_completed: `${p.nick} defeated the Guardian of Eternity — the game is complete!`
+  };
+  return (lang==='en' ? en : uk)[kind];
+}
+async function reportEvent(kind, params){
+  if(!sbReady || !sbClient || !sbPlayerId) return;
+  try{
+    await sbClient.from('events').insert({
+      player_id: sbPlayerId, nickname: state.nickname,
+      event_type: kind, message: eventMessage(kind, params)
+    });
+  }catch(e){ /* мережа/rate-limit (не частіше раз на 5с з боку бази) — тихо ігноруємо */ }
+}
+
+// Нікнейм — ЛИШЕ автогенерація (гравець свідомо попросив прибрати ручний
+// ввід тексту, щоб на публічному лідерборді не було місця для образливих
+// слів). Прикметник+іменник, окремі списки під UA/EN.
+const NICKNAME_ADJ_UK = ['Тіньовий','Грозовий','Демонічний','Крижаний','Вогняний','Швидкий','Древній','Забутий','Прокляний','Золотий','Легендарний','Нічний','Кривавий','Залізний','Дикий','Примарний','Безстрашний','Похмурий','Сяючий','Могутній'];
+const NICKNAME_NOUN_UK = ['Мечник','Слеєр','Мандрівник','Ведмідь','Дракон','Вовк','Лицар','Мисливець','Демон','Страж','Воїн','Клинок','Тінь','Привид','Титан','Сокіл','Барон','Чаклун','Розбійник','Легенда'];
+const NICKNAME_ADJ_EN = ['Shadow','Storm','Demonic','Frozen','Blazing','Swift','Ancient','Forgotten','Cursed','Golden','Legendary','Nightly','Bloody','Iron','Feral','Ghostly','Fearless','Grim','Radiant','Mighty'];
+const NICKNAME_NOUN_EN = ['Swordsman','Slayer','Wanderer','Bear','Dragon','Wolf','Knight','Hunter','Demon','Guardian','Warrior','Blade','Shade','Phantom','Titan','Falcon','Baron','Warlock','Rogue','Legend'];
+function generateNickname(){
+  const adjs = lang==='en' ? NICKNAME_ADJ_EN : NICKNAME_ADJ_UK;
+  const nouns = lang==='en' ? NICKNAME_NOUN_EN : NICKNAME_NOUN_UK;
+  return adjs[Math.floor(Math.random()*adjs.length)] + ' ' + nouns[Math.floor(Math.random()*nouns.length)];
+}
 
 /* =====================================================================
    КОНФІГ ГРИДУ РАННЕРА
@@ -601,6 +722,13 @@ const I18N = {
     'touch.up':'Вперед', 'touch.down':'Назад', 'touch.left':'Ліворуч', 'touch.right':'Праворуч',
     'touch.interact':'Взаємодія', 'touch.jump':'Стрибок',
     'footer.visitorCountTitle':'Орієнтовна кількість людей, що коли-небудь відкривали цю сторінку (по одному разу на пристрій)',
+    'title.nicknameLabel':'Твій нікнейм:', 'title.rerollBtn':'🎲 Перегенерувати',
+    'btn.leaderboard':'🌍 Лідерборд', 'modal.leaderboardTitle':'ЛІДЕРБОРД',
+    'leaderboard.loading':'Завантаження…', 'leaderboard.unavailable':'Лідерборд зараз недоступний — спробуй пізніше.',
+    'leaderboard.explain':'Публічний рейтинг усіх гравців ASCII SLAYER — нікнейм генерується автоматично, дані оновлюються самі, поки ти граєш.',
+    'leaderboard.topHeader':'ТОП ГРАВЦІВ', 'leaderboard.empty':'Поки що тут порожньо — стань першим!',
+    'leaderboard.youTag':'(ти)', 'leaderboard.since':'приєднався {time}',
+    'leaderboard.feedHeader':'СТРІЧКА ПОДІЙ', 'leaderboard.feedEmpty':'Поки що подій не було.',
     'world.explain':'Обери регіон — і моби там лишаться саме такими (той самий рівень складності), скільки б ти не бігав, поки сам не оберешся в інший. Дистанція й рівень персонажа ростуть завжди, як завжди — фіксується лише складність мобів у регіоні. Рекомендований рівень — орієнтир: якщо він набагато вищий за твій, той регіон тобі зараз не пройти.',
     'world.farmingTag':'фармиш тут',
     'world.frontier':'Слідувати за прогресом',
@@ -833,6 +961,13 @@ const I18N = {
     'touch.up':'Up', 'touch.down':'Down', 'touch.left':'Left', 'touch.right':'Right',
     'touch.interact':'Interact', 'touch.jump':'Jump',
     'footer.visitorCountTitle':'Rough count of people who have ever opened this page (once per device)',
+    'title.nicknameLabel':'Your nickname:', 'title.rerollBtn':'🎲 Reroll',
+    'btn.leaderboard':'🌍 Leaderboard', 'modal.leaderboardTitle':'LEADERBOARD',
+    'leaderboard.loading':'Loading…', 'leaderboard.unavailable':'The leaderboard is unavailable right now — try again later.',
+    'leaderboard.explain':'A public ranking of every ASCII SLAYER player — your nickname is auto-generated, and your stats update on their own as you play.',
+    'leaderboard.topHeader':'TOP PLAYERS', 'leaderboard.empty':'Nobody here yet — be the first!',
+    'leaderboard.youTag':'(you)', 'leaderboard.since':'joined {time}',
+    'leaderboard.feedHeader':'ACTIVITY FEED', 'leaderboard.feedEmpty':'No events yet.',
     'world.explain':'Pick a region and its monsters stay at that exact difficulty, no matter how long you run, until you pick another one yourself. Distance and character level always keep climbing as usual — only the region\'s monster difficulty gets pinned. Recommended level is a guide: if it\'s far above yours, you can\'t clear that region yet.',
     'world.farmingTag':'farming here',
     'world.frontier':'Follow real progress',
@@ -1568,6 +1703,8 @@ function buildCastleConstruction(){
   sfxLevelUp();
   updateHud();
   save();
+  if(state.castleLevel===CASTLE_MAX_LEVEL) reportEvent('castle_complete', {nick:state.nickname});
+  syncLeaderboard();
   playCastleBuildAnimation(c);
 }
 
@@ -2490,10 +2627,21 @@ function endBossFight(won, retreated){
     state.souls += souls;
     state.lifetime.bossesDefeated = (state.lifetime.bossesDefeated||0) + 1;
     if(!state.lifetime.bossKills) state.lifetime.bossKills = {};
+    const firstKillOfBoss = !state.lifetime.bossKills[boss.id];
     state.lifetime.bossKills[boss.id] = (state.lifetime.bossKills[boss.id]||0)+1;
     gainXp(rw.xp);
     addLog('log.bossWin', 'levelup', {name:L(boss,'name'), gold, souls, xp:rw.xp});
     sfxLevelUp();
+    // Стрічка подій лідерборду: "гру пройдено" пріоритетніше за звичайне
+    // "переміг боса", якщо це якраз той самий момент (фінальний бос,
+    // перша перемога) — events_validate на боці бази однаково відхилив
+    // би другий запис поспіль (раз на 5с), тож просто ніколи не шлемо
+    // обидва.
+    if(result.isEnding){
+      reportEvent('game_completed', {nick:state.nickname});
+    } else if(firstKillOfBoss){
+      reportEvent('boss_defeat', {nick:state.nickname, boss:L(boss,'name')});
+    }
     result.gold = gold; result.souls = souls; result.xp = rw.xp;
     const demonicChance = boss.demonicChance * (hasRelic('hunter_medallion') ? 2 : 1);
     if(Math.random() < demonicChance){
@@ -2939,6 +3087,7 @@ function travelToFrontier(){
    СТАН
    ===================================================================== */
 const state = {
+  nickname:null, // автогенерований на старт-екрані (generateNickname()) — для лідерборду
   level:1, xp:0, gold:0, crystals:0, souls:0, skillPoints:0, skills:{},
   upgrades:{attack:0, speed:0, atkSpeed:0, luck:0},
   inventory:[],
@@ -3223,8 +3372,15 @@ function gainXp(amount){
     sfxLevelUp();
     if(modalKind==='skills') renderSkillTree(); // щоб кнопки одразу розблокувались, якщо модалка відкрита
     checkLevelUnlocks(); // нові регіони на Карті Світу — за досягнутим рівнем, не за дистанцією
+    if(LEVEL_MILESTONE_EVENTS.includes(state.level)){
+      reportEvent('level_milestone', {nick:state.nickname, lvl:state.level});
+    }
   }
 }
+// Пороги, на яких у стрічку подій лідерборду летить "X досяг Y рівня!" —
+// свідомо НЕ кожен рівень (заспамило б стрічку й наштовхнулось би на
+// анти-спам тригер бази, events_validate, не частіше раз на 5с).
+const LEVEL_MILESTONE_EVENTS = [50,100,200,300,500,750,1000,1500,2000,3000,5000,7500,10000];
 
 /* =====================================================================
    ЛУТ
@@ -4173,6 +4329,78 @@ function closeModal(){
   modalBackdrop.hidden = true;
   modalKind = null;
   forceCursorRefresh();
+  unsubscribeLeaderboardRealtime();
+}
+
+/* =====================================================================
+   ЛІДЕРБОРД — читає з Supabase (публічно, без потреби бути залогіненим
+   кимось конкретним — RLS дозволяє SELECT усім). Стрічка подій живо
+   оновлюється через Realtime, поки модалка відкрита (підписка знімається
+   в closeModal(), щоб не текти й не оновлювати закриту модалку).
+   ===================================================================== */
+let leaderboardRealtimeChannel = null;
+function openLeaderboard(){
+  modalKind = 'leaderboard';
+  modalTitle.textContent = t('modal.leaderboardTitle');
+  modalBody.innerHTML = `<div class="empty-msg">${t('leaderboard.loading')}</div>`;
+  modalBackdrop.hidden = false;
+  renderLeaderboard();
+  subscribeLeaderboardRealtime();
+}
+async function renderLeaderboard(){
+  if(!sbClient){
+    modalBody.innerHTML = `<div class="empty-msg">${t('leaderboard.unavailable')}</div>`;
+    return;
+  }
+  try{
+    const [playersRes, eventsRes] = await Promise.all([
+      sbClient.from('players').select('nickname,best_level,prestige_count,castle_level,created_at')
+        .order('best_level', {ascending:false}).limit(50),
+      sbClient.from('events').select('message,created_at').order('created_at', {ascending:false}).limit(30)
+    ]);
+    if(modalKind!=='leaderboard') return; // гравець встиг закрити/відкрити щось інше, поки чекали мережу
+    if(playersRes.error) throw playersRes.error;
+    let html = `<div style="margin:0 0 10px;color:var(--dim);font-size:12px;line-height:1.5;">${t('leaderboard.explain')}</div>`;
+    html += `<div style="margin:0 0 4px;color:var(--purple);font-size:12px;letter-spacing:1px;">${t('leaderboard.topHeader')}</div>`;
+    const rows = playersRes.data||[];
+    if(rows.length===0){
+      html += `<div class="empty-msg">${t('leaderboard.empty')}</div>`;
+    } else {
+      html += rows.map((p,i)=>{
+        const mine = p.nickname===state.nickname;
+        return `<div class="mrow"${mine?' style="background:#152615;"':''}>
+          <div class="up-name">#${i+1} ${p.nickname}${mine?` <span class="lvl">${t('leaderboard.youTag')}</span>`:''}
+            <small>Lv.${formatNum(p.best_level)} · ♻️${formatNum(p.prestige_count)} · 🏰${p.castle_level}/${CASTLE_MAX_LEVEL} · ${t('leaderboard.since',{time:formatAgo(new Date(p.created_at).getTime())})}</small>
+          </div>
+        </div>`;
+      }).join('');
+    }
+    html += `<div style="margin:14px 0 4px;color:var(--purple);font-size:12px;letter-spacing:1px;">${t('leaderboard.feedHeader')}</div>`;
+    const events = eventsRes.data||[];
+    html += events.length===0
+      ? `<div class="empty-msg">${t('leaderboard.feedEmpty')}</div>`
+      : events.map(e=>`<div class="mrow"><div class="up-name">${e.message}<small>${formatAgo(new Date(e.created_at).getTime())}</small></div></div>`).join('');
+    modalBody.innerHTML = html;
+  }catch(e){
+    if(modalKind==='leaderboard') modalBody.innerHTML = `<div class="empty-msg">${t('leaderboard.unavailable')}</div>`;
+  }
+}
+function subscribeLeaderboardRealtime(){
+  unsubscribeLeaderboardRealtime();
+  if(!sbClient) return;
+  try{
+    leaderboardRealtimeChannel = sbClient.channel('public:events')
+      .on('postgres_changes', {event:'INSERT', schema:'public', table:'events'}, ()=>{
+        if(modalKind==='leaderboard') renderLeaderboard();
+      })
+      .subscribe();
+  }catch(e){ leaderboardRealtimeChannel = null; }
+}
+function unsubscribeLeaderboardRealtime(){
+  if(leaderboardRealtimeChannel && sbClient){
+    try{ sbClient.removeChannel(leaderboardRealtimeChannel); }catch(e){}
+  }
+  leaderboardRealtimeChannel = null;
 }
 function itemBadges(it){
   const cnt = (it.count||1) > 1 ? ` <span class="lvl">x${it.count}</span>` : '';
@@ -4513,7 +4741,12 @@ function doPrestige(){
   sfxLevelUp();
   updateHud();
   save();
+  if(PRESTIGE_MILESTONE_EVENTS.includes(state.lifetime.prestigeCount)){
+    reportEvent('prestige', {nick:state.nickname, count:state.lifetime.prestigeCount});
+  }
+  syncLeaderboard();
 }
+const PRESTIGE_MILESTONE_EVENTS = [1,5,10,25,50,100,250,500,1000];
 
 /* =====================================================================
    ЗВАННЯ (за рівнем) + ЛИСТ ПЕРСОНАЖА — RPG-елементи
@@ -4805,11 +5038,13 @@ function enchantItem(id){
   recomputeStats();
   addLog('log.enchanted', 'upgrade', {name:L(it,'name'), level:it.enchant});
   sfxEnchant();
+  if(it.enchant===10) reportEvent('enchant_10', {nick:state.nickname, item:L(it,'name')});
   renderModalBody(); renderInventory(); updateHud(); save();
 }
 function enchantItemMax(id){
   const it = state.inventory.find(x=>String(x.id)===id);
   if(!it) return;
+  const enchantBefore = it.enchant||0;
   const cur = enchantCurrencyOf(it);
   let count = 0;
   const cap = 200000; // ціна росте по експоненті — стільки разів ніколи не спрацює
@@ -4827,6 +5062,9 @@ function enchantItemMax(id){
   recomputeStats();
   addLog('log.enchantedMax', 'upgrade', {name:L(it,'name'), count, level:it.enchant});
   sfxEnchant();
+  // "На всі" може за один клік перескочити ПОНАД +10 — перевіряємо
+  // перетин порогу, а не точну рівність (як у звичайному enchantItem()).
+  if(enchantBefore<10 && it.enchant>=10) reportEvent('enchant_10', {nick:state.nickname, item:L(it,'name')});
   renderModalBody(); renderInventory(); updateHud(); save();
 }
 function sellItem(id){
@@ -5204,10 +5442,15 @@ function buildSaveObject(){
     relics:state.relics, prestigeSkills:state.prestigeSkills, milestonesClaimed:state.milestonesClaimed,
     castleLevel:state.castleLevel, castleResources:state.castleResources,
     distanceCols, zoneTier, upgrades:state.upgrades, inventory:state.inventory,
-    musicVolume, musicMuted, sfxVolume, sfxMuted, musicTrackIndex, lang
+    musicVolume, musicMuted, sfxVolume, sfxMuted, musicTrackIndex, lang,
+    nickname:state.nickname
   };
 }
 function applyLoadedData(d){
+  // Старі збереження (до лідерборду) не мали нікнейму — генеруємо один
+  // назавжди тут, а не щоразу заново, інакше гравець "змінював" би
+  // нікнейм на кожному завантаженні сторінки.
+  state.nickname = (typeof d.nickname==='string' && d.nickname) ? d.nickname : (state.nickname || generateNickname());
   state.level = d.level || 1;
   state.xp = d.xp || 0;
   state.gold = d.gold || 0;
@@ -5530,6 +5773,7 @@ document.getElementById('characterBtn').addEventListener('click', ()=>{ ensureAu
 document.getElementById('bestiaryBtn').addEventListener('click', ()=>{ ensureAudio(); openBestiary(); });
 document.getElementById('bossPortalBtn').addEventListener('click', ()=>{ ensureAudio(); openBossPortal(); });
 document.getElementById('worldMapHudBtn').addEventListener('click', ()=>{ ensureAudio(); openWorldMap(); });
+document.getElementById('leaderboardBtn').addEventListener('click', ()=>{ ensureAudio(); openLeaderboard(); });
 document.getElementById('zoneModeTag').addEventListener('click', ()=>{ ensureAudio(); openWorldMap(); });
 document.getElementById('langBtn').addEventListener('click', ()=>{ ensureAudio(); setLang(lang==='uk'?'en':'uk'); });
 document.getElementById('upgradesBody').addEventListener('click', (e)=>{
@@ -5628,6 +5872,16 @@ function init(){
   setInterval(save, 5000);
   window.addEventListener('beforeunload', save);
   requestAnimationFrame(loop);
+
+  // Лідерборд — повністю "fire and forget": не await'имо тут, щоб мережева
+  // затримка/недоступність Supabase ніколи не затримувала й не ламала
+  // старт самої гри. Кожен виклик усередині сам тихо ковтає помилки.
+  initSupabase();
+  (async()=>{
+    await ensureSupabaseSession();
+    syncLeaderboard();
+  })();
+  setInterval(syncLeaderboard, 60000);
 }
 
 /* =====================================================================
@@ -5665,6 +5919,7 @@ function peekSavedPrefs(){
     if(typeof d.sfxVolume==='number') sfxVolume = d.sfxVolume;
     if(typeof d.sfxMuted==='boolean') sfxMuted = d.sfxMuted;
     if(typeof d.musicTrackIndex==='number') musicTrackIndex = d.musicTrackIndex;
+    if(typeof d.nickname==='string' && d.nickname) state.nickname = d.nickname;
   }catch(e){ /* немає збереження або пошкоджене — лишаємо дефолти */ }
 }
 
@@ -5820,6 +6075,8 @@ function showTitleScreen(){
   applyI18n();
   refreshAudioUi();
   continueBtn.hidden = !hasExistingSave();
+  if(!state.nickname) state.nickname = generateNickname();
+  document.getElementById('titleNickname').textContent = state.nickname;
   titleScreen.hidden = false;
   sizeTitleCanvas();
   titleLastTs = 0;
@@ -5831,6 +6088,13 @@ function hideTitleScreen(){
   titleRafId = null;
 }
 window.addEventListener('resize', ()=>{ if(!titleScreen.hidden) sizeTitleCanvas(); });
+document.getElementById('rerollNicknameBtn').addEventListener('click', ()=>{
+  // Суто в пам'яті, без save()/синхронізації з лідербордом — гравець ще
+  // навіть не почав гру; реальний нікнейм піде на сервер разом із першим
+  // звичайним збереженням, коли він і так відбудеться.
+  state.nickname = generateNickname();
+  document.getElementById('titleNickname').textContent = state.nickname;
+});
 continueBtn.addEventListener('click', ()=>{ hideTitleScreen(); init(); });
 newGameBtn.addEventListener('click', ()=>{
   if(hasExistingSave() && !confirm(t('confirm.newGame'))) return;

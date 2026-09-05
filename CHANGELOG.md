@@ -5,6 +5,19 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.35] — Public leaderboard
+
+### Added
+- **Nicknames.** Auto-generated only (no free-text entry, by design) with
+  a reroll button on the title screen.
+- **Leaderboard** (new "🌍 Leaderboard" button) — the top 50 players by
+  level, plus a live activity feed of milestones ("X reached level 100!",
+  boss kills, +10 enchants, Prestiges, a finished Castle, defeating the
+  final boss) that updates in real time while the screen is open.
+- Backed by a small Postgres database with row-level security: everyone
+  can read the board, but each player can only ever write their own row —
+  enforced server-side, not just trusted from the client.
+
 ## [0.34] — Version number, modal scroll lock
 
 ### Added

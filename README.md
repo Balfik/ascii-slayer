@@ -33,6 +33,9 @@ export/import a save file to move progress between devices or browsers.
   afterwards — there's no reason to stop grinding.
 - **100 achievements**, a full bestiary, milestone tracks, and daily
   login/quest streaks.
+- **Public leaderboard** — an auto-generated nickname (no free-text entry,
+  by design) and a live global leaderboard with a real-time activity feed
+  of other players' milestones, boss kills, and top enchants.
 - **Original soundtrack** — synthwave/retrowave tracks composed for the game,
   streamed from [ascii-slayer-music](https://github.com/Balfik/ascii-slayer-music),
   with in-game music/SFX controls.
