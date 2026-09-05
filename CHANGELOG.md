@@ -5,6 +5,21 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.37] — Log filters, security hardening
+
+### Added
+- The log panel now has six category filter toggles (combat/kills, loot,
+  achievements, quests, bosses, other) so it doesn't flood with kill
+  spam at high speed — turn off what you don't want to see.
+
+### Security
+- Imported save files are now validated before use: an inventory item
+  with an unrecognized rarity is dropped, and item names are always
+  HTML-escaped wherever they're displayed. Previously, a hand-edited and
+  shared save file could have injected arbitrary script into another
+  player's browser when they imported it. Found and fixed proactively;
+  no evidence this was ever exploited.
+
 ## [0.36] — Shorter cooldowns, colorful leaderboard
 
 ### Changed

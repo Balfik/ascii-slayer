@@ -187,6 +187,13 @@
     margin:0 0 8px;font-size:13px;letter-spacing:2px;color:var(--accent);
     border-bottom:1px dashed var(--border);padding-bottom:6px;
   }
+  .log-filters{display:flex;flex-wrap:wrap;gap:4px;margin:2px 0 8px;}
+  .log-filter-btn{
+    font-family:inherit;font-size:13px;line-height:1;padding:3px 7px;border-radius:4px;cursor:pointer;
+    background:#0d150d;border:1px solid var(--border);color:var(--dim);opacity:.4;
+  }
+  .log-filter-btn.active{opacity:1;border-color:var(--accent);}
+  .log-filter-btn:hover{background:#152615;}
   .panel .body{flex:1;overflow-y:auto;max-height:260px;font-size:12.5px;}
   .panel .body::-webkit-scrollbar{width:6px;}
   .panel .body::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
@@ -464,6 +471,14 @@
     </section>
     <section class="panel">
       <h2 data-i18n="panel.log">ЖУРНАЛ</h2>
+      <div class="log-filters">
+        <button class="log-filter-btn active" data-cat="combat" data-i18n-title="log.filter.combat">⚔</button>
+        <button class="log-filter-btn active" data-cat="loot" data-i18n-title="log.filter.loot">💎</button>
+        <button class="log-filter-btn active" data-cat="achievements" data-i18n-title="log.filter.achievements">🏆</button>
+        <button class="log-filter-btn active" data-cat="quests" data-i18n-title="log.filter.quests">📜</button>
+        <button class="log-filter-btn active" data-cat="bosses" data-i18n-title="log.filter.bosses">👹</button>
+        <button class="log-filter-btn active" data-cat="other" data-i18n-title="log.filter.other">⚙</button>
+      </div>
       <div class="body" id="logBody"></div>
     </section>
   </div>
@@ -506,7 +521,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.36';
+const GAME_VERSION = '0.37';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -854,6 +869,10 @@ const I18N = {
     'log.questReward':'📜 Нагорода отримана: +{gold}$ +{crystals}◆ +{xp} досвіду',
     'log.questFull':'Можна мати не більше {max} активних квестів одночасно',
     'log.empty':'…',
+    'log.allFiltered':'Усі категорії журналу вимкнено — увімкни хоч одну вище.',
+    'log.filter.combat':'Бій і вбивства', 'log.filter.loot':'Знахідки/лут',
+    'log.filter.achievements':'Досягнення й рівні', 'log.filter.quests':'Квести',
+    'log.filter.bosses':'Боси й Гаунтлет', 'log.filter.other':'Інше (крамниця, система тощо)',
     'title.tagline':'ASCII-раннер: біжи, бий, качайся, стань легендою',
     'title.continueBtn':'▶ Продовжити',
     'title.newGameBtn':'✦ Нова гра',
@@ -1094,6 +1113,10 @@ const I18N = {
     'log.questReward':'📜 Reward claimed: +{gold}$ +{crystals}◆ +{xp} XP',
     'log.questFull':'You can have at most {max} active quests at once',
     'log.empty':'…',
+    'log.allFiltered':'Every log category is off — turn at least one back on above.',
+    'log.filter.combat':'Combat & kills', 'log.filter.loot':'Loot/finds',
+    'log.filter.achievements':'Achievements & levels', 'log.filter.quests':'Quests',
+    'log.filter.bosses':'Bosses & Gauntlet', 'log.filter.other':'Other (shop, system, etc.)',
     'title.tagline':'An ASCII runner: run, fight, level up, become a legend',
     'title.continueBtn':'▶ Continue',
     'title.newGameBtn':'✦ New Game',
@@ -1204,12 +1227,22 @@ const I18N = {
     'log.loginStreak':'🔥 Login streak: {streak} day(s) in a row — reward +{gold}$ +{crystals}◆',
   }
 };
+// escapeHtml(params[k]) тут — НЕ про переклад, а про безпеку: t() —
+// ЄДИНА точка, через яку практично весь текст гри (включно з журналом,
+// addLog({name:L(it,'name'), ...})) потрапляє в innerHTML. Значення
+// параметрів здебільшого свої (числа, назви з фіксованих пулів), АЛЕ
+// назва предмета в інвентарі йде із save-файлу, який можна вручну
+// відредагувати й ПОДІЛИТИСЬ ним з іншим гравцем — без екранування тут
+// зловмисний "name":"<img src=x onerror=...>" виконав би довільний JS
+// у БРАУЗЕРІ ТОГО, ХТО ІМПОРТУЄ такий файл (де тепер ще й лежить токен
+// сесії лідерборду). Екранування тут закриває цю діру одразу для
+// геть усіх t()-викликів, а не лише для тих, що йдуть від інвентаря.
 function t(key, params){
   const dict = I18N[lang] || I18N.uk;
   let str = dict[key];
   if(str==null) str = (I18N.uk[key]!=null ? I18N.uk[key] : key);
   if(params){
-    for(const k in params) str = str.split('{'+k+'}').join(params[k]);
+    for(const k in params) str = str.split('{'+k+'}').join(escapeHtml(params[k]));
   }
   return str;
 }
@@ -3115,7 +3148,13 @@ const state = {
   quests:{ offers:[], active:[], history:[], refreshesLeft:3, refreshDate:null, daily:null },
   bossCooldowns:{}, // bossId -> timestamp (мс), коли знову можна атакувати
   gauntletCooldown:0, // timestamp (мс), коли знову можна почати Гаунтлет
-  settings:{ autoRetreatBoss:false }, // налаштування QoL, не lifetime-статистика
+  // налаштування QoL, не lifetime-статистика. logFilters — дефолт для
+  // ЗОВСІМ нового гравця (ще до першого loadLocal()) — applyLoadedData()
+  // перезбирає це ж поле безпечно при реальному завантаженні, але цей
+  // початковий літерал теж мусить мати всі поля, бо loadLocal() може
+  // взагалі не викликати applyLoadedData() (немає збереження, або
+  // localStorage недоступний) — тоді саме цей дефолт і лишається.
+  settings:{ autoRetreatBoss:false, logFilters:{combat:true, loot:true, achievements:true, quests:true, bosses:true, other:true} },
   relics:{}, // relicId -> true; переживає Переродження, як і achievements/milestonesClaimed
   prestigeSkills:{}, // prestigeTreeNodeId -> рівень; НЕ скидається Переродженням (на відміну від skills)
   milestonesClaimed:{}, // milestoneKey -> true; переживає Переродження, як achievements
@@ -4460,7 +4499,7 @@ function renderModalBody(){
         : `<span class="cost-g">${t('forge.enchantCol',{cost:formatNum(cost)})}</span>`;
       const costTitle = isDemonic ? `${formatExact(cost)}👹` : `${formatExact(cost)}$`;
       return `<div class="mrow stack rar-${it.rarity}">
-        <div class="up-name"><span style="color:${rarityColor(it.rarity)}">${L(it,'name')}</span>${itemBadges(it)}
+        <div class="up-name"><span style="color:${rarityColor(it.rarity)}">${escapeHtml(L(it,'name'))}</span>${itemBadges(it)}
           <small>${statLabelOf(it.stat)} ${effectiveVal(it).toFixed(2)}${it.stat==='goldPct'?'%':''} · ${rarityLabel(it.rarity)}</small>
         </div>
         <span class="buy-group">
@@ -4516,7 +4555,7 @@ function renderShop(){
           ? `<span class="empty-msg" title="${t('shop.notSellableTitle')}">🔒 ${t('shop.notSellable')}</span>`
           : `<button class="buy" data-action="sell" data-id="${it.id}" title="${formatExact(price)}$"><span class="cost-g">${t('shop.sellBtn',{price:formatNum(price)})}</span></button>`;
         return `<div class="mrow rar-${it.rarity}">
-          <div class="up-name"><span style="color:${rarityColor(it.rarity)}">${L(it,'name')}</span>${itemBadges(it)}
+          <div class="up-name"><span style="color:${rarityColor(it.rarity)}">${escapeHtml(L(it,'name'))}</span>${itemBadges(it)}
             <small>${statLabelOf(it.stat)} ${effectiveVal(it).toFixed(2)}${it.stat==='goldPct'?'%':''} · ${rarityLabel(it.rarity)}</small>
           </div>
           ${actionHtml}
@@ -5450,7 +5489,7 @@ function renderInventory(){
     const cntTxt = (it.count||1) > 1 ? ` <span style="color:var(--accent)">x${it.count}</span>` : '';
     const ench = it.enchant ? ` · ⚒+${it.enchant}` : '';
     return `<div class="inv-item rar-${it.rarity}">
-      <span class="nm" style="color:${rarityColor(it.rarity)}">${L(it,'name')}${cntTxt}</span>
+      <span class="nm" style="color:${rarityColor(it.rarity)}">${escapeHtml(L(it,'name'))}${cntTxt}</span>
       <span class="bn">${statLabelOf(it.stat)} ${valTxt} · ${rarityLabel(it.rarity)}${ench}</span>
     </div>`;
   }).join('');
@@ -5458,17 +5497,42 @@ function renderInventory(){
 
 const LOG_MAX = 40;
 let logEntries = [];
+// Категорія для ФІЛЬТРАЦІЇ (чекбокси над журналом) — НАВМИСНО окремо від
+// `type` (те визначає лише колір рамки рядка, вже давно так). Гравець
+// попросив: на високих швидкостях "Вбито: X" (combat) заливає журнал —
+// категорії дають змогу вимкнути саме спам-категорії, лишивши рідкісні
+// важливі повідомлення (досягнення, боси, квести). Ключ, якого нема в
+// мапі, тихо падає в 'other' (типово увімкнена) — новий log.* ключ у
+// майбутньому просто не зламає фільтр, і додати його в правильну
+// категорію можна окремо, коли буде час.
+const LOG_CATEGORY = {
+  'log.kill':'combat', 'log.encounter':'combat', 'log.pitFall':'combat',
+  'log.itemFound':'loot', 'log.itemDuplicate':'loot', 'log.legendaryFound':'loot',
+  'log.bossWinDemonic':'loot', 'log.relicFound':'loot',
+  'log.achievement':'achievements', 'log.milestoneReached':'achievements',
+  'log.loginStreak':'achievements', 'log.levelUp':'achievements', 'region.newBiome':'achievements',
+  'log.questAccepted':'quests', 'log.questFull':'quests', 'log.questReady':'quests',
+  'log.questRefreshEmpty':'quests', 'log.questRefreshed':'quests', 'log.questReward':'quests',
+  'log.bossAttempt':'bosses', 'log.bossLocked':'bosses', 'log.bossLose':'bosses',
+  'log.bossOnCooldown':'bosses', 'log.bossRetreat':'bosses', 'log.bossWin':'bosses',
+  'log.gauntletEnd':'bosses', 'log.gauntletLocked':'bosses', 'log.gauntletOnCooldown':'bosses',
+  'log.gauntletStart':'bosses'
+};
+function logCategoryOf(key){ return LOG_CATEGORY[key] || 'other'; }
 // addLog зберігає КЛЮЧ перекладу + параметри (не готовий текст) — так при
 // перемиканні мови вся історія журналу миттєво перекладається наново.
 function addLog(key, type, params){
-  logEntries.unshift({key, params, type, ts:Date.now()});
+  logEntries.unshift({key, params, type, category:logCategoryOf(key), ts:Date.now()});
   if(logEntries.length>LOG_MAX) logEntries.length = LOG_MAX;
   renderLog();
 }
 function renderLog(){
   const el = document.getElementById('logBody');
+  const filters = state.settings.logFilters;
+  const visible = logEntries.filter(le=>filters[le.category]!==false);
   if(logEntries.length===0){ el.innerHTML = `<div class="empty-msg">${t('log.empty')}</div>`; return; }
-  el.innerHTML = logEntries.map(le=>`<div class="log-row log-${le.type}"><span class="nm">${t(le.key, le.params)}</span></div>`).join('');
+  if(visible.length===0){ el.innerHTML = `<div class="empty-msg">${t('log.allFiltered')}</div>`; return; }
+  el.innerHTML = visible.map(le=>`<div class="log-row log-${le.type}"><span class="nm">${t(le.key, le.params)}</span></div>`).join('');
 }
 
 /* =====================================================================
@@ -5514,7 +5578,23 @@ function applyLoadedData(d){
   distanceCols = d.distanceCols || 0;
   zoneTier = (typeof d.zoneTier==='number') ? d.zoneTier : null;
   state.upgrades = Object.assign({attack:0,speed:0,atkSpeed:0,luck:0}, d.upgrades||{});
-  state.inventory = Array.isArray(d.inventory) ? d.inventory : [];
+  // Захист від зловмисно відредагованого save-файлу (гравець явно попросив
+  // перевірити код на такі діри): rarity/name раніше йшли ПРЯМО в
+  // innerHTML без жодної перевірки (rarity — навіть у CSS class="rar-
+  // ${it.rarity}") у Кузні/Крамниці/Інвентарі. Сам по собі "чіт власного
+  // save-файлу" нікому не шкодить (це той самий гравець), АЛЕ файл
+  // збереження можна ЕКСПОРТУВАТИ Й ПОДІЛИТИСЬ НИМ — тобто інший гравець,
+  // що імпортує чужий файл із зловмисно вписаним rarity/name (напр.
+  // `"rarity":"x\"><img src=x onerror=...>"`), виконав би довільний JS у
+  // СВОЄМУ браузері (де тепер ще й лежить токен сесії лідерборду). Фікс:
+  // невідома rarity — відкидаємо предмет цілком (він однаково зламав би
+  // RARITY_COLOR/SELL_PRICE lookup далі по коду); name/name_en рендеряться
+  // тепер через escapeHtml() у Кузні/Крамниці/Інвентарі (нижче) — друга,
+  // незалежна лінія захисту, на випадок, якби якийсь інший рендер
+  // забув про валідацію.
+  const VALID_RARITIES = new Set(['common','uncommon','rare','epic','legendary','demonic']);
+  state.inventory = (Array.isArray(d.inventory) ? d.inventory : [])
+    .filter(it=>it && typeof it==='object' && VALID_RARITIES.has(it.rarity) && typeof it.name==='string');
   state.inventory.forEach(it=>{
     if(it.enchant==null) it.enchant = 0;
     if(it.count==null) it.count = 1;
@@ -5568,7 +5648,18 @@ function applyLoadedData(d){
   state.bossCooldowns = (d.bossCooldowns && typeof d.bossCooldowns==='object') ? d.bossCooldowns : {};
   state.gauntletCooldown = typeof d.gauntletCooldown==='number' ? d.gauntletCooldown : 0;
   const ds = (d.settings && typeof d.settings==='object') ? d.settings : {};
-  state.settings = { autoRetreatBoss: !!ds.autoRetreatBoss };
+  // !==false (не !!) — щоб СТАРІ збереження (без цього поля взагалі) і
+  // МАЙБУТНІ нові категорії (яких тут ще нема) за замовчуванням лишались
+  // увімкненими, а вимкненою категорія ставала лише якщо гравець сам
+  // явно її вимкнув (тоді збережеться реальне false).
+  const dlf = (ds.logFilters && typeof ds.logFilters==='object') ? ds.logFilters : {};
+  state.settings = {
+    autoRetreatBoss: !!ds.autoRetreatBoss,
+    logFilters: {
+      combat: dlf.combat!==false, loot: dlf.loot!==false, achievements: dlf.achievements!==false,
+      quests: dlf.quests!==false, bosses: dlf.bosses!==false, other: dlf.other!==false
+    }
+  };
   state.relics = (d.relics && typeof d.relics==='object') ? d.relics : {};
   state.prestigeSkills = (d.prestigeSkills && typeof d.prestigeSkills==='object') ? d.prestigeSkills : {};
   state.milestonesClaimed = (d.milestonesClaimed && typeof d.milestonesClaimed==='object') ? d.milestonesClaimed : {};
@@ -5822,6 +5913,24 @@ document.getElementById('bestiaryBtn').addEventListener('click', ()=>{ ensureAud
 document.getElementById('bossPortalBtn').addEventListener('click', ()=>{ ensureAudio(); openBossPortal(); });
 document.getElementById('worldMapHudBtn').addEventListener('click', ()=>{ ensureAudio(); openWorldMap(); });
 document.getElementById('leaderboardBtn').addEventListener('click', ()=>{ ensureAudio(); openLeaderboard(); });
+document.querySelectorAll('.log-filter-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const cat = btn.dataset.cat;
+    state.settings.logFilters[cat] = !state.settings.logFilters[cat];
+    btn.classList.toggle('active', state.settings.logFilters[cat]);
+    renderLog();
+    save();
+  });
+});
+// Синхронізує клас .active кнопок-фільтрів із завантаженим станом —
+// потрібно викликати одразу після loadLocal()/applyLoadedData() в
+// init(), інакше гравець, що раніше вимкнув якусь категорію, побачить
+// кнопку "увімкненою" на вигляд, хоча реально фільтр вимкнений.
+function syncLogFilterButtons(){
+  document.querySelectorAll('.log-filter-btn').forEach(btn=>{
+    btn.classList.toggle('active', state.settings.logFilters[btn.dataset.cat]!==false);
+  });
+}
 document.getElementById('zoneModeTag').addEventListener('click', ()=>{ ensureAudio(); openWorldMap(); });
 document.getElementById('langBtn').addEventListener('click', ()=>{ ensureAudio(); setLang(lang==='uk'?'en':'uk'); });
 document.getElementById('upgradesBody').addEventListener('click', (e)=>{
@@ -5916,6 +6025,7 @@ function init(){
   renderUpgrades();
   renderInventory();
   renderQuestLog();
+  syncLogFilterButtons();
   addLog('log.gameStart', 'kill');
   setInterval(save, 5000);
   window.addEventListener('beforeunload', save);
