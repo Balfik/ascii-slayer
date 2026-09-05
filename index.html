@@ -27,6 +27,13 @@
 <meta name="twitter:title" content="ASCII SLAYER" />
 <meta name="twitter:description" content="Free browser idle-runner: auto-battle, build a castle by hand, fight scaling bosses, and climb a live public leaderboard. No install — just open and play." />
 <meta name="twitter:image" content="https://balfik.github.io/ascii-slayer/og-image.png" />
+<!-- PWA — manifest.json/sw.js/icon-*.png живуть окремими файлами поряд
+     із index.html у публічному репозиторії (як і og-image.png вище);
+     локально через file:// їх просто нема — посилання на manifest тихо
+     ігнорується браузером, реєстрація service worker'а нижче обгорнута
+     в перевірку й catch. Ніщо з цього не потрібне для роботи самої гри. -->
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0a0f0a" />
 <style>
   :root{
     --bg:#0a0f0a;
@@ -541,7 +548,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.43';
+const GAME_VERSION = '0.44';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -780,6 +787,7 @@ const I18N = {
     'leaderboard.topHeader':'ТОП ГРАВЦІВ', 'leaderboard.empty':'Поки що тут порожньо — стань першим!',
     'leaderboard.youTag':'(ти)', 'leaderboard.since':'приєднався {time}',
     'leaderboard.feedHeader':'СТРІЧКА ПОДІЙ', 'leaderboard.feedEmpty':'Поки що подій не було.',
+    'leaderboard.yourRankHeader':'ТВОЯ ПОЗИЦІЯ', 'leaderboard.rankOf':'#{rank} з {total}', 'leaderboard.rankOnly':'#{rank}',
     'world.explain':'Обери регіон — і моби там лишаться саме такими (той самий рівень складності), скільки б ти не бігав, поки сам не оберешся в інший. Дистанція й рівень персонажа ростуть завжди, як завжди — фіксується лише складність мобів у регіоні. Рекомендований рівень — орієнтир: якщо він набагато вищий за твій, той регіон тобі зараз не пройти.',
     'world.farmingTag':'фармиш тут',
     'world.frontier':'Слідувати за прогресом',
@@ -982,6 +990,14 @@ const I18N = {
     'char.jumpDuration':'Тривалість стрибка', 'char.pickupReach':'Радіус збору',
     'char.setsHeader':'КОМПЛЕКТИ', 'char.setsPieces':'предметів', 'char.setsBonusActive':'бонус +{pct}% активний',
     'char.relicsHeader':'РЕЛІКВІЇ', 'char.relicUndiscovered':'Ще не здобута',
+    'char.themesHeader':'ТЕМИ', 'char.themeActive':'Активна', 'char.themeSelect':'Обрати',
+    'theme.default.name':'Термінал', 'theme.default.desc':'Класична зелена палітра — завжди доступна.',
+    'theme.blood.name':'Кривава', 'theme.blood.desc':'Розблоковано за перемогу над Стражем Вічності.',
+    'theme.blood.hint':'Здолай Стража Вічності, щоб розблокувати',
+    'theme.arcane.name':'Загадкова', 'theme.arcane.desc':'Розблоковано за повний Бестіарій (усі монстри й боси).',
+    'theme.arcane.hint':'Заповни Бестіарій повністю, щоб розблокувати',
+    'theme.crystal.name':'Кришталева', 'theme.crystal.desc':'Розблоковано за всі 100/100 досягнень.',
+    'theme.crystal.hint':'Здобудь усі досягнення, щоб розблокувати',
     'char.relicsExplain':'Випадають з невеликим шансом (5%) за перемогу над босом (👹 Портал Босів) або за повністю зачищений Гаунтлет — кожна реліквія унікальна, здобувається лише раз.',
     'modal.bestiaryTitle':'БЕСТІАРІЙ', 'bestiary.tabMonsters':'Монстри', 'bestiary.tabBosses':'Боси', 'bestiary.tabRecords':'Рекорди', 'bestiary.tabMilestones':'Віхи',
     'modal.castleTitle':'ЗАМОК', 'castle.levelLine':'Рівень {lvl} / {max}',
@@ -1024,6 +1040,7 @@ const I18N = {
     'leaderboard.topHeader':'TOP PLAYERS', 'leaderboard.empty':'Nobody here yet — be the first!',
     'leaderboard.youTag':'(you)', 'leaderboard.since':'joined {time}',
     'leaderboard.feedHeader':'ACTIVITY FEED', 'leaderboard.feedEmpty':'No events yet.',
+    'leaderboard.yourRankHeader':'YOUR RANK', 'leaderboard.rankOf':'#{rank} of {total}', 'leaderboard.rankOnly':'#{rank}',
     'world.explain':'Pick a region and its monsters stay at that exact difficulty, no matter how long you run, until you pick another one yourself. Distance and character level always keep climbing as usual — only the region\'s monster difficulty gets pinned. Recommended level is a guide: if it\'s far above yours, you can\'t clear that region yet.',
     'world.farmingTag':'farming here',
     'world.frontier':'Follow real progress',
@@ -1226,6 +1243,14 @@ const I18N = {
     'char.jumpDuration':'Jump Duration', 'char.pickupReach':'Pickup Radius',
     'char.setsHeader':'SETS', 'char.setsPieces':'items', 'char.setsBonusActive':'+{pct}% bonus active',
     'char.relicsHeader':'RELICS', 'char.relicUndiscovered':'Not yet obtained',
+    'char.themesHeader':'THEMES', 'char.themeActive':'Active', 'char.themeSelect':'Select',
+    'theme.default.name':'Terminal', 'theme.default.desc':'The classic green palette — always available.',
+    'theme.blood.name':'Blood', 'theme.blood.desc':'Unlocked by defeating the Guardian of Eternity.',
+    'theme.blood.hint':'Defeat the Guardian of Eternity to unlock',
+    'theme.arcane.name':'Arcane', 'theme.arcane.desc':'Unlocked by completing the Bestiary (every monster and boss).',
+    'theme.arcane.hint':'Fill out the entire Bestiary to unlock',
+    'theme.crystal.name':'Crystal', 'theme.crystal.desc':'Unlocked by earning all 100/100 achievements.',
+    'theme.crystal.hint':'Earn every achievement to unlock',
     'char.relicsExplain':'Drop with a small chance (5%) from defeating a boss (👹 Boss Portal) or from a fully-cleared Gauntlet run — each relic is unique, obtainable only once.',
     'modal.bestiaryTitle':'BESTIARY', 'bestiary.tabMonsters':'Monsters', 'bestiary.tabBosses':'Bosses', 'bestiary.tabRecords':'Records', 'bestiary.tabMilestones':'Milestones',
     'modal.castleTitle':'CASTLE', 'castle.levelLine':'Level {lvl} / {max}',
@@ -3182,7 +3207,7 @@ const state = {
   // початковий літерал теж мусить мати всі поля, бо loadLocal() може
   // взагалі не викликати applyLoadedData() (немає збереження, або
   // localStorage недоступний) — тоді саме цей дефолт і лишається.
-  settings:{ autoRetreatBoss:false, logFilters:{combat:true, loot:true, achievements:true, quests:true, bosses:true, other:true} },
+  settings:{ autoRetreatBoss:false, logFilters:{combat:true, loot:true, achievements:true, quests:true, bosses:true, other:true}, theme:'default' },
   relics:{}, // relicId -> true; переживає Переродження, як і achievements/milestonesClaimed
   prestigeSkills:{}, // prestigeTreeNodeId -> рівень; НЕ скидається Переродженням (на відміну від skills)
   milestonesClaimed:{}, // milestoneKey -> true; переживає Переродження, як achievements
@@ -4460,37 +4485,81 @@ function openLeaderboard(){
   renderLeaderboard();
   subscribeLeaderboardRealtime();
 }
+// Рендер одного рядка лідерборду — той самий вигляд і для топ-50, і для
+// рядків "твоєї позиції" нижче, щоб обидва блоки виглядали однаково.
+function leaderboardRowHtml(rank, p, mine){
+  const name = mine ? `${nickSpan(state.nickname)} <span class="lvl">${t('leaderboard.youTag')}</span>` : nickSpan(p.nickname);
+  const bestLevel = mine ? state.lifetime.bestLevel : p.best_level;
+  const prestigeCount = mine ? state.lifetime.prestigeCount : p.prestige_count;
+  const castleLevel = mine ? state.castleLevel : p.castle_level;
+  const since = (!mine && p.created_at) ? ` · ${t('leaderboard.since',{time:formatAgo(new Date(p.created_at).getTime())})}` : '';
+  return `<div class="mrow"${mine?' style="background:#152615;"':''}>
+    <div class="up-name">#${rank} ${name}
+      <small>Lv.${formatNum(bestLevel)} · ♻️${formatNum(prestigeCount)} · 🏰${castleLevel}/${CASTLE_MAX_LEVEL}${since}</small>
+    </div>
+  </div>`;
+}
+// Блок "Твоя позиція" — окремо від топ-50, показуємо тільки якщо гравця
+// НЕМА серед топ-50 (інакше він уже й так там видно, дублювати нема сенсу).
+// Замість одного важкого запиту "дай мені весь рейтинг і знайди мене в
+// ньому" (не масштабується — гравців може стати тисячі) беремо РІВНО
+// стільки, скільки треба показати: точний ранг через count-запит (players
+// із best_level СУВОРО більшим за мій, +1), і по 3 найближчих сусіди зверху
+// й знизу — 3 легкі запити замість одного важкого.
+async function fetchNearbyRank(){
+  const myLevel = state.lifetime.bestLevel;
+  const [rankRes, aboveRes, belowRes] = await Promise.all([
+    sbClient.from('players').select('id', {count:'exact', head:true}).gt('best_level', myLevel),
+    sbClient.from('players').select('nickname,best_level,prestige_count,castle_level,created_at')
+      .gt('best_level', myLevel).order('best_level', {ascending:true}).limit(3),
+    sbClient.from('players').select('nickname,best_level,prestige_count,castle_level,created_at')
+      .lt('best_level', myLevel).order('best_level', {ascending:false}).limit(3)
+  ]);
+  if(rankRes.error || aboveRes.error || belowRes.error) return null;
+  const myRank = (rankRes.count||0) + 1;
+  const above = (aboveRes.data||[]).slice().reverse(); // найдальший зверху → найближчий, як на екрані
+  const below = belowRes.data||[];
+  return {myRank, above, below};
+}
+function renderNearbyRankHtml(nearby){
+  const {myRank, above, below} = nearby;
+  let cachedTotal = null;
+  try{ cachedTotal = localStorage.getItem(PLAYER_COUNT_CACHE_KEY); }catch(e){}
+  const rankLabel = cachedTotal ? t('leaderboard.rankOf',{rank:myRank, total:cachedTotal}) : t('leaderboard.rankOnly',{rank:myRank});
+  let html = `<div style="margin:14px 0 4px;color:var(--purple);font-size:12px;letter-spacing:1px;">${t('leaderboard.yourRankHeader')} — ${rankLabel}</div>`;
+  above.forEach((p,i)=>{ html += leaderboardRowHtml(myRank-(above.length-i), p, false); });
+  html += leaderboardRowHtml(myRank, null, true);
+  below.forEach((p,i)=>{ html += leaderboardRowHtml(myRank+1+i, p, false); });
+  return html;
+}
 async function renderLeaderboard(){
   if(!sbClient){
     modalBody.innerHTML = `<div class="empty-msg">${t('leaderboard.unavailable')}</div>`;
     return;
   }
   try{
-    const [playersRes, eventsRes] = await Promise.all([
-      sbClient.from('players').select('nickname,best_level,prestige_count,castle_level,created_at')
+    const wantNearby = sbReady && sbPlayerId;
+    const [playersRes, eventsRes, nearby] = await Promise.all([
+      sbClient.from('players').select('id,nickname,best_level,prestige_count,castle_level,created_at')
         .order('best_level', {ascending:false}).limit(50),
       // Стрічка й так обмежена в базі (events_prune лишає не більше 500
       // записів загалом) — тут беремо ще менше, останні 30, для показу.
       sbClient.from('events').select('nickname,event_type,target_name,target_rarity,value,created_at')
-        .order('created_at', {ascending:false}).limit(30)
+        .order('created_at', {ascending:false}).limit(30),
+      wantNearby ? fetchNearbyRank().catch(()=>null) : Promise.resolve(null)
     ]);
     if(modalKind!=='leaderboard') return; // гравець встиг закрити/відкрити щось інше, поки чекали мережу
     if(playersRes.error) throw playersRes.error;
     let html = `<div style="margin:0 0 10px;color:var(--dim);font-size:12px;line-height:1.5;">${t('leaderboard.explain')}</div>`;
     html += `<div style="margin:0 0 4px;color:var(--purple);font-size:12px;letter-spacing:1px;">${t('leaderboard.topHeader')}</div>`;
     const rows = playersRes.data||[];
+    const amInTop50 = sbPlayerId && rows.some(p=>p.id===sbPlayerId);
     if(rows.length===0){
       html += `<div class="empty-msg">${t('leaderboard.empty')}</div>`;
     } else {
-      html += rows.map((p,i)=>{
-        const mine = p.nickname===state.nickname;
-        return `<div class="mrow"${mine?' style="background:#152615;"':''}>
-          <div class="up-name">#${i+1} ${nickSpan(p.nickname)}${mine?` <span class="lvl">${t('leaderboard.youTag')}</span>`:''}
-            <small>Lv.${formatNum(p.best_level)} · ♻️${formatNum(p.prestige_count)} · 🏰${p.castle_level}/${CASTLE_MAX_LEVEL} · ${t('leaderboard.since',{time:formatAgo(new Date(p.created_at).getTime())})}</small>
-          </div>
-        </div>`;
-      }).join('');
+      html += rows.map((p,i)=>leaderboardRowHtml(i+1, p, p.id===sbPlayerId)).join('');
     }
+    if(nearby && !amInTop50) html += renderNearbyRankHtml(nearby);
     html += `<div style="margin:14px 0 4px;color:var(--purple);font-size:12px;letter-spacing:1px;">${t('leaderboard.feedHeader')}</div>`;
     const events = eventsRes.data||[];
     html += events.length===0
@@ -4906,6 +4975,46 @@ function getRankTitle(level){
   for(const r of RANK_TITLES){ if(level>=r.level) best=r; else break; }
   return best;
 }
+/* =====================================================================
+   КОСМЕТИЧНІ ТЕМИ — суто візуальні, розблоковуються за реальні тривалі
+   досягнення (не купуються). Перевизначають ЛИШЕ "нейтральні" CSS-змінні
+   (--bg/--panel/--border/--text/--dim/--accent/--crystal/--purple) — НЕ
+   чіпають --gold/--danger/--legendary/--demonic: ті мають фіксоване
+   смислове значення (колір рідкості предмета, попередження) в усій грі
+   й мають лишатись однаковими незалежно від обраної теми.
+   ===================================================================== */
+const THEME_VARS = ['--bg','--panel','--border','--text','--dim','--accent','--crystal','--purple'];
+function bestiaryComplete(){
+  const mk = state.lifetime.monsterKills||{};
+  const bk = state.lifetime.bossKills||{};
+  return MONSTER_TYPES.every(m=>(mk[m.key]||0)>0) && BOSS_TIERS.every(b=>(bk[b.id]||0)>0);
+}
+const THEMES = [
+  {id:'default', swatch:'#4dffb8', vars:null, unlockCheck:()=>true},
+  {id:'blood', swatch:'#ff4d4d', unlockCheck:()=>!!state.lifetime.gameCompleted,
+    vars:{'--bg':'#100505','--panel':'#170707','--border':'#4a1f1f','--text':'#ffd6d6','--dim':'#a06868','--accent':'#ff4d4d','--crystal':'#ff8f6b','--purple':'#ff6b9d'}},
+  {id:'arcane', swatch:'#c77dff', unlockCheck:bestiaryComplete,
+    vars:{'--bg':'#0a0714','--panel':'#100b1e','--border':'#3d2a54','--text':'#e0d4ff','--dim':'#9080b0','--accent':'#c77dff','--crystal':'#4dd2ff','--purple':'#ff7dc7'}},
+  {id:'crystal', swatch:'#4dd2ff', unlockCheck:()=>ACHIEVEMENTS.every(a=>state.achievements[a.id]),
+    vars:{'--bg':'#050a10','--panel':'#081018','--border':'#1f3a4a','--text':'#d4f0ff','--dim':'#6f8fa0','--accent':'#4dd2ff','--crystal':'#8ff0ff','--purple':'#7db8ff'}}
+];
+function themeUnlocked(id){
+  const th = THEMES.find(th=>th.id===id);
+  return !!th && th.unlockCheck();
+}
+function applyTheme(id){
+  const th = THEMES.find(th=>th.id===id) || THEMES[0];
+  const root = document.documentElement;
+  THEME_VARS.forEach(v=>root.style.removeProperty(v));
+  if(th.vars){ for(const v in th.vars) root.style.setProperty(v, th.vars[v]); }
+}
+function selectTheme(id){
+  if(!themeUnlocked(id)) return; // не можна вибрати нерозблоковану тему навіть підробленим кліком
+  state.settings.theme = id;
+  applyTheme(id);
+  renderCharacterSheet();
+  save();
+}
 function openCharacterSheet(){
   modalKind = 'character';
   modalTitle.textContent = t('modal.characterTitle');
@@ -4962,6 +5071,18 @@ function renderCharacterSheet(){
         <span style="margin-left:6px;">${owned?L(r,'name'):'???'}</span>
         <small>${owned?L(r,'desc'):t('char.relicUndiscovered')}</small>
       </div>
+    </div>`;
+  }).join('');
+
+  html += `<div style="margin:14px 0 4px;color:var(--purple);font-size:12px;letter-spacing:1px;">${t('char.themesHeader')}</div>`;
+  html += THEMES.map(th=>{
+    const unlocked = th.unlockCheck();
+    const active = (state.settings.theme||'default')===th.id;
+    return `<div class="mrow" style="${unlocked?'':'opacity:.5;'}">
+      <div class="up-name"><span style="display:inline-block;width:11px;height:11px;border-radius:3px;background:${th.swatch};vertical-align:middle;margin-right:7px;"></span>${unlocked?t('theme.'+th.id+'.name'):'???'}
+        <small>${unlocked?t('theme.'+th.id+'.desc'):t('theme.'+th.id+'.hint')}</small>
+      </div>
+      ${unlocked?`<button class="buy-max${active?' active':''}" data-action="selectTheme" data-theme="${th.id}"${active?' disabled':''}>${active?t('char.themeActive'):t('char.themeSelect')}</button>`:''}
     </div>`;
   }).join('');
 
@@ -5261,6 +5382,7 @@ modalBody.addEventListener('click', (e)=>{
   else if(btn.dataset.action==='travelTier') travelToTier(btn.dataset.id);
   else if(btn.dataset.action==='travelFrontier') travelToFrontier();
   else if(btn.dataset.action==='closeEnding') closeEndingScreen();
+  else if(btn.dataset.action==='selectTheme') selectTheme(btn.dataset.theme);
 });
 document.getElementById('bossRetreatBtn').addEventListener('click', ()=>{ if(mode==='gauntlet') retreatGauntlet(); else retreatBoss(); });
 document.getElementById('bossContinueBtn').addEventListener('click', ()=>{ if(mode==='gauntlet') returnFromGauntlet(); else returnFromBoss(); });
@@ -5723,7 +5845,13 @@ function applyLoadedData(d){
     logFilters: {
       combat: dlf.combat!==false, loot: dlf.loot!==false, achievements: dlf.achievements!==false,
       quests: dlf.quests!==false, bosses: dlf.bosses!==false, other: dlf.other!==false
-    }
+    },
+    // Тема — перевіряємо, що збережена тема РЕАЛЬНО розблокована ЗАРАЗ
+    // (той самий принцип, що й VALID_RARITIES вище): відредагований
+    // save-файл міг би просто вписати "theme":"blood" без жодного
+    // реального досягнення — themeUnlocked() рахує умову заново з уже
+    // щойно завантажених lifetime/achievements, а не довіряє файлу.
+    theme: themeUnlocked(ds.theme) ? ds.theme : 'default'
   };
   state.relics = (d.relics && typeof d.relics==='object') ? d.relics : {};
   state.prestigeSkills = (d.prestigeSkills && typeof d.prestigeSkills==='object') ? d.prestigeSkills : {};
@@ -5812,6 +5940,7 @@ function importSaveFile(file){
     try{
       const d = JSON.parse(e.target.result);
       applyLoadedData(d);
+      applyTheme(state.settings.theme||'default');
       recomputeStats();
       resetWorldAfterLoad();
       ensureQuestOffers();
@@ -6069,6 +6198,7 @@ async function fetchPlayerCount(){
 
 function init(){
   loadLocal();
+  applyTheme(state.settings.theme||'default');
   document.getElementById('versionNum').textContent = GAME_VERSION;
   applyI18n();
   updateModeUiText();
@@ -6323,6 +6453,13 @@ newGameBtn.addEventListener('click', ()=>{
 });
 
 showTitleScreen();
+
+// PWA: service worker — див. sw.js (файл поряд із index.html у публічному
+// репозиторії, локально через file:// його просто нема). Реєстрація тихо
+// провалюється сама собою в такому разі (catch), гра не залежить від цього.
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
 
 })();
 </script>

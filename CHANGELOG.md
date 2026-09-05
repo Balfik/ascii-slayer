@@ -5,6 +5,21 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.44] — Cosmetic themes, nearby rank, installable (PWA)
+
+### Added
+- **Cosmetic themes** — 4 color palettes, unlocked by real long-term
+  milestones: Terminal (default), Blood (defeat the Guardian of
+  Eternity), Arcane (100% Bestiary), Crystal (100/100 achievements).
+  Switch them from the Character sheet.
+- **Nearby rank** on the leaderboard — if you're not in the top 50, a
+  new section shows your exact rank plus the 3 closest players above
+  and below you, so mid-pack players get something to chase too.
+- **Installable (PWA)** — the game can now be installed on desktop or
+  mobile like a native app, with offline support for the last version
+  you played. Online play always gets the newest version first — the
+  offline cache is purely a fallback.
+
 ## [0.43] — Code cleanup
 
 No player-facing changes. Trimmed development-process notes out of the

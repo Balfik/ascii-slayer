@@ -1,0 +1,15 @@
+{
+  "name": "ASCII SLAYER",
+  "short_name": "ASCII SLAYER",
+  "description": "Free browser idle-runner: auto-battle, build a castle by hand, fight scaling bosses, and climb a live public leaderboard.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a0f0a",
+  "theme_color": "#0a0f0a",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
