@@ -5,6 +5,26 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.36] — Shorter cooldowns, colorful leaderboard
+
+### Changed
+- Boss and Gauntlet cooldowns are now half as long across the board.
+- The Prestige tree now shows the total effect of each skill you've
+  leveled, not just its per-level description.
+
+### Added
+- The activity feed now colors nicknames and item names (by real
+  rarity — legendary gold, demonic red, and so on), matching the color
+  language used everywhere else in the game.
+
+### Fixed
+- Rerolling your nickname on the title screen before hitting Continue
+  didn't actually stick — the old saved nickname silently won out.
+- The activity feed's underlying data is now stored as structured
+  fields validated server-side, rather than a pre-built string — this
+  also closes a theoretical stored-XSS gap in how feed messages were
+  written.
+
 ## [0.35] — Public leaderboard
 
 ### Added

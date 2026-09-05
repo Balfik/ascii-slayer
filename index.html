@@ -506,7 +506,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.35';
+const GAME_VERSION = '0.36';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -563,35 +563,51 @@ async function syncLeaderboard(){
     });
   }catch(e){ /* мережа/rate-limit — не критично для гри, спробуємо наступного разу */ }
 }
-// Готові фрази для стрічки подій — навмисно НЕ через t()/i18n-ключі: це
-// СПІЛЬНІ дані для всіх гравців (лідерборд бачать усі, незалежно від
-// того, якою мовою грає той, хто задав подію), тож форматуємо рядок ОДРАЗУ
-// мовою автора події в момент, коли вона стається, а не зберігаємо ключ.
-function eventMessage(kind, p){
+// Стрічка подій зберігає СТРУКТУРОВАНІ поля (target_name/target_rarity/
+// value), а НЕ готовий HTML-рядок — навмисно: якщо колись зберігати вже
+// готовий HTML (напр. із кольоровими <span>), будь-хто, хто обійде
+// клієнта й напряму викличе REST API, міг би вписати туди довільний
+// HTML/JS, який потім виконався б у БРАУЗЕРІ КОЖНОГО ІНШОГО гравця, що
+// відкриє лідерборд (класична stored-XSS). Замість цього — сирі,
+// перевірені на боці бази поля (events_validate — той самий безпечний
+// набір символів, що й у нікнейма), а фрази/кольори будує САМ клієнт із
+// довіреного локального коду (renderEventLine нижче), мовою ЦЬОГО
+// глядача (не автора події) — так навіть краще, ніж було.
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+const LEADERBOARD_NICK_COLOR = 'var(--accent)';
+function nickSpan(nick){ return `<span style="color:${LEADERBOARD_NICK_COLOR}">${escapeHtml(nick)}</span>`; }
+function renderEventLine(e){
+  const nick = nickSpan(e.nickname);
+  const rarityColor = e.target_rarity ? RARITY_COLOR[e.target_rarity] : null;
+  const target = e.target_name!=null ? `«<span style="color:${rarityColor||'var(--text)'}">${escapeHtml(e.target_name)}</span>»` : '';
   const uk = {
-    level_milestone: `${p.nick} досяг ${p.lvl} рівня!`,
-    boss_defeat: `${p.nick} переміг боса «${p.boss}»!`,
-    enchant_10: `${p.nick} заточив «${p.item}» на +10!`,
-    prestige: `${p.nick} здійснив Переродження (№${p.count})!`,
-    castle_complete: `${p.nick} добудував Замок до кінця!`,
-    game_completed: `${p.nick} переміг Стража Вічності — гру пройдено!`
+    level_milestone: `${nick} досяг ${e.value} рівня!`,
+    boss_defeat: `${nick} переміг боса ${target}!`,
+    enchant_10: `${nick} заточив ${target} на +10!`,
+    prestige: `${nick} здійснив Переродження (№${e.value})!`,
+    castle_complete: `${nick} добудував Замок до кінця!`,
+    game_completed: `${nick} переміг Стража Вічності — гру пройдено!`
   };
   const en = {
-    level_milestone: `${p.nick} reached level ${p.lvl}!`,
-    boss_defeat: `${p.nick} defeated "${p.boss}"!`,
-    enchant_10: `${p.nick} enchanted "${p.item}" to +10!`,
-    prestige: `${p.nick} performed a Prestige (#${p.count})!`,
-    castle_complete: `${p.nick} finished building the Castle!`,
-    game_completed: `${p.nick} defeated the Guardian of Eternity — the game is complete!`
+    level_milestone: `${nick} reached level ${e.value}!`,
+    boss_defeat: `${nick} defeated ${target}!`,
+    enchant_10: `${nick} enchanted ${target} to +10!`,
+    prestige: `${nick} performed a Prestige (#${e.value})!`,
+    castle_complete: `${nick} finished building the Castle!`,
+    game_completed: `${nick} defeated the Guardian of Eternity — the game is complete!`
   };
-  return (lang==='en' ? en : uk)[kind];
+  return (lang==='en' ? en : uk)[e.event_type] || '';
 }
-async function reportEvent(kind, params){
+async function reportEvent(kind, extra){
   if(!sbReady || !sbClient || !sbPlayerId) return;
   try{
     await sbClient.from('events').insert({
-      player_id: sbPlayerId, nickname: state.nickname,
-      event_type: kind, message: eventMessage(kind, params)
+      player_id: sbPlayerId, nickname: state.nickname, event_type: kind,
+      target_name: extra && extra.targetName!=null ? extra.targetName : null,
+      target_rarity: extra && extra.targetRarity!=null ? extra.targetRarity : null,
+      value: extra && extra.value!=null ? extra.value : null
     });
   }catch(e){ /* мережа/rate-limit (не частіше раз на 5с з боку бази) — тихо ігноруємо */ }
 }
@@ -793,6 +809,7 @@ const I18N = {
     'unit.castleRes':'видобутку матеріалів Замку', 'unit.soulGain':'душ з босів',
     'skills.farmOnly':'лише під час фарму зони',
     'skills.together':'разом', 'confirm.reset':'Скинути весь прогрес? Дію не можна відмінити.',
+    'prestige.cooldownUnit':'кулдауну босів/Гаунтлета', 'prestige.capped':'стеля',
     'btn.buyMax':'⤒ На всі', 'confirm.sellAll':'Продати ВСІ предмети в інвентарі за золото? Дію не можна відмінити.',
     'shop.sellAllBtn':'💰 Продати все спорядження', 'shop.sellAllEmpty':'Немає що продавати',
     'shop.resourcesHeader':'БУДІВЕЛЬНІ МАТЕРІАЛИ', 'shop.itemsHeader':'СПОРЯДЖЕННЯ',
@@ -1032,6 +1049,7 @@ const I18N = {
     'unit.castleRes':'Castle material gain', 'unit.soulGain':'souls from bosses',
     'skills.farmOnly':'zone-farming only',
     'skills.together':'total', 'confirm.reset':'Reset all progress? This cannot be undone.',
+    'prestige.cooldownUnit':'boss/Gauntlet cooldown', 'prestige.capped':'cap',
     'btn.buyMax':'⤒ Max', 'confirm.sellAll':'Sell ALL items in your inventory for gold? This cannot be undone.',
     'shop.sellAllBtn':'💰 Sell all gear', 'shop.sellAllEmpty':'Nothing to sell',
     'shop.resourcesHeader':'BUILDING MATERIALS', 'shop.itemsHeader':'GEAR',
@@ -1393,20 +1411,22 @@ const BOSS_SHAPES = {
 };
 const BOSS_FIGHT_TIME = 120; // секунд на бій, інакше "відступ" (частковий утішний приз)
 const BOSS_TIERS = [
-  {id:'b50',   reqLevel:50,   shape:'demon',  name:'Молодший Демон',  name_en:'Lesser Demon',   hp:8000,      goldMin:600,    goldMax:1000,    souls:3,  xp:1200,    cooldownHours:4,  demonicChance:0.15},
-  {id:'b100',  reqLevel:100,  shape:'dragon', name:'Дракон Печер',    name_en:'Cave Dragon',    hp:35000,     goldMin:2500,   goldMax:4200,    souls:6,  xp:5000,    cooldownHours:6,  demonicChance:0.18},
-  {id:'b175',  reqLevel:175,  shape:'demon',  name:'Демон Крові',     name_en:'Blood Demon',    hp:130000,    goldMin:9000,   goldMax:15000,   souls:9,  xp:16000,   cooldownHours:8,  demonicChance:0.20},
-  {id:'b250',  reqLevel:250,  shape:'titan',  name:'Титан Руїн',      name_en:'Ruin Titan',     hp:500000,    goldMin:30000,  goldMax:48000,   souls:13, xp:55000,   cooldownHours:10, demonicChance:0.24},
-  {id:'b400',  reqLevel:400,  shape:'dragon', name:'Дракон Безодні',  name_en:'Abyssal Dragon', hp:2200000,   goldMin:110000, goldMax:170000,  souls:18, xp:200000,  cooldownHours:14, demonicChance:0.28},
-  {id:'b600',  reqLevel:600,  shape:'demon',  name:'Владика Пекла',   name_en:'Hell Sovereign', hp:9000000,   goldMin:380000, goldMax:560000,  souls:26, xp:700000,  cooldownHours:18, demonicChance:0.32},
-  {id:'b800',  reqLevel:800,  shape:'titan',  name:'Древній Титан',   name_en:'Ancient Titan',  hp:35000000,  goldMin:1200000,goldMax:1800000, souls:38, xp:2200000, cooldownHours:22, demonicChance:0.36},
-  {id:'b1000', reqLevel:1000, shape:'dragon', name:'Володар Кінця',   name_en:'Lord of the End',hp:130000000, goldMin:3500000,goldMax:5200000, souls:55, xp:6500000, cooldownHours:26, demonicChance:0.40},
+  // Відкати вдвічі менші, ніж спершу (v0.36, гравець попросив прямо) —
+  // було 4/6/8/10/14/18/22/26/24 год.
+  {id:'b50',   reqLevel:50,   shape:'demon',  name:'Молодший Демон',  name_en:'Lesser Demon',   hp:8000,      goldMin:600,    goldMax:1000,    souls:3,  xp:1200,    cooldownHours:2,  demonicChance:0.15},
+  {id:'b100',  reqLevel:100,  shape:'dragon', name:'Дракон Печер',    name_en:'Cave Dragon',    hp:35000,     goldMin:2500,   goldMax:4200,    souls:6,  xp:5000,    cooldownHours:3,  demonicChance:0.18},
+  {id:'b175',  reqLevel:175,  shape:'demon',  name:'Демон Крові',     name_en:'Blood Demon',    hp:130000,    goldMin:9000,   goldMax:15000,   souls:9,  xp:16000,   cooldownHours:4,  demonicChance:0.20},
+  {id:'b250',  reqLevel:250,  shape:'titan',  name:'Титан Руїн',      name_en:'Ruin Titan',     hp:500000,    goldMin:30000,  goldMax:48000,   souls:13, xp:55000,   cooldownHours:5,  demonicChance:0.24},
+  {id:'b400',  reqLevel:400,  shape:'dragon', name:'Дракон Безодні',  name_en:'Abyssal Dragon', hp:2200000,   goldMin:110000, goldMax:170000,  souls:18, xp:200000,  cooldownHours:7,  demonicChance:0.28},
+  {id:'b600',  reqLevel:600,  shape:'demon',  name:'Владика Пекла',   name_en:'Hell Sovereign', hp:9000000,   goldMin:380000, goldMax:560000,  souls:26, xp:700000,  cooldownHours:9,  demonicChance:0.32},
+  {id:'b800',  reqLevel:800,  shape:'titan',  name:'Древній Титан',   name_en:'Ancient Titan',  hp:35000000,  goldMin:1200000,goldMax:1800000, souls:38, xp:2200000, cooldownHours:11, demonicChance:0.36},
+  {id:'b1000', reqLevel:1000, shape:'dragon', name:'Володар Кінця',   name_en:'Lord of the End',hp:130000000, goldMin:3500000,goldMax:5200000, souls:55, xp:6500000, cooldownHours:13, demonicChance:0.40},
   // Фінальний бос — НЕ просто ще один рівневий поріг: доступ додатково
   // вимагає Замок на максимумі (20) І всі 5 реліквій (finalBossUnlocked()),
   // перевіряється окремо в renderBossPortal()/attemptBoss(). Перша
   // перемога над ним (endBossFight) відкриває фінальний екран — інші
   // умови ("isFinal") ніде більше по коду не читаються.
-  {id:'final_guardian', reqLevel:1200, shape:'guardian', name:'Страж Вічності', name_en:'Guardian of Eternity', hp:400000000, goldMin:9000000, goldMax:14000000, souls:150, xp:18000000, cooldownHours:24, demonicChance:0.5, isFinal:true}
+  {id:'final_guardian', reqLevel:1200, shape:'guardian', name:'Страж Вічності', name_en:'Guardian of Eternity', hp:400000000, goldMin:9000000, goldMax:14000000, souls:150, xp:18000000, cooldownHours:12, demonicChance:0.5, isFinal:true}
 ];
 function bossById(id){ return BOSS_TIERS.find(b=>b.id===id); }
 
@@ -1703,7 +1723,7 @@ function buildCastleConstruction(){
   sfxLevelUp();
   updateHud();
   save();
-  if(state.castleLevel===CASTLE_MAX_LEVEL) reportEvent('castle_complete', {nick:state.nickname});
+  if(state.castleLevel===CASTLE_MAX_LEVEL) reportEvent('castle_complete');
   syncLeaderboard();
   playCastleBuildAnimation(c);
 }
@@ -2638,9 +2658,9 @@ function endBossFight(won, retreated){
     // би другий запис поспіль (раз на 5с), тож просто ніколи не шлемо
     // обидва.
     if(result.isEnding){
-      reportEvent('game_completed', {nick:state.nickname});
+      reportEvent('game_completed');
     } else if(firstKillOfBoss){
-      reportEvent('boss_defeat', {nick:state.nickname, boss:L(boss,'name')});
+      reportEvent('boss_defeat', {targetName:L(boss,'name')});
     }
     result.gold = gold; result.souls = souls; result.xp = rw.xp;
     const demonicChance = boss.demonicChance * (hasRelic('hunter_medallion') ? 2 : 1);
@@ -2806,7 +2826,7 @@ function renderBossFight(){
    Дерева Переродження застосовується.
    ===================================================================== */
 const GAUNTLET_TIME = 90;
-const GAUNTLET_COOLDOWN_HOURS = 6;
+const GAUNTLET_COOLDOWN_HOURS = 3; // v0.36: удвічі менше (було 6) — гравець попросив прямо
 const GAUNTLET_MIN_LEVEL = 10;
 const GAUNTLET_WAVE_SCALE = 1.15;
 const GAUNTLET_MIN_WAVES_FOR_FULL_REWARD = 5;
@@ -3373,7 +3393,7 @@ function gainXp(amount){
     if(modalKind==='skills') renderSkillTree(); // щоб кнопки одразу розблокувались, якщо модалка відкрита
     checkLevelUnlocks(); // нові регіони на Карті Світу — за досягнутим рівнем, не за дистанцією
     if(LEVEL_MILESTONE_EVENTS.includes(state.level)){
-      reportEvent('level_milestone', {nick:state.nickname, lvl:state.level});
+      reportEvent('level_milestone', {value:state.level});
     }
   }
 }
@@ -4356,7 +4376,10 @@ async function renderLeaderboard(){
     const [playersRes, eventsRes] = await Promise.all([
       sbClient.from('players').select('nickname,best_level,prestige_count,castle_level,created_at')
         .order('best_level', {ascending:false}).limit(50),
-      sbClient.from('events').select('message,created_at').order('created_at', {ascending:false}).limit(30)
+      // Стрічка й так обмежена в базі (events_prune лишає не більше 500
+      // записів загалом) — тут беремо ще менше, останні 30, для показу.
+      sbClient.from('events').select('nickname,event_type,target_name,target_rarity,value,created_at')
+        .order('created_at', {ascending:false}).limit(30)
     ]);
     if(modalKind!=='leaderboard') return; // гравець встиг закрити/відкрити щось інше, поки чекали мережу
     if(playersRes.error) throw playersRes.error;
@@ -4369,7 +4392,7 @@ async function renderLeaderboard(){
       html += rows.map((p,i)=>{
         const mine = p.nickname===state.nickname;
         return `<div class="mrow"${mine?' style="background:#152615;"':''}>
-          <div class="up-name">#${i+1} ${p.nickname}${mine?` <span class="lvl">${t('leaderboard.youTag')}</span>`:''}
+          <div class="up-name">#${i+1} ${nickSpan(p.nickname)}${mine?` <span class="lvl">${t('leaderboard.youTag')}</span>`:''}
             <small>Lv.${formatNum(p.best_level)} · ♻️${formatNum(p.prestige_count)} · 🏰${p.castle_level}/${CASTLE_MAX_LEVEL} · ${t('leaderboard.since',{time:formatAgo(new Date(p.created_at).getTime())})}</small>
           </div>
         </div>`;
@@ -4379,7 +4402,7 @@ async function renderLeaderboard(){
     const events = eventsRes.data||[];
     html += events.length===0
       ? `<div class="empty-msg">${t('leaderboard.feedEmpty')}</div>`
-      : events.map(e=>`<div class="mrow"><div class="up-name">${e.message}<small>${formatAgo(new Date(e.created_at).getTime())}</small></div></div>`).join('');
+      : events.map(e=>`<div class="mrow"><div class="up-name">${renderEventLine(e)}<small>${formatAgo(new Date(e.created_at).getTime())}</small></div></div>`).join('');
     modalBody.innerHTML = html;
   }catch(e){
     if(modalKind==='leaderboard') modalBody.innerHTML = `<div class="empty-msg">${t('leaderboard.unavailable')}</div>`;
@@ -4693,6 +4716,26 @@ function renderPrestigeModal(){
     </button>`;
   modalBody.innerHTML = html;
 }
+// Той самий патерн, що й skillTotalEffectText() для звичайного дерева
+// навичок — гравець попросив бачити, скільки сумарно дає прокачаний
+// вузол, а не тільки "+X% за рівень" у описі. bossCooldownPct — єдиний
+// ефект тут із жорсткою стелею (60%, застосовується в endBossFight()/
+// endGauntlet() через Math.min(60, ...)) — показуємо ВЖЕ обмежене
+// число, а не сире lvl*3, інакше на високих рівнях текст брехав би.
+function prestigeTotalEffectText(node, lvl){
+  if(lvl<=0) return '';
+  const e = node.effect;
+  const parts = [];
+  if(e.atkPct) parts.push(`+${(e.atkPct*lvl).toFixed(1)}% ${t('unit.atk')}`);
+  if(e.goldPct) parts.push(`+${(e.goldPct*lvl).toFixed(1)}% ${t('unit.gold')}`);
+  if(e.xpPct) parts.push(`+${(e.xpPct*lvl).toFixed(1)}% ${t('unit.xp')}`);
+  if(e.critChance) parts.push(`+${(e.critChance*lvl).toFixed(1)}% ${t('unit.crit')}`);
+  if(e.bossCooldownPct){
+    const capped = Math.min(60, e.bossCooldownPct*lvl);
+    parts.push(`-${capped.toFixed(1)}% ${t('prestige.cooldownUnit')}${capped>=60?` (${t('prestige.capped')})`:''}`);
+  }
+  return parts.length ? ` · <span style="color:var(--accent)">${t('skills.together')} ${parts.join(', ')}</span>` : '';
+}
 function renderPrestigeTreeHtml(){
   let html = `<div style="margin-bottom:10px;color:var(--dim);font-size:12px;line-height:1.5;">${t('prestige.treeExplain')}</div>`;
   html += `<div style="margin-bottom:8px;color:var(--purple);font-size:12px;">${t('prestige.treePointsLine',{pts:state.lifetime.prestigeSkillPoints||0})}</div>`;
@@ -4703,7 +4746,7 @@ function renderPrestigeTreeHtml(){
     const canBuy = !maxed && (state.lifetime.prestigeSkillPoints||0) >= cost;
     html += `<div class="mrow stack">
       <div class="up-name">${L(node,'name')} <span class="lvl">Lv.${lvl}</span>
-        <small>${L(node,'desc')}</small>
+        <small>${L(node,'desc')}${prestigeTotalEffectText(node, lvl)}</small>
       </div>
       ${maxed ? `<span class="empty-msg">${t('skills.max')}</span>` : `<span class="buy-group">
         <button class="buy" data-action="prestigeSkill" data-id="${node.id}" ${canBuy?'':'disabled'}>${t('prestige.costBtn',{cost})}</button>
@@ -4742,7 +4785,7 @@ function doPrestige(){
   updateHud();
   save();
   if(PRESTIGE_MILESTONE_EVENTS.includes(state.lifetime.prestigeCount)){
-    reportEvent('prestige', {nick:state.nickname, count:state.lifetime.prestigeCount});
+    reportEvent('prestige', {value:state.lifetime.prestigeCount});
   }
   syncLeaderboard();
 }
@@ -5038,7 +5081,7 @@ function enchantItem(id){
   recomputeStats();
   addLog('log.enchanted', 'upgrade', {name:L(it,'name'), level:it.enchant});
   sfxEnchant();
-  if(it.enchant===10) reportEvent('enchant_10', {nick:state.nickname, item:L(it,'name')});
+  if(it.enchant===10) reportEvent('enchant_10', {targetName:L(it,'name'), targetRarity:it.rarity});
   renderModalBody(); renderInventory(); updateHud(); save();
 }
 function enchantItemMax(id){
@@ -5064,7 +5107,7 @@ function enchantItemMax(id){
   sfxEnchant();
   // "На всі" може за один клік перескочити ПОНАД +10 — перевіряємо
   // перетин порогу, а не точну рівність (як у звичайному enchantItem()).
-  if(enchantBefore<10 && it.enchant>=10) reportEvent('enchant_10', {nick:state.nickname, item:L(it,'name')});
+  if(enchantBefore<10 && it.enchant>=10) reportEvent('enchant_10', {targetName:L(it,'name'), targetRarity:it.rarity});
   renderModalBody(); renderInventory(); updateHud(); save();
 }
 function sellItem(id){
@@ -5447,10 +5490,15 @@ function buildSaveObject(){
   };
 }
 function applyLoadedData(d){
-  // Старі збереження (до лідерборду) не мали нікнейму — генеруємо один
-  // назавжди тут, а не щоразу заново, інакше гравець "змінював" би
-  // нікнейм на кожному завантаженні сторінки.
-  state.nickname = (typeof d.nickname==='string' && d.nickname) ? d.nickname : (state.nickname || generateNickname());
+  // state.nickname уже виставлений showTitleScreen() (peekSavedPrefs() +
+  // можливий клік "Перегенерувати" ДО натискання "Продовжити") — саме
+  // ЦЕ значення має перемогти, інакше перегенерація для гравця, що
+  // продовжує стару гру, тихо "не спрацьовувала б": ми б щоразу
+  // перечитували СТАРИЙ нікнейм із самого збереження (d.nickname) і
+  // відкидали щойно обраний. d.nickname — лише запасний варіант, якщо
+  // state.nickname чомусь порожній (напр. старий формат/обхід стартового
+  // екрана); фінальний generateNickname() — лише якщо взагалі нізвідки.
+  state.nickname = state.nickname || (typeof d.nickname==='string' && d.nickname ? d.nickname : generateNickname());
   state.level = d.level || 1;
   state.xp = d.xp || 0;
   state.gold = d.gold || 0;
