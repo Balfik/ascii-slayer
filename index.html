@@ -282,7 +282,18 @@
     background:none;border:1px solid var(--border);color:var(--text);
     font-family:inherit;cursor:pointer;border-radius:4px;padding:2px 8px;
   }
-  .modal-body{padding:10px 14px;overflow-y:auto;font-size:12.5px;}
+  .modal-body{padding:10px 14px;overflow-y:auto;font-size:12.5px;overscroll-behavior:contain;}
+  /* Поки відкрита будь-яка модалка — сторінка НЕ скролиться (ні колесом
+     миші на пк, ні пальцем на мобілі); скролиться лише сама модалка
+     (.modal-body, вище). Навмисно НЕ position:fixed на body — той трюк
+     робить body новим containing block для власних position:fixed
+     нащадків (сама .modal-backdrop!), і вона "з'їжджає" разом з ним
+     замість лишатись прив'язаною до справжнього вьюпорта. Просто
+     overflow:hidden на корені (html) — той самий елемент, що й реально
+     скролить сторінку в цьому документі (немає власного overflow на
+     html/body, які б це змінювали) — зупиняє скрол, НІЧОГО не рухаючи
+     і не ламаючи. */
+  html.modal-scroll-lock, html.modal-scroll-lock body{overflow:hidden;}
   .mrow{
     display:flex;justify-content:space-between;align-items:center;gap:8px;
     padding:8px 0 8px 8px;border-bottom:1px solid #16241a;
@@ -446,6 +457,7 @@
       <span data-i18n="footer.autosave">Прогрес зберігається автоматично (localStorage) у цьому браузері.</span>
       <a href="https://github.com/Balfik" target="_blank" rel="noopener noreferrer">🔗 github.com/Balfik</a>
       <span id="visitorCountLine" data-i18n-title="footer.visitorCountTitle">👥 <b id="visitorCount">—</b></span>
+      <span id="versionLine">v<span id="versionNum"></span></span>
     </span>
     <span class="fbtns">
       <button id="exportBtn" data-i18n="btn.export">💾 Зберегти у файл</button>
@@ -469,6 +481,12 @@
 <script>
 (function(){
 "use strict";
+
+// Номер версії — суто інформаційний (показується внизу футера), НІЯК не
+// пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
+// збереження, зовсім інша річ). Онови це число при кожному новому
+// релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
+const GAME_VERSION = '0.34';
 
 /* =====================================================================
    КОНФІГ ГРИДУ РАННЕРА
@@ -4045,6 +4063,42 @@ const modalTitle = document.getElementById('modalTitle');
 const modalBody = document.getElementById('modalBody');
 let modalKind = null; // 'forge' | 'shop' | 'skills'
 
+// Блокування скролу body, поки відкрита БУДЬ-ЯКА модалка (гравець явно
+// попросив — на мобілі скрол сторінки "за" модалкою критично заважає).
+// Відкриттів модалки багато (openForge/openShop/openQuestBoard/...) — усі
+// просто виставляють modalBackdrop.hidden=false напряму, БЕЗ єдиної
+// спільної функції "відкрити модалку". Замість дублювати lock-виклик у
+// кожному з них (легко пропустити один і зламати саме той екран) —
+// стежимо за самим атрибутом hidden через MutationObserver: спрацює
+// однаково, з якого б місця його не виставили, і для всіх модалок, що
+// з'являться в майбутньому, без жодних змін тут.
+// Підстраховка понад html{overflow:hidden} — саме воно не в усіх
+// рушіях надійно зупиняє КОЖЕН спосіб проскролити сторінку (старі iOS
+// Safari — touch, деякі рушії й далі рухають window.scrollY на wheel/
+// programmatic scrollTo навіть з overflow:hidden на корені). Блокуємо
+// touchmove й wheel, що починаються ПОЗА самою модалкою (.modal-body),
+// поки лок активний. Скрол ВСЕРЕДИНІ модалки не займаємо взагалі —
+// passive:false лише щоб e.preventDefault() узагалі мав ефект, сам
+// обробник нічого не робить, якщо ціль події лежить у modalBody.
+function preventBackgroundScroll(e){
+  if(!modalBody.contains(e.target)) e.preventDefault();
+}
+function lockBodyScroll(){
+  if(document.documentElement.classList.contains('modal-scroll-lock')) return;
+  document.documentElement.classList.add('modal-scroll-lock');
+  document.addEventListener('touchmove', preventBackgroundScroll, {passive:false});
+  document.addEventListener('wheel', preventBackgroundScroll, {passive:false});
+}
+function unlockBodyScroll(){
+  if(!document.documentElement.classList.contains('modal-scroll-lock')) return;
+  document.documentElement.classList.remove('modal-scroll-lock');
+  document.removeEventListener('touchmove', preventBackgroundScroll, {passive:false});
+  document.removeEventListener('wheel', preventBackgroundScroll, {passive:false});
+}
+new MutationObserver(()=>{
+  if(modalBackdrop.hidden) unlockBodyScroll(); else lockBodyScroll();
+}).observe(modalBackdrop, {attributes:true, attributeFilter:['hidden']});
+
 // Кожна дія в модалці (Прийняти/Продати/Заточити/тощо) замінює
 // modalBody.innerHTML під час одного кліку — кнопка, на якій щойно
 // відбулось mousedown, часто зникає з DOM ДО mouseup. Браузер тоді
@@ -5555,6 +5609,7 @@ function trackUniqueVisitor(){
 function init(){
   loadLocal();
   trackUniqueVisitor();
+  document.getElementById('versionNum').textContent = GAME_VERSION;
   applyI18n();
   updateModeUiText();
   recomputeStats();

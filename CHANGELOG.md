@@ -5,6 +5,18 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.34] — Version number, modal scroll lock
+
+### Added
+- The current version number now shows in the footer.
+
+### Fixed
+- Opening a modal (Achievements, Bestiary, Quest Board, etc.) on a long
+  page, or on mobile, could let you scroll the page underneath it instead
+  of the modal's own content — especially disruptive on touch devices.
+  The background now stays put while any modal is open; only the modal
+  itself scrolls. Closing it restores normal scrolling immediately.
+
 ## [0.33] — Mobile controls, player counter, quest board fix
 
 ### Added
