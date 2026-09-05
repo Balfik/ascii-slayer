@@ -344,6 +344,15 @@
   .mrow.rar-epic{border-left-color:var(--purple);}
   .mrow.rar-legendary{border-left-color:var(--legendary);}
   .mrow.rar-demonic{border-left-color:var(--demonic);}
+  .cloud-input{
+    display:block;width:100%;margin:4px 0 10px;padding:7px 9px;
+    font-family:inherit;font-size:13px;
+    background:var(--panel);border:1px solid var(--border);border-radius:4px;color:var(--text);
+  }
+  .cloud-input:focus{outline:none;border-color:var(--accent);}
+  .cloud-label{font-size:11.5px;color:var(--dim);}
+  .cloud-err{color:var(--danger);font-size:12px;margin:-4px 0 10px;}
+  .cloud-ok{color:var(--accent);font-size:12px;margin:-4px 0 10px;}
   #bossRetreatBtn{
     display:block;margin:-6px auto 12px;background:#2a1010;border:1px solid var(--demonic);
     color:var(--demonic);font-family:inherit;font-size:12px;padding:6px 16px;border-radius:4px;cursor:pointer;
@@ -523,6 +532,7 @@
     <span class="fbtns">
       <button id="exportBtn" data-i18n="btn.export">💾 Зберегти у файл</button>
       <button id="importBtn" data-i18n="btn.import">📂 Завантажити з файлу</button>
+      <button id="cloudBtn" data-i18n="btn.cloud">☁️ Хмарні збереження</button>
       <button id="resetBtn" data-i18n="btn.reset">Скинути прогрес</button>
     </span>
     <input type="file" id="fileInput" accept="application/json,.json" hidden>
@@ -548,7 +558,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.46';
+const GAME_VERSION = '0.47';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -583,6 +593,13 @@ async function ensureSupabaseSession(){
       sbPlayerId = signIn.data.user.id;
     } else {
       sbPlayerId = session.user.id;
+      // Сесія з попереднього разу вже могла бути "прив'язаною" (гравець
+      // раніше зареєстрував/увійшов логін+пароль) — is_anonymous:false
+      // означає саме це, а не свіжий анонімний вхід.
+      if(session.user.is_anonymous===false && session.user.email){
+        cloudLinked = true;
+        cloudUsername = usernameFromEmail(session.user.email);
+      }
     }
     sbReady = true;
     return sbPlayerId;
@@ -604,6 +621,101 @@ async function syncLeaderboard(){
       castle_level: state.castleLevel
     });
   }catch(e){ /* мережа/rate-limit — не критично для гри, спробуємо наступного разу */ }
+}
+
+/* =====================================================================
+   ХМАРНІ ЗБЕРЕЖЕННЯ — логін/пароль БЕЗ пошти: усередині це звичайний
+   email+password Supabase Auth, просто username перетворюється на
+   службовий фейковий email (@players.ascii-slayer.internal), яким
+   ніколи нікуди не надсилається жодного листа — це лише спосіб дати
+   гравцю "просто логін і пароль" поверх email-based системи Supabase.
+   "Прив'язати" = auth.updateUser() на ПОТОЧНІЙ анонімній сесії (НЕ нова
+   реєстрація) — той самий auth.uid() лишається, тож рядок у лідерборді
+   (players) нікуди не зникає, просто стає доступним і з інших
+   пристроїв. "Увійти" на іншому пристрої (signInWithPassword) підміняє
+   поточну (анонімну) сесію на сесію ЦЬОГО САМОГО акаунта.
+   Через відсутність пошти немає й відновлення пароля — забутий пароль
+   означає назавжди втрачений доступ до хмарного акаунта (локальний
+   прогрес на пристрої, де вже граєш, це ніяк не чіпає).
+   ===================================================================== */
+const CLOUD_EMAIL_DOMAIN = 'players.ascii-slayer.internal';
+function emailForUsername(u){ return u.trim().toLowerCase()+'@'+CLOUD_EMAIL_DOMAIN; }
+function usernameFromEmail(email){ return (email||'').split('@')[0]; }
+function validCloudUsername(u){ return /^[a-z0-9_]{3,20}$/.test(u.trim().toLowerCase()); }
+
+let cloudLinked = false;
+let cloudUsername = null;
+let cloudLastSyncTs = null;
+
+async function registerCloudAccount(username, password){
+  if(!sbClient || !sbReady) return {error:'offline'};
+  if(!validCloudUsername(username)) return {error:'badUsername'};
+  if(password.length < 6) return {error:'badPassword'};
+  try{
+    const { data, error } = await sbClient.auth.updateUser({
+      email: emailForUsername(username), password
+    });
+    if(error) return {error: /registered|exists/i.test(error.message) ? 'taken' : 'network'};
+    sbPlayerId = data.user.id;
+    cloudLinked = true;
+    cloudUsername = username.trim().toLowerCase();
+    await pushCloudSave();
+    return {ok:true};
+  }catch(e){ return {error:'network'}; }
+}
+
+async function loginCloudAccount(username, password){
+  if(!sbClient) return {error:'offline'};
+  if(!validCloudUsername(username)) return {error:'badUsername'};
+  try{
+    const { data, error } = await sbClient.auth.signInWithPassword({
+      email: emailForUsername(username), password
+    });
+    if(error) return {error:'invalid'};
+    sbPlayerId = data.user.id;
+    sbReady = true;
+    cloudLinked = true;
+    cloudUsername = username.trim().toLowerCase();
+    const pulled = await pullCloudSaveInfo();
+    return {ok:true, pulled};
+  }catch(e){ return {error:'network'}; }
+}
+
+async function logoutCloudAccount(){
+  if(sbClient){ try{ await sbClient.auth.signOut(); }catch(e){} }
+  cloudLinked = false;
+  cloudUsername = null;
+  cloudLastSyncTs = null;
+  sbReady = false; sbPlayerId = null;
+  await ensureSupabaseSession(); // одразу новий анонімний сеанс — лідерборд і далі працює
+  syncLeaderboard();
+}
+
+// Повний обʼєкт збереження (buildSaveObject() — та сама функція, що й
+// для "Зберегти у файл") іде в СВІЙ, приватний рядок бази (player_saves,
+// RLS: лише сам власник) — не плутати з players (публічний лідерборд,
+// лише кілька окремих полів).
+async function pushCloudSave(){
+  if(!sbReady || !sbClient || !sbPlayerId || !cloudLinked) return {error:'notLinked'};
+  try{
+    const { error } = await sbClient.from('player_saves').upsert({
+      id: sbPlayerId, save_data: buildSaveObject()
+    });
+    if(error) return {error:'network'};
+    cloudLastSyncTs = Date.now();
+    return {ok:true};
+  }catch(e){ return {error:'network'}; }
+}
+// Лише ЗАПИТУЄ, що є в хмарі — не застосовує нічого сама (застосування
+// = явне підтвердження гравця, бо це перезаписує локальний прогрес).
+async function pullCloudSaveInfo(){
+  if(!sbReady || !sbClient || !sbPlayerId) return {error:'notLinked'};
+  try{
+    const { data, error } = await sbClient.from('player_saves').select('save_data,updated_at').eq('id', sbPlayerId).maybeSingle();
+    if(error) return {error:'network'};
+    if(!data) return {ok:true, found:false};
+    return {ok:true, found:true, saveData:data.save_data, updatedAt:data.updated_at};
+  }catch(e){ return {error:'network'}; }
 }
 // Стрічка подій зберігає СТРУКТУРОВАНІ поля (target_name/target_rarity/
 // value), а НЕ готовий HTML-рядок — навмисно: якщо колись зберігати вже
@@ -926,6 +1038,32 @@ const I18N = {
     'quests.ready':'ГОТОВО! Забери нагороду на дошці оголошень',
     'footer.autosave':'Прогрес зберігається автоматично (localStorage) у цьому браузері.',
     'btn.export':'💾 Зберегти у файл', 'btn.import':'📂 Завантажити з файлу', 'btn.reset':'Скинути прогрес',
+    'btn.cloud':'☁️ Хмарні збереження',
+    'modal.cloudTitle':'ХМАРНІ ЗБЕРЕЖЕННЯ',
+    'cloud.explain':'Прив\'яжи логін і пароль до прогресу — і зможеш зайти з іншого пристрою (телефон/ПК) та підтягнути те, що там напрацював. Це не справжня пошта, лише логін — тож відновити забутий пароль неможливо.',
+    'cloud.usernameLabel':'Логін', 'cloud.passwordLabel':'Пароль',
+    'cloud.usernameHint':'Лише латинські літери, цифри, підкреслення — 3–20 символів',
+    'cloud.passwordHint':'Щонайменше 6 символів',
+    'cloud.registerHeader':'Прив\'язати цей прогрес (уперше)',
+    'cloud.registerBtn':'Прив\'язати логін і пароль',
+    'cloud.loginHeader':'Уже є акаунт? Увійти (замінить локальний прогрес)',
+    'cloud.loginBtn':'Увійти',
+    'cloud.err.badUsername':'Логін: лише латинські літери/цифри/підкреслення, 3–20 символів.',
+    'cloud.err.badPassword':'Пароль має бути щонайменше 6 символів.',
+    'cloud.err.taken':'Цей логін уже зайнятий — обери інший.',
+    'cloud.err.invalid':'Невірний логін або пароль.',
+    'cloud.err.network':'Немає зв\'язку з сервером — спробуй пізніше.',
+    'cloud.err.offline':'Хмарні збереження зараз недоступні.',
+    'cloud.linkedAs':'Залогінено як: {username}',
+    'cloud.lastSync':'Останній синк: {time}', 'cloud.neverSynced':'Ще не синхронізовано в цій сесії',
+    'cloud.saveNowBtn':'☁️ Зберегти в хмару зараз', 'cloud.pullBtn':'⬇️ Завантажити з хмари', 'cloud.logoutBtn':'Вийти',
+    'cloud.pullConfirmTitle':'Знайдено хмарне збереження',
+    'cloud.pullConfirmBody':'Рівень {level}, збережено {time}. Завантажити? Це ЗАМІНИТЬ поточний локальний прогрес.',
+    'cloud.pullNotFound':'У хмарі ще немає збереження для цього акаунта.',
+    'cloud.pullSuccess':'Прогрес завантажено з хмари.',
+    'cloud.pushSuccess':'Збережено в хмару.',
+    'cloud.registerSuccess':'Готово! Тепер можеш зайти цим логіном/паролем з іншого пристрою.',
+    'cloud.confirmLogout':'Вийти з хмарного акаунта на цьому пристрої? Локальний прогрес лишиться, але автосинк у хмару зупиниться, поки не зайдеш знову.',
     'modal.close':'✕ закрити (Esc)',
     'modal.forgeTitle':'КУЗНЯ — прокачка спорядження',
     'modal.shopTitle':'КРАМНИЦЯ — продаж спорядження',
@@ -1179,6 +1317,32 @@ const I18N = {
     'quests.ready':'DONE! Claim your reward at the board',
     'footer.autosave':'Progress autosaves (localStorage) in this browser.',
     'btn.export':'💾 Save to file', 'btn.import':'📂 Load from file', 'btn.reset':'Reset progress',
+    'btn.cloud':'☁️ Cloud save',
+    'modal.cloudTitle':'CLOUD SAVE',
+    'cloud.explain':'Link a username and password to your progress, and you\'ll be able to sign in on another device (phone/PC) and pull down what you did there. This isn\'t a real email, just a username — so a forgotten password can\'t be recovered.',
+    'cloud.usernameLabel':'Username', 'cloud.passwordLabel':'Password',
+    'cloud.usernameHint':'Latin letters, digits, underscore only — 3–20 characters',
+    'cloud.passwordHint':'At least 6 characters',
+    'cloud.registerHeader':'Link this progress (first time)',
+    'cloud.registerBtn':'Link username and password',
+    'cloud.loginHeader':'Already have an account? Sign in (replaces local progress)',
+    'cloud.loginBtn':'Sign in',
+    'cloud.err.badUsername':'Username: letters/digits/underscore only, 3–20 characters.',
+    'cloud.err.badPassword':'Password must be at least 6 characters.',
+    'cloud.err.taken':'That username is already taken — pick another.',
+    'cloud.err.invalid':'Wrong username or password.',
+    'cloud.err.network':'Can\'t reach the server — try again later.',
+    'cloud.err.offline':'Cloud save is unavailable right now.',
+    'cloud.linkedAs':'Signed in as: {username}',
+    'cloud.lastSync':'Last synced: {time}', 'cloud.neverSynced':'Not synced yet this session',
+    'cloud.saveNowBtn':'☁️ Save to cloud now', 'cloud.pullBtn':'⬇️ Load from cloud', 'cloud.logoutBtn':'Sign out',
+    'cloud.pullConfirmTitle':'Cloud save found',
+    'cloud.pullConfirmBody':'Level {level}, saved {time}. Load it? This will REPLACE your current local progress.',
+    'cloud.pullNotFound':'There\'s no cloud save for this account yet.',
+    'cloud.pullSuccess':'Progress loaded from the cloud.',
+    'cloud.pushSuccess':'Saved to the cloud.',
+    'cloud.registerSuccess':'Done! You can now sign in with this username/password on another device.',
+    'cloud.confirmLogout':'Sign out of the cloud account on this device? Local progress stays, but cloud auto-sync stops until you sign in again.',
     'modal.close':'✕ close (Esc)',
     'modal.forgeTitle':'FORGE — upgrade gear',
     'modal.shopTitle':'SHOP — sell gear',
@@ -4615,6 +4779,7 @@ function renderModalBody(){
   if(modalKind==='bestiary'){ renderBestiary(); return; }
   if(modalKind==='castle'){ renderCastle(); return; }
   if(modalKind==='shop'){ renderShop(); return; }
+  if(modalKind==='cloud'){ renderCloudModal(); return; }
   if(state.inventory.length===0){
     modalBody.innerHTML = `<div class="empty-msg">${t('modal.emptyInventory')}</div>`;
     return;
@@ -5394,6 +5559,11 @@ modalBody.addEventListener('click', (e)=>{
   else if(btn.dataset.action==='travelFrontier') travelToFrontier();
   else if(btn.dataset.action==='closeEnding') closeEndingScreen();
   else if(btn.dataset.action==='selectTheme') selectTheme(btn.dataset.theme);
+  else if(btn.dataset.action==='cloudRegister') handleCloudRegisterClick();
+  else if(btn.dataset.action==='cloudLogin') handleCloudLoginClick();
+  else if(btn.dataset.action==='cloudSaveNow') handleCloudSaveNowClick();
+  else if(btn.dataset.action==='cloudPull') handleCloudPullClick();
+  else if(btn.dataset.action==='cloudLogout') handleCloudLogoutClick();
 });
 document.getElementById('bossRetreatBtn').addEventListener('click', ()=>{ if(mode==='gauntlet') retreatGauntlet(); else retreatBoss(); });
 document.getElementById('bossContinueBtn').addEventListener('click', ()=>{ if(mode==='gauntlet') returnFromGauntlet(); else returnFromBoss(); });
@@ -5991,6 +6161,150 @@ function importSaveFile(file){
   reader.readAsText(file);
 }
 
+/* =====================================================================
+   ХМАРНІ ЗБЕРЕЖЕННЯ — модалка (форми реєстрації/входу + статус, коли
+   вже прив'язано). Сама логіка запитів — вище, біля ensureSupabaseSession.
+   ===================================================================== */
+function openCloudModal(){
+  modalKind = 'cloud';
+  modalTitle.textContent = t('modal.cloudTitle');
+  renderCloudModal();
+  modalBackdrop.hidden = false;
+}
+function renderCloudModal(){
+  let html = `<div style="margin:0 0 12px;color:var(--dim);font-size:12px;line-height:1.5;">${t('cloud.explain')}</div>`;
+  if(cloudLinked){
+    html += `<div class="mrow"><div class="up-name">${t('cloud.linkedAs',{username:escapeHtml(cloudUsername||'')})}
+      <small>${cloudLastSyncTs ? t('cloud.lastSync',{time:formatAgo(cloudLastSyncTs)}) : t('cloud.neverSynced')}</small>
+    </div></div>
+    <div id="cloudMsg"></div>
+    <button class="buy" data-action="cloudSaveNow" style="width:100%;margin-top:10px;padding:9px;">${t('cloud.saveNowBtn')}</button>
+    <button class="buy-max" data-action="cloudPull" style="width:100%;margin-top:8px;padding:9px;">${t('cloud.pullBtn')}</button>
+    <button class="buy-max" data-action="cloudLogout" style="width:100%;margin-top:8px;padding:9px;">${t('cloud.logoutBtn')}</button>`;
+  } else {
+    html += `<div style="color:var(--purple);font-size:12px;letter-spacing:1px;margin-bottom:2px;">${t('cloud.registerHeader')}</div>
+    <label class="cloud-label">${t('cloud.usernameLabel')} <span style="opacity:.7">(${t('cloud.usernameHint')})</span></label>
+    <input type="text" class="cloud-input" id="cloudRegUser" autocomplete="username" maxlength="20" />
+    <label class="cloud-label">${t('cloud.passwordLabel')} <span style="opacity:.7">(${t('cloud.passwordHint')})</span></label>
+    <input type="password" class="cloud-input" id="cloudRegPass" autocomplete="new-password" />
+    <div id="cloudRegMsg"></div>
+    <button class="buy" data-action="cloudRegister" style="width:100%;margin-bottom:18px;padding:9px;">${t('cloud.registerBtn')}</button>
+
+    <div style="color:var(--purple);font-size:12px;letter-spacing:1px;margin-bottom:2px;">${t('cloud.loginHeader')}</div>
+    <label class="cloud-label">${t('cloud.usernameLabel')}</label>
+    <input type="text" class="cloud-input" id="cloudLoginUser" autocomplete="username" maxlength="20" />
+    <label class="cloud-label">${t('cloud.passwordLabel')}</label>
+    <input type="password" class="cloud-input" id="cloudLoginPass" autocomplete="current-password" />
+    <div id="cloudLoginMsg"></div>
+    <button class="buy-max" data-action="cloudLogin" style="width:100%;padding:9px;">${t('cloud.loginBtn')}</button>`;
+  }
+  modalBody.innerHTML = html;
+}
+// Спільне застосування збереження з хмари — той самий ланцюжок
+// перемальовок, що й importSaveFile() (applyLoadedData() уже містить
+// увесь захист від зловмисних/побитих полів, той самий, що й для
+// імпорту файлу — джерело даних тут не має значення для цього захисту).
+function applyCloudSaveData(saveData){
+  applyLoadedData(saveData);
+  applyTheme(state.settings.theme||'default');
+  recomputeStats();
+  resetWorldAfterLoad();
+  ensureQuestOffers();
+  applyI18n();
+  updateModeUiText();
+  renderUpgrades();
+  renderInventory();
+  renderQuestLog();
+  updateHud();
+  addLog('log.loadedFromFile', 'upgrade');
+  save();
+}
+async function handleCloudRegisterClick(){
+  const user = document.getElementById('cloudRegUser').value;
+  const pass = document.getElementById('cloudRegPass').value;
+  const msgEl = document.getElementById('cloudRegMsg');
+  if(!validCloudUsername(user)){ msgEl.className='cloud-err'; msgEl.textContent=t('cloud.err.badUsername'); return; }
+  if(pass.length<6){ msgEl.className='cloud-err'; msgEl.textContent=t('cloud.err.badPassword'); return; }
+  msgEl.className=''; msgEl.textContent='';
+  const res = await registerCloudAccount(user, pass);
+  if(!res.ok){
+    msgEl.className='cloud-err';
+    msgEl.textContent = res.error==='taken' ? t('cloud.err.taken') : t('cloud.err.network');
+    return;
+  }
+  renderCloudModal();
+  const doneMsg = document.getElementById('cloudMsg');
+  if(doneMsg){ doneMsg.className='cloud-ok'; doneMsg.textContent=t('cloud.registerSuccess'); }
+}
+async function handleCloudLoginClick(){
+  const user = document.getElementById('cloudLoginUser').value;
+  const pass = document.getElementById('cloudLoginPass').value;
+  const msgEl = document.getElementById('cloudLoginMsg');
+  if(!validCloudUsername(user)){ msgEl.className='cloud-err'; msgEl.textContent=t('cloud.err.badUsername'); return; }
+  msgEl.className=''; msgEl.textContent='';
+  const res = await loginCloudAccount(user, pass);
+  if(!res.ok){
+    msgEl.className='cloud-err';
+    msgEl.textContent = res.error==='invalid' ? t('cloud.err.invalid') : t('cloud.err.network');
+    return;
+  }
+  const pulled = res.pulled;
+  if(pulled && pulled.ok && pulled.found){
+    // Нікнейм підхоплюємо ОДРАЗУ, незалежно від того, чи гравець погодиться
+    // завантажити весь прогрес нижче: sbPlayerId уже змінився на щойно
+    // залогінений акаунт, і якщо лишити старий (з попереднього анонімного
+    // сеансу на цьому пристрої) state.nickname — наступний фоновий
+    // syncLeaderboard() перепише лідерборд ЦЬОГО акаунта чужим нікнеймом.
+    if(typeof pulled.saveData.nickname==='string' && pulled.saveData.nickname){
+      state.nickname = pulled.saveData.nickname;
+    }
+    const lvl = (pulled.saveData && pulled.saveData.level) || '?';
+    const timeAgo = formatAgo(new Date(pulled.updatedAt).getTime());
+    if(confirm(t('cloud.pullConfirmBody',{level:lvl, time:timeAgo}))){
+      applyCloudSaveData(pulled.saveData);
+    } else {
+      syncLeaderboard(); // хоча б нікнейм одразу узгодити з лідербордом цього акаунта
+    }
+  }
+  renderCloudModal();
+}
+async function handleCloudSaveNowClick(){
+  const res = await pushCloudSave();
+  renderCloudModal();
+  const msgEl = document.getElementById('cloudMsg');
+  if(!msgEl) return;
+  if(res.ok){ msgEl.className='cloud-ok'; msgEl.textContent=t('cloud.pushSuccess'); }
+  else { msgEl.className='cloud-err'; msgEl.textContent=t('cloud.err.network'); }
+}
+async function handleCloudPullClick(){
+  const res = await pullCloudSaveInfo();
+  if(!res.ok){
+    renderCloudModal();
+    const msgEl = document.getElementById('cloudMsg');
+    if(msgEl){ msgEl.className='cloud-err'; msgEl.textContent=t('cloud.err.network'); }
+    return;
+  }
+  if(!res.found){
+    renderCloudModal();
+    const msgEl = document.getElementById('cloudMsg');
+    if(msgEl){ msgEl.className='cloud-err'; msgEl.textContent=t('cloud.pullNotFound'); }
+    return;
+  }
+  const lvl = (res.saveData && res.saveData.level) || '?';
+  const timeAgo = formatAgo(new Date(res.updatedAt).getTime());
+  if(confirm(t('cloud.pullConfirmBody',{level:lvl, time:timeAgo}))){
+    applyCloudSaveData(res.saveData);
+  }
+  renderCloudModal();
+  const msgEl = document.getElementById('cloudMsg');
+  if(msgEl){ msgEl.className='cloud-ok'; msgEl.textContent=t('cloud.pullSuccess'); }
+}
+async function handleCloudLogoutClick(){
+  if(!confirm(t('cloud.confirmLogout'))) return;
+  await logoutCloudAccount();
+  renderCloudModal();
+}
+
 function resetProgress(){
   if(!confirm(t('confirm.reset'))) return;
   localStorage.removeItem(SAVE_KEY);
@@ -6036,6 +6350,7 @@ function resetProgress(){
   save();
 }
 document.getElementById('resetBtn').addEventListener('click', resetProgress);
+document.getElementById('cloudBtn').addEventListener('click', openCloudModal);
 document.getElementById('exportBtn').addEventListener('click', exportSave);
 document.getElementById('importBtn').addEventListener('click', ()=>{
   document.getElementById('fileInput').click();
@@ -6263,6 +6578,10 @@ function init(){
   })();
   setInterval(syncLeaderboard, 60000);
   setInterval(fetchPlayerCount, 300000); // оновлюємо число, поки гра відкрита, а не лише при завантаженні
+  // Автозбереження в хмару — лише якщо гравець прив'язав логін/пароль
+  // (cloudLinked); pushCloudSave() сама тихо ігнорує себе, якщо ні, але
+  // перевірка тут же зайвий мережевий запит на кожен tick не готує дарма.
+  setInterval(()=>{ if(cloudLinked) pushCloudSave(); }, 5*60*1000);
 }
 
 /* =====================================================================

@@ -5,6 +5,18 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.47] — Cloud save (username + password, no email)
+
+### Added
+- Link a username and password to your progress from the new "☁️ Cloud
+  save" button (next to save/load-to-file), then sign in with the same
+  credentials on another device to pull down what you did there. No
+  email involved — which also means a forgotten password can't be
+  recovered; the game says so up front. Auto-saves to the cloud every 5
+  minutes while signed in, plus a manual "save now" button. Loading a
+  cloud save always asks for confirmation first, since it replaces
+  local progress.
+
 ## [0.46] — Fix: freezing at very high levels
 
 ### Fixed
