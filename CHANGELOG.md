@@ -5,6 +5,23 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.33] — Mobile controls, player counter, quest board fix
+
+### Added
+- **Mobile/touch controls.** On touch devices, an on-screen D-pad (town
+  movement), an interact button (context-sensitive, appears near a
+  building) and a jump button now overlay the game view — no keyboard
+  needed. Desktop/mouse play is unaffected.
+- **Player counter.** A rough "how many people have played" count now
+  shows in the footer.
+
+### Fixed
+- The Quest Board's "Turn in" button could occasionally fail to respond
+  if you opened the board mid-run (rather than through the board's own
+  building in town) — a background quest-progress update could replace
+  the button out from under your click at just the wrong moment. It no
+  longer touches the board's layout while a click is in flight.
+
 ## [0.32] — First public release
 
 This is the first version published outside of local development, bundling
