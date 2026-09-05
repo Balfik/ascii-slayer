@@ -548,7 +548,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.45';
+const GAME_VERSION = '0.46';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -3470,14 +3470,25 @@ function buyUpgradeMax(key){
 function gainXp(amount){
   state.xp += amount * (stats.bonusXpMult||1);
   let leveled = false;
+  // recomputeStats() ВАЖКА (обходить дерево навичок, дерево Переродження,
+  // увесь Замок, увесь інвентар) — і НЕ залежить від проміжного стану між
+  // окремими рівнями (xpToNext(level) рахує лише від рівня, stats тут
+  // ніде не читається), тож викликаємо її РАЗ, після циклу, а не на
+  // кожен рівень — так само, як уже давно зроблено в buySkillMax()/
+  // buyPrestigeSkillMax() (там теж можуть бути тисячі рівнів за раз).
+  // Один великий gainXp() (найчастіше — offline-прогрес, до 8 годин
+  // одним шматком, applyOfflineProgress()) на високому рівні легко дає
+  // тисячі рівнів за виклик — з recomputeStats() усередині циклу це
+  // означало тисячі важких перерахунків підряд синхронно й реальне
+  // зависання вкладки браузера.
   while(state.xp >= xpToNext(state.level)){
     state.xp -= xpToNext(state.level);
     state.level++;
     state.skillPoints++;
     leveled = true;
-    recomputeStats();
   }
   if(leveled){
+    recomputeStats();
     state.lifetime.bestLevel = Math.max(state.lifetime.bestLevel, state.level);
     addLog('log.levelUp', 'levelup', {level:state.level});
     spawnFloatingText(PLAYER_COL, 'LVL UP!', '#ffd94d');
@@ -5701,6 +5712,27 @@ const LOG_CATEGORY = {
 function logCategoryOf(key){ return LOG_CATEGORY[key] || 'other'; }
 // addLog зберігає КЛЮЧ перекладу + параметри (не готовий текст) — так при
 // перемиканні мови вся історія журналу миттєво перекладається наново.
+// На дуже високій швидкості атаки addLog() може викликатись по кілька
+// разів на кадр (кожен вбитий моб) — без тротлінгу renderLog() перебудовує
+// весь DOM журналу на КОЖЕН такий виклик, що додає помітне навантаження
+// саме тоді, коли гра й так найважча (найвищі рівні/швидкості). Той самий
+// принцип, що й QUEST_BOARD_RENDER_THROTTLE_MS вище: рендеримо одразу,
+// якщо з попереднього рендеру минуло достатньо часу, інакше плануємо ОДИН
+// відкладений рендер (не по одному на кожен пропущений виклик) — останній
+// стан журналу однаково потрапить у той відкладений рендер.
+const LOG_RENDER_THROTTLE_MS = 200;
+let lastLogRenderTs = 0;
+let logRenderPending = false;
+function scheduleLogRender(){
+  const now = Date.now();
+  if(now - lastLogRenderTs >= LOG_RENDER_THROTTLE_MS){
+    lastLogRenderTs = now;
+    renderLog();
+  } else if(!logRenderPending){
+    logRenderPending = true;
+    setTimeout(()=>{ logRenderPending = false; lastLogRenderTs = Date.now(); renderLog(); }, LOG_RENDER_THROTTLE_MS);
+  }
+}
 function addLog(key, type, params){
   logEntries.unshift({key, params, type, category:logCategoryOf(key), ts:Date.now()});
   // Тримаємо по LOG_MAX_PER_CATEGORY найновіших записів У КОЖНІЙ категорії
@@ -5712,7 +5744,7 @@ function addLog(key, type, params){
     counts[c] = (counts[c]||0) + 1;
     return counts[c] <= LOG_MAX_PER_CATEGORY;
   });
-  renderLog();
+  scheduleLogRender();
 }
 function renderLog(){
   const el = document.getElementById('logBody');

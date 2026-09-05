@@ -5,6 +5,22 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.46] — Fix: freezing at very high levels
+
+### Fixed
+- Reported at level ~5000: the game would occasionally freeze the
+  browser tab, and once left 2000 skill points unspent all at once. The
+  cause: gaining XP re-ran a heavy stat-recalculation on every single
+  level inside the level-up loop instead of once after it. A single
+  large XP gain (most commonly offline progress, which can pay out up
+  to 8 hours at once) can be worth hundreds or thousands of levels at
+  high level — meaning hundreds or thousands of expensive recalculations
+  back to back on the main thread. Fixed to recalculate once, after all
+  levels are applied, matching the pattern already used correctly
+  elsewhere (bulk skill purchases). Also throttled the log panel's
+  re-render so very high attack speeds (many kills per frame) don't
+  rebuild its DOM on every single kill.
+
 ## [0.45] — Fix: service worker could serve a stale cached page
 
 ### Fixed
