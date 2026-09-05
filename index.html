@@ -521,7 +521,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.40';
+const GAME_VERSION = '0.41';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -752,7 +752,7 @@ const I18N = {
     'modal.worldmapTitle':'КАРТА СВІТУ',
     'touch.up':'Вперед', 'touch.down':'Назад', 'touch.left':'Ліворуч', 'touch.right':'Праворуч',
     'touch.interact':'Взаємодія', 'touch.jump':'Стрибок',
-    'footer.visitorCountTitle':'Орієнтовна кількість людей, що коли-небудь відкривали цю сторінку (по одному разу на пристрій)',
+    'footer.visitorCountTitle':'Кількість гравців у публічній базі лідерборду (реальні дані, не кеш)',
     'title.nicknameLabel':'Твій нікнейм:', 'title.rerollBtn':'🎲 Перегенерувати',
     'btn.leaderboard':'🌍 Лідерборд', 'modal.leaderboardTitle':'ЛІДЕРБОРД',
     'leaderboard.loading':'Завантаження…', 'leaderboard.unavailable':'Лідерборд зараз недоступний — спробуй пізніше.',
@@ -996,7 +996,7 @@ const I18N = {
     'modal.worldmapTitle':'WORLD MAP',
     'touch.up':'Up', 'touch.down':'Down', 'touch.left':'Left', 'touch.right':'Right',
     'touch.interact':'Interact', 'touch.jump':'Jump',
-    'footer.visitorCountTitle':'Rough count of people who have ever opened this page (once per device)',
+    'footer.visitorCountTitle':'Number of players in the public leaderboard database (real data, not cached)',
     'title.nicknameLabel':'Your nickname:', 'title.rerollBtn':'🎲 Reroll',
     'btn.leaderboard':'🌍 Leaderboard', 'modal.leaderboardTitle':'LEADERBOARD',
     'leaderboard.loading':'Loading…', 'leaderboard.unavailable':'The leaderboard is unavailable right now — try again later.',
@@ -6017,47 +6017,47 @@ function loop(ts){
 /* =====================================================================
    СТАРТ
    ===================================================================== */
-/* Лічильник унікальних гравців — суто інформаційний віджет у футері, БЕЗ
-   жодного впливу на геймплей. У гри немає власного бекенду (статичний
-   файл на GitHub Pages), тож рахуємо через безкоштовний сторонній сервіс
-   (visitorbadge.io) — його "хіт"-ендпоінт збільшує число на КОЖЕН запит,
-   без дедуплікації на їхньому боці, тож дедуплікацію робимо самі:
-   інкремент шлемо ЛИШЕ ОДИН РАЗ за все життя цього браузера (окремий
-   ключ у localStorage, навмисно НЕ в SAVE_KEY — "Скинути прогрес" НЕ
-   повинен змушувати рахувати того самого гравця вдруге). Показане число
-   після першого разу лишається закешованим (немає безкоштовного
-   "прочитати без інкременту" ендпоінта) — чесний компроміс: ліпше трохи
-   застаріле число, ніж роздувати лічильник щоразу, коли той самий
-   гравець просто відкриває сторінку повторно. Якщо сервіс колись
-   зникне/зламається — усе тихо ігнорується (catch), гра як завжди
-   продовжує працювати без жодної залежності від цього.
+/* Лічильник гравців — суто інформаційний віджет у футері, БЕЗ жодного
+   впливу на геймплей. РАНІШЕ (до v0.41) рахували через сторонній сервіс
+   visitorbadge.io — але той не мав "прочитати без інкременту" ендпоінта,
+   тож показане число назавжди застигало кешованим з ПЕРШОГО-ЛІПШОГО
+   завантаження цього конкретного браузера й більше ніколи не оновлювалось
+   (гравець це сам підмітив: ПК і телефон показували геть різні застиглі
+   числа). Тепер, коли в нас уже є власна база (Supabase, `players`,
+   SELECT відкритий усім через RLS — див. NOTES_FOR_CLAUDE.txt), рахуємо
+   напряму з неї: реальна кількість рядків, тобто реальних гравців, що
+   хоч раз відкрили гру (перший syncLeaderboard() у init() нижче стається
+   одразу при завантаженні, ще до будь-якого прогресу) — питаємо базу
+   ЗАНОВО щоразу, коли гра відкривається (і періодично, поки відкрита),
+   тож число завжди актуальне, а не застигле на випадковому моменті.
+   head:true у select() — просимо в бази лише ЛІЧБУ рядків (заголовок
+   Content-Range), не самі дані, тож запит легкий і не залежить від
+   кількості гравців. Якщо Supabase недоступний — тихо лишаємо останнє
+   закешоване число (той самий "чесний компроміс", що й раніше), гра як
+   завжди продовжує працювати без жодної залежності від цього.
    ===================================================================== */
-const VISITOR_COUNT_URL = 'https://api.visitorbadge.io/api/visitors?path=Balfik.ascii-slayer.players';
-const VISITOR_COUNTED_KEY = 'asciiSlayerVisitorCounted';
-const VISITOR_CACHE_KEY = 'asciiSlayerVisitorCountCache';
+const PLAYER_COUNT_CACHE_KEY = 'asciiSlayerPlayerCountCache';
 function updateVisitorCountUi(n){
   const el = document.getElementById('visitorCount');
   if(el) el.textContent = formatNum(n);
 }
-function trackUniqueVisitor(){
+async function fetchPlayerCount(){
   try{
-    const cached = localStorage.getItem(VISITOR_CACHE_KEY);
+    const cached = localStorage.getItem(PLAYER_COUNT_CACHE_KEY);
     if(cached) updateVisitorCountUi(parseInt(cached,10));
-    if(localStorage.getItem(VISITOR_COUNTED_KEY)) return;
-    fetch(VISITOR_COUNT_URL).then(r=>r.text()).then(svg=>{
-      const m = svg.match(/font-weight="bold">(\d+)<\/text>/);
-      if(m){
-        localStorage.setItem(VISITOR_CACHE_KEY, m[1]);
-        updateVisitorCountUi(parseInt(m[1],10));
-      }
-      localStorage.setItem(VISITOR_COUNTED_KEY, '1');
-    }).catch(()=>{});
   }catch(e){}
+  if(!sbClient) return;
+  try{
+    const { count, error } = await sbClient.from('players').select('id', {count:'exact', head:true});
+    if(!error && typeof count==='number'){
+      updateVisitorCountUi(count);
+      try{ localStorage.setItem(PLAYER_COUNT_CACHE_KEY, String(count)); }catch(e){}
+    }
+  }catch(e){ /* мережа/сервіс недоступні — лишаємо кешоване значення, якщо було */ }
 }
 
 function init(){
   loadLocal();
-  trackUniqueVisitor();
   document.getElementById('versionNum').textContent = GAME_VERSION;
   applyI18n();
   updateModeUiText();
@@ -6083,11 +6083,13 @@ function init(){
   // затримка/недоступність Supabase ніколи не затримувала й не ламала
   // старт самої гри. Кожен виклик усередині сам тихо ковтає помилки.
   initSupabase();
+  fetchPlayerCount(); // лічильник у футері — див. коментар над fetchPlayerCount()
   (async()=>{
     await ensureSupabaseSession();
     syncLeaderboard();
   })();
   setInterval(syncLeaderboard, 60000);
+  setInterval(fetchPlayerCount, 300000); // оновлюємо число, поки гра відкрита, а не лише при завантаженні
 }
 
 /* =====================================================================

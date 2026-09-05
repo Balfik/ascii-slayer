@@ -5,6 +5,19 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.41] — Player counter now reads from our own database
+
+### Changed
+- The footer's player counter used to go through a free third-party
+  badge service that had no "read without incrementing" option, so the
+  number shown was permanently frozen from whatever it happened to be
+  the very first time each individual browser opened the page — two
+  devices could show completely different, both stale, numbers forever.
+  It now queries our own leaderboard database directly (a lightweight
+  row-count query, refreshed on every load and every 5 minutes while
+  the game stays open), so it reflects the real, current count instead
+  of a permanent snapshot from one random moment.
+
 ## [0.40] — Fix: cursor flickering on every level-up
 
 ### Fixed
