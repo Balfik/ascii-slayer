@@ -5,6 +5,14 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.38] — Fix: offline-progress screen showed raw HTML tags
+
+### Fixed
+- A regression from 0.37's security hardening: the "while you were
+  away" screen briefly showed literal `<b>` tags instead of bolding the
+  elapsed time. Fixed with a narrow, explicit exception rather than
+  rolling back the fix that closed the injection vector.
+
 ## [0.37] — Log filters, security hardening
 
 ### Added

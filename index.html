@@ -521,7 +521,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.37';
+const GAME_VERSION = '0.38';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -1237,12 +1237,22 @@ const I18N = {
 // у БРАУЗЕРІ ТОГО, ХТО ІМПОРТУЄ такий файл (де тепер ще й лежить токен
 // сесії лідерборду). Екранування тут закриває цю діру одразу для
 // геть усіх t()-викликів, а не лише для тих, що йдуть від інвентаря.
+// Виняток — trustedHtml() нижче: одне свідоме місце (welcome.body, час
+// офлайн-прогресу), де параметр САМ по собі мусить лишитись HTML (щоб
+// підсвітити число кольором). Значення там повністю своє/обчислене
+// (summary.timeLabel — просто число+одиниця), не з save-файлу/мережі —
+// тому свідомо позначене як довірене, а НЕ виняток із самого t().
+function trustedHtml(html){ return {__trustedHtml:true, value:html}; }
 function t(key, params){
   const dict = I18N[lang] || I18N.uk;
   let str = dict[key];
   if(str==null) str = (I18N.uk[key]!=null ? I18N.uk[key] : key);
   if(params){
-    for(const k in params) str = str.split('{'+k+'}').join(escapeHtml(params[k]));
+    for(const k in params){
+      const v = params[k];
+      const safe = (v && typeof v==='object' && v.__trustedHtml) ? v.value : escapeHtml(v);
+      str = str.split('{'+k+'}').join(safe);
+    }
   }
   return str;
 }
@@ -5082,7 +5092,7 @@ function showOfflineModal(summary){
   modalTitle.textContent = t('modal.welcomeTitle');
   modalBody.innerHTML = `
     <p style="font-size:13px;line-height:1.6;color:var(--text);margin-top:0;">
-      ${t('welcome.body',{time:`<b style="color:var(--accent)">${summary.timeLabel}</b>`})}
+      ${t('welcome.body',{time:trustedHtml(`<b style="color:var(--accent)">${escapeHtml(summary.timeLabel)}</b>`)})}
     </p>
     <div class="mrow"><div class="up-name">${t('welcome.gold')}</div><span class="lvl" style="color:var(--gold)">+${summary.goldGained}$</span></div>
     <div class="mrow"><div class="up-name">${t('welcome.xp')}</div><span class="lvl" style="color:var(--accent)">+${summary.xpGained}</span></div>
