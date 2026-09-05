@@ -15,6 +15,14 @@
 // з GAME_VERSION при кожному релізі — успішний онлайн-візит сам оновлює
 // кеш. CACHE_NAME треба бампати лише якщо міняється сам ПІДХІД
 // кешування (список файлів/стратегія), не контент.
+//
+// {cache:'no-store'} у fetch() нижче — КРИТИЧНО, знайдено живим тестом
+// одразу після першого деплою: голий fetch(req) без цього сам собі "мережа
+// спочатку" НЕ гарантує — браузер може мовчки повернути власний HTTP-кеш
+// (звичайний, не Cache API) замість реального походу в мережу, якщо
+// відповідь мала кешовні заголовки. Тоді "найсвіжіша версія онлайн" різко
+// переставала бути правдою (реальний прояв: щойно задеплой index.html
+// показував старий вміст, доки HTTP-кеш браузера не протух сам).
 const CACHE_NAME = 'ascii-slayer-sw-v1';
 const CORE_ASSETS = ['./', './index.html', './manifest.json'];
 
@@ -38,7 +46,7 @@ self.addEventListener('fetch', (e)=>{
   if(url.origin !== self.location.origin) return; // Supabase/CDN — не наша справа
 
   e.respondWith(
-    fetch(req).then(res=>{
+    fetch(req, {cache:'no-store'}).then(res=>{
       const resClone = res.clone();
       caches.open(CACHE_NAME).then(cache=>cache.put(req, resClone)).catch(()=>{});
       return res;

@@ -5,6 +5,17 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.45] — Fix: service worker could serve a stale cached page
+
+### Fixed
+- The service worker's "network first" strategy from 0.44 didn't
+  actually guarantee fresh content: a plain `fetch()` inside a service
+  worker doesn't bypass the browser's regular HTTP cache, so it could
+  silently return an old cached copy of the page instead of reaching
+  the network. Found immediately after shipping 0.44 via live testing.
+  Fixed by forcing `cache: 'no-store'` on every request the service
+  worker makes.
+
 ## [0.44] — Cosmetic themes, nearby rank, installable (PWA)
 
 ### Added
