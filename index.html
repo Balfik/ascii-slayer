@@ -521,7 +521,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.38';
+const GAME_VERSION = '0.39';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -5505,7 +5505,11 @@ function renderInventory(){
   }).join('');
 }
 
-const LOG_MAX = 40;
+// ОКРЕМИЙ ліміт на кожну категорію (а не спільний на весь журнал!) — інакше
+// категорія-спам (combat) виштовхувала б рідкісні записи (achievements,
+// bosses) з масиву ще ДО фільтрації рендером, навіть якщо гравець combat
+// сховав з перегляду: запис же однаково фізично зникав би з logEntries.
+const LOG_MAX_PER_CATEGORY = 50;
 let logEntries = [];
 // Категорія для ФІЛЬТРАЦІЇ (чекбокси над журналом) — НАВМИСНО окремо від
 // `type` (те визначає лише колір рамки рядка, вже давно так). Гравець
@@ -5533,7 +5537,15 @@ function logCategoryOf(key){ return LOG_CATEGORY[key] || 'other'; }
 // перемиканні мови вся історія журналу миттєво перекладається наново.
 function addLog(key, type, params){
   logEntries.unshift({key, params, type, category:logCategoryOf(key), ts:Date.now()});
-  if(logEntries.length>LOG_MAX) logEntries.length = LOG_MAX;
+  // Тримаємо по LOG_MAX_PER_CATEGORY найновіших записів У КОЖНІЙ категорії
+  // окремо (масив вже відсортований від найновішого, unshift вище) — так
+  // одна "гучна" категорія ніколи не витісняє записи іншої.
+  const counts = {};
+  logEntries = logEntries.filter(le=>{
+    const c = le.category;
+    counts[c] = (counts[c]||0) + 1;
+    return counts[c] <= LOG_MAX_PER_CATEGORY;
+  });
   renderLog();
 }
 function renderLog(){

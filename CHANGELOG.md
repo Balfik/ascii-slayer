@@ -5,6 +5,17 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.39] — Fix: log filters were still losing rare messages
+
+### Fixed
+- The log's category filters (added in 0.37) correctly hid/showed rows,
+  but the underlying log buffer was still a single shared list capped at
+  a fixed size — so a burst of a spammy category (e.g. kills) could push
+  a rare message (a level-up, an achievement) out of the buffer entirely,
+  even while that category was toggled on and should have stayed visible.
+  Each category now keeps its own capped buffer, so one category can no
+  longer evict another's entries.
+
 ## [0.38] — Fix: offline-progress screen showed raw HTML tags
 
 ### Fixed
