@@ -558,7 +558,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.50';
+const GAME_VERSION = '0.51';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -917,6 +917,9 @@ const I18N = {
     'boss.autoRetreatLabel':'Автовідступ у безнадійних боях',
     'boss.autoRetreatDesc':'Якщо бій точно не виграти за час, що лишився — вийти одразу, не чекаючи таймера',
     'boss.autoRetreatOn':'Увімкнено', 'boss.autoRetreatOff':'Вимкнено',
+    'auto.enchantLabel':'Автозаточка за золото', 'auto.enchantDesc':'Автоматично заточує предмети в Кузні, поки вистачає золота (душі демонів не витрачаються)',
+    'auto.upgradeLabel':'Автопрокачка за золото', 'auto.upgradeDesc':'Автоматично прокачує силу атаки/швидкість бігу/швидкість атаки, поки вистачає золота (удача за кристали — не автоматично)',
+    'auto.skillSpendLabel':'Автостратег', 'auto.skillSpendDesc':'Вільні очки навичок автоматично йдуть у прокачку дерева навичок по порядку гілок, згори вниз',
     'boss.attackBtn':'⚔ Атакувати',
     'boss.retreatBtn':'🏳 Відступити',
     'gauntlet.retreatBtn':'🏳 Завершити', 'gauntlet.continueBtn':'🏘 У місто',
@@ -972,6 +975,9 @@ const I18N = {
     'shop.resourcesExplain':'Продаж матеріалів Замку за золото — пам\'ятай, що вони потрібні для будівництва, продавай лише зайве.',
     'shop.resourcePriceEach':'{price}$ за одиницю',
     'log.upgradeBoughtMax':'Прокачано «{label}» на {count} рівнів (до Lv.{level})',
+    'log.autoEnchanted':'🔨 Автоковаль: +{count} рівнів заточки за золото',
+    'log.autoUpgraded':'💪 Автотренер: {count} прокачок за золото',
+    'log.autoSkillSpend':'🧠 Автостратег: {count} рівнів навичок автоматично',
     'log.enchantedMax':'Кузня: «{name}» прокачано на {count} рівнів (до +{level})',
     'log.skillLeveledMax':'🌳 «{name}» прокачано на {count} рівнів (до Lv.{level})',
     'log.soldAll':'Продано {count} предметів за {price} золота',
@@ -1197,6 +1203,9 @@ const I18N = {
     'boss.autoRetreatLabel':'Auto-retreat from hopeless fights',
     'boss.autoRetreatDesc':"If the fight can't possibly be won in the time left, bail out immediately instead of waiting out the timer",
     'boss.autoRetreatOn':'On', 'boss.autoRetreatOff':'Off',
+    'auto.enchantLabel':'Auto-enchant with gold', 'auto.enchantDesc':'Automatically enchants items at the Forge as long as there\'s gold for it (never spends demonic souls)',
+    'auto.upgradeLabel':'Auto-upgrade with gold', 'auto.upgradeDesc':'Automatically upgrades attack/run speed/attack speed as long as there\'s gold for it (luck costs crystals — not automatic)',
+    'auto.skillSpendLabel':'Auto-Strategist', 'auto.skillSpendDesc':'Free skill points automatically go into the skill tree, branch by branch, top to bottom',
     'boss.attackBtn':'⚔ Attack',
     'boss.retreatBtn':'🏳 Retreat',
     'gauntlet.retreatBtn':'🏳 End Run', 'gauntlet.continueBtn':'🏘 To town',
@@ -1252,6 +1261,9 @@ const I18N = {
     'shop.resourcesExplain':"Sell Castle materials for gold — remember you need them for building, only sell what you don't need.",
     'shop.resourcePriceEach':'{price}$ each',
     'log.upgradeBoughtMax':'Upgraded «{label}» by {count} levels (to Lv.{level})',
+    'log.autoEnchanted':'🔨 Auto-Smith: +{count} enchant levels with gold',
+    'log.autoUpgraded':'💪 Auto-Trainer: {count} upgrades with gold',
+    'log.autoSkillSpend':'🧠 Auto-Strategist: {count} skill levels automatically',
     'log.enchantedMax':'Forge: «{name}» upgraded by {count} levels (to +{level})',
     'log.skillLeveledMax':'🌳 «{name}» upgraded by {count} levels (to Lv.{level})',
     'log.soldAll':'Sold {count} items for {price} gold',
@@ -2021,7 +2033,10 @@ const SKILL_TREE = {
     label: '🤖 Гілка автоматизації', label_en: '🤖 Automation Branch',
     nodes: [
       {id:'a1', name:'Автоквести', name_en:'Auto-Quests', desc:'Автоматично бере доступні квести з дошки оголошень (окрім "Акробат" — на стрибки) і одразу здає виконані, навіть коли дошка закрита', desc_en:'Automatically accepts available quests from the board (except "Acrobat" — jumps) and instantly turns in completed ones, even while the board is closed', baseCost:20, costStep:0, maxLevel:1, effect:{autoQuest:1}},
-      {id:'a2', name:'Без акробатики', name_en:'No More Acrobatics', desc:'Квести на стрибки більше не з\'являються на дошці оголошень (ефект зникає при Переродженні, як і всі звичайні навички)', desc_en:"Jump quests stop appearing on the board (effect ends on Prestige, like all regular skills)", baseCost:50, costStep:0, maxLevel:1, effect:{noJumpQuests:1}, requires:'a1'}
+      {id:'a2', name:'Без акробатики', name_en:'No More Acrobatics', desc:'Квести на стрибки більше не з\'являються на дошці оголошень (ефект зникає при Переродженні, як і всі звичайні навички)', desc_en:"Jump quests stop appearing on the board (effect ends on Prestige, like all regular skills)", baseCost:50, costStep:0, maxLevel:1, effect:{noJumpQuests:1}, requires:'a1'},
+      {id:'a3', name:'Автоковаль', name_en:'Auto-Smith', desc:'Дозволяє увімкнути автозаточку предметів у Кузні — лише за золото (не за душі демонів), окремий перемикач у Кузні', desc_en:'Unlocks auto-enchanting items at the Forge — gold only (never demonic souls), separate on/off switch in the Forge', baseCost:50, costStep:0, maxLevel:1, effect:{autoEnchantGold:1}},
+      {id:'a4', name:'Автотренер', name_en:'Auto-Trainer', desc:'Дозволяє увімкнути автопрокачку сили атаки/швидкості бігу/швидкості атаки — лише за золото (не за кристали, удача не автопрокачується), окремий перемикач у панелі "Прокачка"', desc_en:'Unlocks auto-upgrading attack/run speed/attack speed — gold only (never crystals, luck is not auto-upgraded), separate on/off switch in the Upgrades panel', baseCost:50, costStep:0, maxLevel:1, effect:{autoUpgradeGold:1}},
+      {id:'a5', name:'Автостратег', name_en:'Auto-Strategist', desc:'Дозволяє увімкнути автоматичний розподіл вільних очок навичок по всьому дереву (по порядку гілок, згори вниз) — окремий перемикач у Дереві навичок', desc_en:'Unlocks automatically spending free skill points across the whole tree (branch by branch, top to bottom) — separate on/off switch in the Skill Tree', baseCost:100, costStep:0, maxLevel:1, effect:{autoSkillSpend:1}}
     ]
   }
 };
@@ -2572,6 +2587,118 @@ function autoManageQuests(dt){
     if(idx<0) break;
     acceptQuest(state.quests.offers[idx].uid);
   }
+}
+// Автоковаль/Автотренер/Автостратег — три окремі автоматизації (a3/a4/a5
+// у гілці "Автоматизація"), кожна вимагає СВОЄЇ навички (stats.*) І
+// ОКРЕМОГО перемикача (state.settings.*Enabled, вимкнено за замовчуванням
+// навіть після вивчення навички — гравець сам вмикає). НАВМИСНО НЕ
+// перевикористовуємо enchantItemMax()/buySkillMax() напряму — ті
+// розраховані на ОДИН клік гравця (свій addLog/render/save на кожен
+// виклик); викликані в циклі по всьому інвентарю/дереву раз на секунду,
+// вони заспамили б журнал і марно перемальовували б DOM на кожен окремий
+// предмет/вузол. Тут — один сумарний addLog за тік, і рендер лише тієї
+// панелі, що зараз відкрита.
+let autoEnchantTimer = 0;
+const AUTO_ENCHANT_CHECK_INTERVAL = 1;
+function autoManageEnchant(dt){
+  if(!stats.autoEnchantGold || !state.settings.autoEnchantEnabled) return;
+  autoEnchantTimer += dt;
+  if(autoEnchantTimer < AUTO_ENCHANT_CHECK_INTERVAL) return;
+  autoEnchantTimer = 0;
+  let totalCount = 0;
+  for(const it of state.inventory){
+    if(it.rarity==='demonic') continue; // лише за золото — душі демонів автоматизація не займає
+    const enchantBefore = it.enchant||0;
+    let count = 0;
+    const cap = 200000;
+    while(count < cap){
+      const free = hasRelic('miser_chains') && Math.random() < RELIC_FREE_ENCHANT_CHANCE;
+      if(free){ it.enchant = (it.enchant||0)+1; count++; continue; }
+      const cost = enchantCostOf(it);
+      if(state.gold < cost) break;
+      state.gold -= cost;
+      it.enchant = (it.enchant||0)+1;
+      count++;
+    }
+    if(count>0 && enchantBefore<10 && it.enchant>=10){
+      reportEvent('enchant_10', {targetName:L(it,'name'), targetRarity:it.rarity});
+    }
+    totalCount += count;
+  }
+  if(totalCount===0) return;
+  state.lifetime.itemsEnchanted = (state.lifetime.itemsEnchanted||0)+totalCount;
+  recomputeStats();
+  addLog('log.autoEnchanted', 'upgrade', {count:totalCount});
+  sfxEnchant();
+  if(modalKind==='forge') renderModalBody();
+  renderInventory();
+  updateHud();
+  save();
+}
+let autoUpgradeTimer = 0;
+const AUTO_UPGRADE_CHECK_INTERVAL = 1;
+const AUTO_UPGRADE_GOLD_KEYS = ['attack','speed','atkSpeed']; // НЕ luck — та за кристали
+function autoManageUpgrade(dt){
+  if(!stats.autoUpgradeGold || !state.settings.autoUpgradeEnabled) return;
+  autoUpgradeTimer += dt;
+  if(autoUpgradeTimer < AUTO_UPGRADE_CHECK_INTERVAL) return;
+  autoUpgradeTimer = 0;
+  let totalCount = 0;
+  for(const key of AUTO_UPGRADE_GOLD_KEYS){
+    let count = 0;
+    const cap = 200000;
+    while(count < cap){
+      const cost = upgradeCost(key);
+      if(state.gold < cost) break;
+      state.gold -= cost;
+      state.upgrades[key]++;
+      count++;
+    }
+    totalCount += count;
+  }
+  if(totalCount===0) return;
+  recomputeStats();
+  addLog('log.autoUpgraded', 'upgrade', {count:totalCount});
+  renderUpgrades();
+  updateHud();
+  save();
+}
+let autoSkillSpendTimer = 0;
+const AUTO_SKILL_SPEND_CHECK_INTERVAL = 1;
+function autoManageSkillSpend(dt){
+  if(!stats.autoSkillSpend || !state.settings.autoSkillSpendEnabled) return;
+  autoSkillSpendTimer += dt;
+  if(autoSkillSpendTimer < AUTO_SKILL_SPEND_CHECK_INTERVAL) return;
+  autoSkillSpendTimer = 0;
+  if(state.skillPoints<=0) return;
+  let totalCount = 0;
+  outer:
+  for(const branchKey in SKILL_TREE){
+    for(const node of SKILL_TREE[branchKey].nodes){
+      if(state.skillPoints<=0) break outer;
+      if(skillLockInfo(node).locked) continue; // ще недоступний вузол — пропускаємо, не помилка
+      const cap = 1000000;
+      let count = 0;
+      while(count < cap){
+        const lvl = skillLevel(node.id);
+        if(lvl >= node.maxLevel) break;
+        const cost = skillCost(node);
+        if(state.skillPoints < cost) break;
+        state.skillPoints -= cost;
+        state.skills[node.id] = lvl+1;
+        count++;
+      }
+      totalCount += count;
+    }
+  }
+  if(totalCount===0) return;
+  state.lifetime.skillLevelsBought = (state.lifetime.skillLevelsBought||0)+totalCount;
+  recomputeStats();
+  if(stats.noJumpQuests) purgeJumpQuestOffers(); // той самий побічний ефект, що й buySkillMax()
+  addLog('log.autoSkillSpend', 'upgrade', {count:totalCount});
+  if(modalKind==='skills') renderSkillTree();
+  updateHud();
+  save();
 }
 function asciiBar(ratio, width){
   const filled = Math.max(0, Math.min(width, Math.round(ratio*width)));
@@ -3386,7 +3513,8 @@ const state = {
   // початковий літерал теж мусить мати всі поля, бо loadLocal() може
   // взагалі не викликати applyLoadedData() (немає збереження, або
   // localStorage недоступний) — тоді саме цей дефолт і лишається.
-  settings:{ autoRetreatBoss:false, logFilters:{combat:true, loot:true, achievements:true, quests:true, bosses:true, other:true}, theme:'default' },
+  settings:{ autoRetreatBoss:false, logFilters:{combat:true, loot:true, achievements:true, quests:true, bosses:true, other:true}, theme:'default',
+             autoEnchantEnabled:false, autoUpgradeEnabled:false, autoSkillSpendEnabled:false },
   relics:{}, // relicId -> true; переживає Переродження, як і achievements/milestonesClaimed
   prestigeSkills:{}, // prestigeTreeNodeId -> рівень; НЕ скидається Переродженням (на відміну від skills)
   milestonesClaimed:{}, // milestoneKey -> true; переживає Переродження, як achievements
@@ -3404,7 +3532,8 @@ const state = {
 const stats = {
   attack:BASE_ATTACK, speed:BASE_SPEED, atkSpeed:BASE_ATKSPEED, goldMult:1, dropChance:0.08,
   jumpDuration:JUMP_DURATION_BASE, critChance:0, pickupReach:0, crystalBonus:0, ignorePits:false,
-  castleResourceMult:1, soulMult:1, bonusXpMult:1, autoQuest:false, noJumpQuests:false
+  castleResourceMult:1, soulMult:1, bonusXpMult:1, autoQuest:false, noJumpQuests:false,
+  autoEnchantGold:false, autoUpgradeGold:false, autoSkillSpend:false
 };
 
 let distanceCols = 0; // "одометр" — скільки пройдено за все життя забігу, росте ЗАВЖДИ, ніщо його не заморожує й не переставляє
@@ -3501,7 +3630,7 @@ function goldMultEff(){ return stats.goldMult * (1+comboMultBonus()) * dayNightG
    СТАТИ
    ===================================================================== */
 function computeSkillBonuses(){
-  const b = {atkPct:0, atkSpeedFlat:0, spdPct:0, jumpPct:0, dropPct:0, goldPct:0, critChance:0, magnetReach:0, crystalBonus:0, ignorePits:0, farmGoldPct:0, farmXpPct:0, farmDropPct:0, autoQuest:0, noJumpQuests:0};
+  const b = {atkPct:0, atkSpeedFlat:0, spdPct:0, jumpPct:0, dropPct:0, goldPct:0, critChance:0, magnetReach:0, crystalBonus:0, ignorePits:0, farmGoldPct:0, farmXpPct:0, farmDropPct:0, autoQuest:0, noJumpQuests:0, autoEnchantGold:0, autoUpgradeGold:0, autoSkillSpend:0};
   for(const branchKey in SKILL_TREE){
     for(const node of SKILL_TREE[branchKey].nodes){
       const lvl = state.skills[node.id] || 0;
@@ -3522,6 +3651,9 @@ function computeSkillBonuses(){
       if(e.farmDropPct) b.farmDropPct += e.farmDropPct*lvl;
       if(e.autoQuest) b.autoQuest += e.autoQuest*lvl;
       if(e.noJumpQuests) b.noJumpQuests += e.noJumpQuests*lvl;
+      if(e.autoEnchantGold) b.autoEnchantGold += e.autoEnchantGold*lvl;
+      if(e.autoUpgradeGold) b.autoUpgradeGold += e.autoUpgradeGold*lvl;
+      if(e.autoSkillSpend) b.autoSkillSpend += e.autoSkillSpend*lvl;
     }
   }
   return b;
@@ -3597,6 +3729,9 @@ function recomputeStats(){
   stats.ignorePits = skillB.ignorePits > 0;
   stats.autoQuest = skillB.autoQuest > 0;
   stats.noJumpQuests = skillB.noJumpQuests > 0;
+  stats.autoEnchantGold = skillB.autoEnchantGold > 0;
+  stats.autoUpgradeGold = skillB.autoUpgradeGold > 0;
+  stats.autoSkillSpend = skillB.autoSkillSpend > 0;
   stats.farmXpMult = farmXpMult;
   stats.bonusXpMult = (1 + prestigeB.xpPct/100) * (1 + castleB.xpPct/100);
   stats.castleResourceMult = 1 + castleB.resourceMult/100;
@@ -4819,12 +4954,17 @@ function renderModalBody(){
     return;
   }
   if(modalKind==='forge'){
+    const autoEnchantOn = !!state.settings.autoEnchantEnabled;
+    const autoRow = stats.autoEnchantGold ? `<div class="mrow">
+      <div class="up-name">${t('auto.enchantLabel')}<small>${t('auto.enchantDesc')}</small></div>
+      <button class="buy-max${autoEnchantOn?' active':''}" data-action="toggleAutoEnchant">${autoEnchantOn?t('boss.autoRetreatOn'):t('boss.autoRetreatOff')}</button>
+    </div>` : '';
     const sortRow = `<div class="forge-sort">
       <span class="forge-sort-label">${t('forge.sortLabel')}</span>
       ${FORGE_SORT_STATS.map(s=>`<button class="buy-max${forgeSortKey===s?' active':''}" data-action="forgeSort" data-stat="${s}">${statLabelOf(s)}</button>`).join('')}
       ${forgeSortKey ? `<button class="buy-max" data-action="forgeSort" data-stat="">✕ ${t('forge.sortReset')}</button>` : ''}
     </div>`;
-    modalBody.innerHTML = sortRow + sortedForgeInventory().map(it=>{
+    modalBody.innerHTML = autoRow + sortRow + sortedForgeInventory().map(it=>{
       const cost = enchantCostOf(it);
       const isDemonic = it.rarity==='demonic';
       const costLabel = isDemonic
@@ -4943,6 +5083,13 @@ function skillLockInfo(node){
 }
 function renderSkillTree(){
   let html = `<div style="margin-bottom:10px;color:var(--dim);font-size:12px;">${t('skills.pointsLine',{pts:state.skillPoints, max:MAX_SKILL_LEVEL.toLocaleString(lang==='en'?'en-US':'uk-UA')})}</div>`;
+  if(stats.autoSkillSpend){
+    const autoSkillOn = !!state.settings.autoSkillSpendEnabled;
+    html += `<div class="mrow" style="margin-bottom:8px;">
+      <div class="up-name">${t('auto.skillSpendLabel')}<small>${t('auto.skillSpendDesc')}</small></div>
+      <button class="buy-max${autoSkillOn?' active':''}" data-action="toggleAutoSkillSpend">${autoSkillOn?t('boss.autoRetreatOn'):t('boss.autoRetreatOff')}</button>
+    </div>`;
+  }
   for(const key in SKILL_TREE){
     const branch = SKILL_TREE[key];
     html += `<div style="margin:12px 0 4px;color:var(--purple);font-size:12px;letter-spacing:1px;">${L(branch,'label')}</div>`;
@@ -5585,6 +5732,8 @@ modalBody.addEventListener('click', (e)=>{
   else if(btn.dataset.action==='prestigeSkill') buyPrestigeSkill(btn.dataset.id);
   else if(btn.dataset.action==='prestigeSkillMax') buyPrestigeSkillMax(btn.dataset.id);
   else if(btn.dataset.action==='toggleAutoRetreat'){ state.settings.autoRetreatBoss = !state.settings.autoRetreatBoss; renderBossPortal(); save(); }
+  else if(btn.dataset.action==='toggleAutoEnchant'){ state.settings.autoEnchantEnabled = !state.settings.autoEnchantEnabled; renderModalBody(); save(); }
+  else if(btn.dataset.action==='toggleAutoSkillSpend'){ state.settings.autoSkillSpendEnabled = !state.settings.autoSkillSpendEnabled; renderSkillTree(); save(); }
   else if(btn.dataset.action==='closeModal') closeModal();
   else if(btn.dataset.action==='bossAttack') attemptBoss(btn.dataset.id);
   else if(btn.dataset.action==='attemptGauntlet') attemptGauntlet();
@@ -5847,7 +5996,12 @@ function updateHud(){
 
 function renderUpgrades(){
   const el = document.getElementById('upgradesBody');
-  el.innerHTML = Object.keys(UPGRADE_CFG).map(key=>{
+  const autoUpgradeOn = !!state.settings.autoUpgradeEnabled;
+  const autoRow = stats.autoUpgradeGold ? `<div class="up-row">
+    <div class="up-name">${t('auto.upgradeLabel')}<small>${t('auto.upgradeDesc')}</small></div>
+    <button class="buy-max${autoUpgradeOn?' active':''}" data-toggle-auto-upgrade>${autoUpgradeOn?t('boss.autoRetreatOn'):t('boss.autoRetreatOff')}</button>
+  </div>` : '';
+  el.innerHTML = autoRow + Object.keys(UPGRADE_CFG).map(key=>{
     const cfg = UPGRADE_CFG[key];
     const cost = upgradeCost(key);
     const curSym = cfg.currency==='gold' ? '$' : '◆';
@@ -6099,7 +6253,13 @@ function applyLoadedData(d){
     // save-файл міг би просто вписати "theme":"blood" без жодного
     // реального досягнення — themeUnlocked() рахує умову заново з уже
     // щойно завантажених lifetime/achievements, а не довіряє файлу.
-    theme: themeUnlocked(ds.theme) ? ds.theme : 'default'
+    theme: themeUnlocked(ds.theme) ? ds.theme : 'default',
+    // Автоматизації за золото/скілпоінти — за замовчуванням ВИМКНЕНІ,
+    // навіть якщо відповідна навичка вже вивчена (як і autoRetreatBoss
+    // вище): гравець сам вмикає перемикачем, коли схоче.
+    autoEnchantEnabled: !!ds.autoEnchantEnabled,
+    autoUpgradeEnabled: !!ds.autoUpgradeEnabled,
+    autoSkillSpendEnabled: !!ds.autoSkillSpendEnabled
   };
   state.relics = (d.relics && typeof d.relics==='object') ? d.relics : {};
   state.prestigeSkills = (d.prestigeSkills && typeof d.prestigeSkills==='object') ? d.prestigeSkills : {};
@@ -6532,7 +6692,9 @@ document.getElementById('upgradesBody').addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-upgrade]');
   if(btn){ buyUpgrade(btn.dataset.upgrade); return; }
   const maxBtn = e.target.closest('button[data-upgrade-max]');
-  if(maxBtn) buyUpgradeMax(maxBtn.dataset.upgradeMax);
+  if(maxBtn){ buyUpgradeMax(maxBtn.dataset.upgradeMax); return; }
+  const toggleBtn = e.target.closest('button[data-toggle-auto-upgrade]');
+  if(toggleBtn){ state.settings.autoUpgradeEnabled = !state.settings.autoUpgradeEnabled; renderUpgrades(); save(); }
 });
 window.addEventListener('resize', setupCanvas);
 
@@ -6542,6 +6704,9 @@ window.addEventListener('resize', setupCanvas);
 function update(dt){
   updateRelics(dt);
   autoManageQuests(dt);
+  autoManageEnchant(dt);
+  autoManageUpgrade(dt);
+  autoManageSkillSpend(dt);
   if(mode==='town'){
     updateTown(dt);
   } else if(mode==='boss'){

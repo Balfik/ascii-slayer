@@ -5,6 +5,22 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.51] — Three new automation skills
+
+### Added
+- **Auto-Smith** (50 skill points): automatically enchants items at the
+  Forge using gold — never touches demonic items (those cost souls).
+- **Auto-Trainer** (50 skill points): automatically upgrades attack /
+  run speed / attack speed using gold — never touches Luck (that costs
+  crystals).
+- **Auto-Strategist** (100 skill points): automatically spends free
+  skill points across the whole skill tree, branch by branch, top to
+  bottom.
+
+Each unlocks its own on/off switch once learned (off by default even
+after learning, same as the existing boss auto-retreat toggle) — in
+the Forge, the Upgrades panel, and the Skill Tree respectively.
+
 ## [0.50] — Zones never lock, castle icon on the door tile, modal fix
 
 ### Changed
