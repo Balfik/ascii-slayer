@@ -5,6 +5,18 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.64] — World Map: browse much further ahead, jump straight to a zone
+
+### Changed
+- The "Next 100" button was disabling itself only 5 tiers past your
+  current progress — a leftover limit from before pagination existed.
+  Raised that lookahead to 100,000 tiers, so you can now page far ahead
+  and pick a much later zone on purpose.
+- Added a "Jump to zone #" field next to the pagination controls, so
+  reaching a distant zone doesn't mean clicking "Next 100" over and
+  over — type the number (or press Enter) and the map jumps straight to
+  that page.
+
 ## [0.63] — World Map: paginated 100 zones at a time
 
 ### Changed

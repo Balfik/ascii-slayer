@@ -558,7 +558,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.63';
+const GAME_VERSION = '0.64';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -914,6 +914,8 @@ const I18N = {
     'world.pageLabel':'Зони {from}–{to}',
     'world.prevPage':'Попередні 100',
     'world.nextPage':'Наступні 100',
+    'world.jumpLabel':'Перейти до зони №',
+    'world.jumpBtn':'Перейти',
     'log.traveled':'🗺 Складність зафіксована на регіоні «{name}»',
     'log.traveledFrontier':'🗺 Складність знову слідує за твоєю справжньою дистанцією',
     'boss.locked':'Потрібен {lvl} рівень персонажа',
@@ -1203,6 +1205,8 @@ const I18N = {
     'world.pageLabel':'Zones {from}–{to}',
     'world.prevPage':'Previous 100',
     'world.nextPage':'Next 100',
+    'world.jumpLabel':'Jump to zone #',
+    'world.jumpBtn':'Go',
     'log.traveled':'🗺 Difficulty pinned to region «{name}»',
     'log.traveledFrontier':'🗺 Difficulty now follows your true distance again',
     'boss.locked':'Requires character level {lvl}',
@@ -3556,6 +3560,18 @@ function changeWorldMapPage(delta){
   worldMapPage = Math.max(0, Math.min(maxPage, worldMapPage + delta));
   renderWorldMap();
 }
+// "Перейти до зони №" — щоб не клікати "Наступні 100" сотні разів,
+// якщо гравець хоче обрати зону далеко попереду (WORLD_MAP_LOOKAHEAD_TIERS
+// дає дуже великий діапазон). Лише перемикає СТОРІНКУ карти на ту, де
+// лежить введений тир — саму подорож (travelToTier) і далі робить окрема
+// кнопка "Обрати регіон" на потрібному рядку, як завжди.
+function jumpToWorldMapZone(){
+  const input = document.getElementById('worldMapJumpInput');
+  if(!input) return;
+  const tier = Math.max(0, Math.min(worldMapMaxTier(), Math.round(Number(input.value)||0)));
+  worldMapPage = Math.floor(tier / WORLD_MAP_PAGE_SIZE);
+  renderWorldMap();
+}
 // Максимальний тир, який показуємо/дозволяємо обрати на Карті Світу.
 // РАНІШЕ тут була сходинкова система розблокування (maxTierAnnounced,
 // bestLevel мав перевищити ПОВНИЙ biomeRecommendedLevel(tier)) — гравець
@@ -3566,9 +3582,16 @@ function changeWorldMapPage(delta){
 // (бо реальний поріг — 70, а не 7). Прибрано повністю за прямим запитом
 // гравця: усі зони доступні одразу, ⚠-попередження лишається (за
 // показаним числом, як і раніше), але нічого не блокує вибір.
+// "+5" було замало ЩЕ до пагінації (v0.63) — з нею список і так по 100
+// рядків за сторінку, тож більше нема причин штучно ховати далекі зони:
+// гравець прямо попросив можливість погортати вперед і обрати собі
+// набагато пізнішу зону (напр. заради виклику чи фарму важчих мобів на
+// вищу нагороду — гра й так ніколи не блокує вибір, лише попереджає ⚠).
+// Про запас — дуже великий буфер понад поточний тир, а не "+5".
+const WORLD_MAP_LOOKAHEAD_TIERS = 100000;
 function worldMapMaxTier(){
   const namedMax = BIOMES.length-1;
-  return Math.max(namedMax, getTier()) + 5; // +5 "нескінченних" тірів про запас понад поточний
+  return Math.max(namedMax, getTier()) + WORLD_MAP_LOOKAHEAD_TIERS;
 }
 function renderWorldMap(){
   const showMax = worldMapMaxTier();
@@ -3586,6 +3609,12 @@ function renderWorldMap(){
     <button class="buy-max" data-action="worldMapPrevPage" ${worldMapPage<=0?'disabled':''}>◀ ${t('world.prevPage')}</button>
     <span style="color:var(--dim);font-size:12px;white-space:nowrap;">${t('world.pageLabel',{from:pageFrom, to:pageTo})}</span>
     <button class="buy-max" data-action="worldMapNextPage" ${worldMapPage>=maxPage?'disabled':''}>${t('world.nextPage')} ▶</button>
+  </div>`;
+  html += `<div style="margin:0 0 10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+    <span style="color:var(--dim);font-size:12px;white-space:nowrap;">${t('world.jumpLabel')}</span>
+    <input type="number" id="worldMapJumpInput" min="0" max="${showMax}" placeholder="0-${formatNum(showMax)}"
+      style="width:90px;padding:5px 7px;font-family:inherit;font-size:12.5px;background:var(--panel);border:1px solid var(--border);border-radius:4px;color:var(--text);" />
+    <button class="buy-max" data-action="worldMapJumpToTier">${t('world.jumpBtn')}</button>
   </div>`;
   for(let tier=pageFrom; tier<=pageTo; tier++){
     // ⚠/червоний колір — за ПОКАЗАНИМ (÷10) числом, а не реальним lvl:
@@ -5981,6 +6010,14 @@ function sellAllItems(){
   sfxCoin();
   renderModalBody(); renderInventory(); updateHud(); save();
 }
+// Enter у полі "перейти до зони №" — той самий ефект, що клік по кнопці
+// поруч. Дозволяємо тут (а не глобальний keydown-гард для WASD/пробілу,
+// той і так уже пропускає INPUT/TEXTAREA), бо поле щоразу пересоздається
+// разом з усією модалкою (renderWorldMap()), тож звичайний addEventListener
+// на самому елементі довелось би вішати наново на кожен рендер.
+modalBody.addEventListener('keydown', (e)=>{
+  if(e.key==='Enter' && e.target.id==='worldMapJumpInput') jumpToWorldMapZone();
+});
 modalBody.addEventListener('click', (e)=>{
   const btn = e.target.closest('button[data-action]');
   if(!btn) return;
@@ -6012,6 +6049,7 @@ modalBody.addEventListener('click', (e)=>{
   else if(btn.dataset.action==='travelFrontier') travelToFrontier();
   else if(btn.dataset.action==='worldMapPrevPage') changeWorldMapPage(-1);
   else if(btn.dataset.action==='worldMapNextPage') changeWorldMapPage(1);
+  else if(btn.dataset.action==='worldMapJumpToTier') jumpToWorldMapZone();
   else if(btn.dataset.action==='closeEnding') closeEndingScreen();
   else if(btn.dataset.action==='selectTheme') selectTheme(btn.dataset.theme);
   else if(btn.dataset.action==='cloudRegister') handleCloudRegisterClick();
