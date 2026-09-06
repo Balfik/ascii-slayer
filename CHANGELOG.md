@@ -5,6 +5,16 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.63] — World Map: paginated 100 zones at a time
+
+### Changed
+- The World Map used to list every zone from 0 up to your current
+  frontier in one long scrollable modal — thousands of rows deep into
+  the game. It's now paginated 100 zones per page, with Previous/Next
+  buttons and a "Zones X–Y" label. Opening the map always lands on the
+  page containing your current zone, so it stays out of your way early
+  and still gets you straight to the frontier later.
+
 ## [0.62] — Skill Tree: the complete fix (not just clicks, hover too)
 
 ### Fixed

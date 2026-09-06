@@ -558,7 +558,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.62';
+const GAME_VERSION = '0.63';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -911,6 +911,9 @@ const I18N = {
     'world.releaseBtn':'🔓 Зняти фіксацію',
     'world.hereTag':'(ти тут)',
     'world.upcomingHeader':'НАСТУПНІ ЗОНИ (ще заблоковано)',
+    'world.pageLabel':'Зони {from}–{to}',
+    'world.prevPage':'Попередні 100',
+    'world.nextPage':'Наступні 100',
     'log.traveled':'🗺 Складність зафіксована на регіоні «{name}»',
     'log.traveledFrontier':'🗺 Складність знову слідує за твоєю справжньою дистанцією',
     'boss.locked':'Потрібен {lvl} рівень персонажа',
@@ -1197,6 +1200,9 @@ const I18N = {
     'world.releaseBtn':'🔓 Unpin',
     'world.hereTag':'(you are here)',
     'world.upcomingHeader':'UPCOMING ZONES (still locked)',
+    'world.pageLabel':'Zones {from}–{to}',
+    'world.prevPage':'Previous 100',
+    'world.nextPage':'Next 100',
     'log.traveled':'🗺 Difficulty pinned to region «{name}»',
     'log.traveledFrontier':'🗺 Difficulty now follows your true distance again',
     'boss.locked':'Requires character level {lvl}',
@@ -3528,11 +3534,27 @@ function biomeRecommendedLevel(tier){
 function biomeRecommendedLevelDisplay(tier){
   return Math.max(1, Math.round(biomeRecommendedLevel(tier)/10));
 }
+// Карта Світу за життя гри легко доростає до сотень/тисяч тірів
+// (worldMapMaxTier() = getTier()+5, а тир росте з дистанцією/рівнем
+// назавжди) — рендерити ВСІ одразу означало б тисячі рядків в одній
+// прокручуваній модалці за раз. Гравець прямо попросив пагінацію по 100
+// зон: спочатку зони 0-99, після переходу в зону 100 — 100-199, і так
+// далі. worldMapPage — суто сесійний UI-стан (як forgeSortKey), у
+// збереження НЕ пишеться: кожне відкриття карти саме заново обчислює
+// сторінку за поточним тіром гравця (openWorldMap() нижче).
+const WORLD_MAP_PAGE_SIZE = 100;
+let worldMapPage = 0;
 function openWorldMap(){
   modalKind = 'worldmap';
   modalTitle.textContent = t('modal.worldmapTitle');
+  worldMapPage = Math.floor(getTier() / WORLD_MAP_PAGE_SIZE);
   renderWorldMap();
   modalBackdrop.hidden = false;
+}
+function changeWorldMapPage(delta){
+  const maxPage = Math.floor(worldMapMaxTier() / WORLD_MAP_PAGE_SIZE);
+  worldMapPage = Math.max(0, Math.min(maxPage, worldMapPage + delta));
+  renderWorldMap();
 }
 // Максимальний тир, який показуємо/дозволяємо обрати на Карті Світу.
 // РАНІШЕ тут була сходинкова система розблокування (maxTierAnnounced,
@@ -3551,12 +3573,21 @@ function worldMapMaxTier(){
 function renderWorldMap(){
   const showMax = worldMapMaxTier();
   const curTier = getTier(); // ефективний тир — з урахуванням обраної зони, якщо вона є
+  const maxPage = Math.floor(showMax / WORLD_MAP_PAGE_SIZE);
+  worldMapPage = Math.max(0, Math.min(maxPage, worldMapPage));
+  const pageFrom = worldMapPage * WORLD_MAP_PAGE_SIZE;
+  const pageTo = Math.min(showMax, pageFrom + WORLD_MAP_PAGE_SIZE - 1);
   let html = `<div style="margin-bottom:8px;color:var(--dim);font-size:12px;line-height:1.5;">${t('world.explain')}</div>`;
   html += `<div class="mrow">
     <div class="up-name">🚩 ${t('world.frontier')}${zoneTier===null?` <span class="lvl">${t('world.hereTag')}</span>`:''}<small>${t('world.frontierSmall',{dist:formatExact(distanceCols)})}</small></div>
     <button class="buy" data-action="travelFrontier">${t('world.releaseBtn')}</button>
   </div>`;
-  for(let tier=0; tier<=showMax; tier++){
+  html += `<div style="margin:10px 0 4px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+    <button class="buy-max" data-action="worldMapPrevPage" ${worldMapPage<=0?'disabled':''}>◀ ${t('world.prevPage')}</button>
+    <span style="color:var(--dim);font-size:12px;white-space:nowrap;">${t('world.pageLabel',{from:pageFrom, to:pageTo})}</span>
+    <button class="buy-max" data-action="worldMapNextPage" ${worldMapPage>=maxPage?'disabled':''}>${t('world.nextPage')} ▶</button>
+  </div>`;
+  for(let tier=pageFrom; tier<=pageTo; tier++){
     // ⚠/червоний колір — за ПОКАЗАНИМ (÷10) числом, а не реальним lvl:
     // значок має зникати, коли персонаж досягає САМЕ того рівня, що
     // бачить на екрані, а не половини набагато більшого внутрішнього
@@ -5979,6 +6010,8 @@ modalBody.addEventListener('click', (e)=>{
   else if(btn.dataset.action==='buildCastle') buildCastleConstruction();
   else if(btn.dataset.action==='travelTier') travelToTier(btn.dataset.id);
   else if(btn.dataset.action==='travelFrontier') travelToFrontier();
+  else if(btn.dataset.action==='worldMapPrevPage') changeWorldMapPage(-1);
+  else if(btn.dataset.action==='worldMapNextPage') changeWorldMapPage(1);
   else if(btn.dataset.action==='closeEnding') closeEndingScreen();
   else if(btn.dataset.action==='selectTheme') selectTheme(btn.dataset.theme);
   else if(btn.dataset.action==='cloudRegister') handleCloudRegisterClick();
