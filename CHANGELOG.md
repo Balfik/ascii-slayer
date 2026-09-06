@@ -5,6 +5,27 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.52] — Optimization: severe lag with automation at extreme levels
+
+### Fixed
+- Reported at level ~11,600 with very high stats: enabling the new
+  automation skills made the game hang and lag horribly (already heavy
+  without them). Two causes found:
+  1. All three automation skills (Auto-Smith/Auto-Trainer/
+     Auto-Strategist) were forcing a full save every second they acted —
+     no other frequent game event does this (even 60 kills/sec rely on
+     the existing periodic autosave). Removed; also removed a redundant
+     HUD update each was calling on top of the one the main loop already
+     does every frame regardless.
+  2. Independent of automation: at extreme run speed, the monster/coin/
+     pit/wood spawn horizon can jump hundreds of tiles in a single
+     frame, which uncapped could spawn thousands of entities per second
+     — almost all of them passed and discarded before ever being seen.
+     Capped at 8 new entities per type per frame (unnoticeable at normal
+     speed, where this was already 0-1 per frame). Measured ~7,400
+     entities/sec before the cap vs ~2,400/sec after, at the reported
+     character's actual speed.
+
 ## [0.51] — Three new automation skills
 
 ### Added

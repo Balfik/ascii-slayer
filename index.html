@@ -558,7 +558,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.51';
+const GAME_VERSION = '0.52';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -2632,8 +2632,15 @@ function autoManageEnchant(dt){
   sfxEnchant();
   if(modalKind==='forge') renderModalBody();
   renderInventory();
-  updateHud();
-  save();
+  // НАВМИСНО без updateHud()/save() тут: update(dt) і так викликає
+  // updateHud() БЕЗУМОВНО щокадру одразу після цієї функції (тут воно
+  // було чистим дублікатом) — а save() ніколи не форсується на частих
+  // автоматичних подіях у грі (60 вбивств/сек так само НЕ викликають
+  // save() — awardKill() покладається на періодичний setInterval(save,
+  // 5000)). Форсоване збереження щосекунди тут — то й був справжній
+  // винуватець "жахливих лагів з автоматизацією" на екстремальних
+  // рівнях: повна JSON-серіалізація стану щосекунди, поверх і так
+  // напруженого рендер-циклу.
 }
 let autoUpgradeTimer = 0;
 const AUTO_UPGRADE_CHECK_INTERVAL = 1;
@@ -2660,8 +2667,7 @@ function autoManageUpgrade(dt){
   recomputeStats();
   addLog('log.autoUpgraded', 'upgrade', {count:totalCount});
   renderUpgrades();
-  updateHud();
-  save();
+  // Без updateHud()/save() — див. коментар у autoManageEnchant() вище.
 }
 let autoSkillSpendTimer = 0;
 const AUTO_SKILL_SPEND_CHECK_INTERVAL = 1;
@@ -2697,8 +2703,7 @@ function autoManageSkillSpend(dt){
   if(stats.noJumpQuests) purgeJumpQuestOffers(); // той самий побічний ефект, що й buySkillMax()
   addLog('log.autoSkillSpend', 'upgrade', {count:totalCount});
   if(modalKind==='skills') renderSkillTree();
-  updateHud();
-  save();
+  // Без updateHud()/save() — див. коментар у autoManageEnchant() вище.
 }
 function asciiBar(ratio, width){
   const filled = Math.max(0, Math.min(width, Math.round(ratio*width)));
@@ -3906,24 +3911,51 @@ function spawnPitAt(col){
 function spawnWoodAt(col){
   entities.push({type:'wood', worldCol:col, value:randInt(1,3), state:'pending'});
 }
+// На звичайній швидкості SPD — кілька тайлів/кадр, ці while НІКОЛИ не
+// роблять більш як 0-1 ітерацію за виклик (horizon майже не рухається
+// між кадрами) — цей ліміт непомітний. АЛЕ на екстремальних швидкостях
+// пізньої гри (SPD у десятки тисяч тайлів/с — реально трапляється з
+// накопиченими бонусами на дуже високих рівнях) horizon стрибає на
+// СОТНІ тайлів за один кадр, і без ліміту ці ж while спавнили б ДЕСЯТКИ
+// сутностей на КОЖЕН тип щокадру (тисячі об'єктів/с) — переважна
+// більшість із них гравець фізично не встиг би навіть побачити, вони
+// одразу опинялись би "позаду" й відсіювались фільтром entities ще до
+// того, як хоч якось вплинули на гру. Це і є справжня причина "важко
+// працює навіть без автоматизації" на екстремальних рівнях. Ліміт —
+// лише запобіжник: не спавнимо більш як MAX_SPAWN_PER_TICK штук за
+// виклик, а якщо horizon пішов ще далі — курсор просто ДОганяємо без
+// спавну решти (усе одно недосяжні для гравця на такій швидкості).
+const MAX_SPAWN_PER_TICK = 8;
 function updateSpawns(){
   const horizon = distanceCols + GRID_COLS + 10;
-  while(nextMonsterSpawnCol < horizon){
+  let n=0;
+  while(nextMonsterSpawnCol < horizon && n<MAX_SPAWN_PER_TICK){
     spawnMonsterAt(nextMonsterSpawnCol);
     nextMonsterSpawnCol += randRange(10,20);
+    n++;
   }
-  while(nextCoinSpawnCol < horizon){
+  if(nextMonsterSpawnCol < horizon) nextMonsterSpawnCol = horizon;
+  n=0;
+  while(nextCoinSpawnCol < horizon && n<MAX_SPAWN_PER_TICK){
     spawnCoinsAt(nextCoinSpawnCol);
     nextCoinSpawnCol += randRange(5,10);
+    n++;
   }
-  while(nextPitSpawnCol < horizon){
+  if(nextCoinSpawnCol < horizon) nextCoinSpawnCol = horizon;
+  n=0;
+  while(nextPitSpawnCol < horizon && n<MAX_SPAWN_PER_TICK){
     spawnPitAt(nextPitSpawnCol);
     nextPitSpawnCol += randRange(28,50);
+    n++;
   }
-  while(nextWoodSpawnCol < horizon){
+  if(nextPitSpawnCol < horizon) nextPitSpawnCol = horizon;
+  n=0;
+  while(nextWoodSpawnCol < horizon && n<MAX_SPAWN_PER_TICK){
     spawnWoodAt(nextWoodSpawnCol);
     nextWoodSpawnCol += randRange(16,28);
+    n++;
   }
+  if(nextWoodSpawnCol < horizon) nextWoodSpawnCol = horizon;
 }
 function screenCol(e){ return e.worldCol - distanceCols + PLAYER_COL; }
 function displayCol(e){ return e.state==='fighting' ? PLAYER_COL+1 : screenCol(e); }
