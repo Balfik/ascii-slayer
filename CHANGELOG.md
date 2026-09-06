@@ -5,6 +5,39 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.56] — Second contributor to the lag: redundant saves in quest automation
+
+### Fixed
+- After 0.55 shipped, the player sent new console output showing the same
+  slowdown pattern (frames up to 837ms) — but this time with a new
+  detail: the quest-automation step itself measured 339ms and 41ms in
+  specific frames, instead of the flat 0ms seen in every earlier sample.
+  0.55's fix was correct, but not the only cause.
+- The real bug: turning in or accepting a quest (the same functions used
+  by the player's own quest-log/board clicks, dating back to v0.35) each
+  unconditionally writes a full save to `localStorage` (a synchronous
+  `JSON.stringify` of the entire game state) and refreshes the HUD. The
+  "Auto-Quests" skill's once-per-second automation tick calls these same
+  functions in a loop — once per completed active quest, once for the
+  daily, once per newly-accepted board quest — so a single tick could
+  fire several full saves back to back. On a very late-game save (a huge
+  inventory built up over thousands of levels) that's real, measurable
+  work, and it's exactly the same anti-pattern already fixed for the
+  three automation skills added in 0.51/0.52 — it had just never been
+  audited on this older, pre-existing quest-automation path.
+- Fixed: turning in / accepting a quest no longer force-saves or
+  force-refreshes the HUD when triggered by automation (the existing
+  5-second autosave and the main loop's own per-frame HUD update already
+  cover both) — only a direct player click still saves immediately, same
+  as before.
+- Measured: a single save costs roughly 2-7ms on a 4,000-item inventory
+  and 27-47ms on 50,000 items (scales close to linearly) — several of
+  those stacking in one automation tick on a much larger real inventory
+  lines up well with the reported 300ms+ spikes. Verified live with a
+  crafted save (huge inventory, several quests ready to turn in, several
+  more to auto-accept) running the automation every second for multiple
+  ticks with no slowdown and no console warnings.
+
 ## [0.55] — Found and fixed the actual cause of the freezing
 
 ### Fixed

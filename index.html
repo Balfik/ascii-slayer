@@ -558,7 +558,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.55';
+const GAME_VERSION = '0.56';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -2363,7 +2363,7 @@ function ensureDailyQuest(){
     state.quests.daily = { date:key, quest:generateDailyQuestOffer(), claimed:false };
   }
 }
-function turnInDailyQuest(){
+function turnInDailyQuest(auto){
   if(!state.quests.daily || !state.quests.daily.quest.completed || state.quests.daily.claimed) return;
   const q = state.quests.daily.quest;
   state.gold += q.rewardGold;
@@ -2383,8 +2383,9 @@ function turnInDailyQuest(){
   sfxCoin();
   if(modalKind==='questboard') renderQuestBoard();
   renderQuestLog();
-  updateHud();
-  save();
+  // auto=true: викликано з autoManageQuests() — див. коментар у turnInQuest()
+  // вище щодо того, чому save()/updateHud() тут пропускаються.
+  if(!auto){ updateHud(); save(); }
 }
 const MAX_QUEST_REFRESHES = 3;
 function dateKey(d){ return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`; }
@@ -2515,7 +2516,7 @@ function updateQuestProgress(typeId, amount){
     }
   }
 }
-function acceptQuest(uid){
+function acceptQuest(uid, auto){
   if(state.quests.active.length >= MAX_ACTIVE_QUESTS){
     addLog('log.questFull', 'warn', {max:MAX_ACTIVE_QUESTS});
     return;
@@ -2532,9 +2533,18 @@ function acceptQuest(uid){
   // (навичка "Автоквести") могло б затерти вміст іншої відкритої модалки.
   if(modalKind==='questboard') renderQuestBoard();
   renderQuestLog();
-  save();
+  // auto=true: викликано з autoManageQuests() (тік раз/сек, потенційно
+  // кілька викликів за один тік). save() — це синхронний JSON.stringify()
+  // усього стану + запис у localStorage; на пізній грі (величезний інвентар/
+  // історія) це реально важка операція, і кілька save() поспіль за один тік
+  // саме й спричиняли зафіксовані користувачем "повільні кадри" (ті самі
+  // 300+мс всередині autoManageQuests). Автозбереження й так є —
+  // setInterval(save, 5000) — тож тут просто НЕ дублюємо його щосекунди
+  // на кожен прийнятий квест. При кліку гравця (auto не передано) поведінка
+  // не змінилась.
+  if(!auto) save();
 }
-function turnInQuest(uid){
+function turnInQuest(uid, auto){
   const idx = state.quests.active.findIndex(q=>q.uid===uid);
   if(idx<0) return;
   const q = state.quests.active[idx];
@@ -2556,8 +2566,10 @@ function turnInQuest(uid){
   sfxCoin();
   if(modalKind==='questboard') renderQuestBoard();
   renderQuestLog();
-  updateHud();
-  save();
+  // auto=true: те саме обґрунтування, що й у acceptQuest() вище —
+  // updateHud() тут теж зайвий, бо update(dt) і так викликає його
+  // безумовно наприкінці КОЖНОГО кадру.
+  if(!auto){ updateHud(); save(); }
 }
 /* Навичка "Автоквести" (a1): раз на секунду (без сенсу перевіряти щокадру)
    сама здає виконані активні квести й щоденний квест, а потім добирає нові
@@ -2576,16 +2588,16 @@ function autoManageQuests(dt){
   if(autoQuestTimer < AUTO_QUEST_CHECK_INTERVAL) return;
   autoQuestTimer = 0;
   for(const q of [...state.quests.active]){
-    if(q.completed) turnInQuest(q.uid);
+    if(q.completed) turnInQuest(q.uid, true);
   }
   if(state.quests.daily && state.quests.daily.quest.completed && !state.quests.daily.claimed){
-    turnInDailyQuest();
+    turnInDailyQuest(true);
   }
   ensureQuestOffers();
   while(state.quests.active.length < MAX_ACTIVE_QUESTS){
     const idx = state.quests.offers.findIndex(o=>o.typeId!=='jump');
     if(idx<0) break;
-    acceptQuest(state.quests.offers[idx].uid);
+    acceptQuest(state.quests.offers[idx].uid, true);
   }
 }
 // Автоковаль/Автотренер/Автостратег — три окремі автоматизації (a3/a4/a5
