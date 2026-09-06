@@ -482,6 +482,8 @@
   <div class="hud hud-fixed">
     <span class="hud-stat hud-stat-wide">LV <b id="lvl">1</b> <span id="rankTitle" style="color:var(--purple);font-size:11px;"></span></span>
     <span class="hud-stat hud-stat-wide" id="xpbar">[--------------------] 0/20</span>
+  </div>
+  <div class="hud hud-fixed">
     <span class="hud-stat">💰 <b id="gold" style="color:var(--gold)">0</b></span>
     <span class="hud-stat">◆ <b id="crystals" style="color:var(--crystal)">0</b></span>
     <span class="hud-stat">👹 <b id="souls" style="color:var(--demonic)">0</b></span>
@@ -612,7 +614,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.67';
+const GAME_VERSION = '0.68';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -793,7 +795,10 @@ function renderEventLine(e){
   const uk = {
     level_milestone: `${nick} досяг ${e.value} рівня!`,
     boss_defeat: `${nick} переміг боса ${target}!`,
-    enchant_10: `${nick} заточив ${target} на +10!`,
+    enchant_10: `${nick} заточив ${target} на +10!`, // старі записи в базі (до v0.68) — лишаємо текст для сумісності
+    enchant_milestone: `${nick} заточив ${target} на +${e.value}!`,
+    relic_found: `${nick} здобув реліквію ${target}!`,
+    demonic_item_found: `${nick} виборов демонічний предмет ${target}!`,
     prestige: `${nick} здійснив Переродження (№${e.value})!`,
     castle_complete: `${nick} добудував Замок до кінця!`,
     game_completed: `${nick} переміг Стража Вічності — гру пройдено!`
@@ -801,12 +806,30 @@ function renderEventLine(e){
   const en = {
     level_milestone: `${nick} reached level ${e.value}!`,
     boss_defeat: `${nick} defeated ${target}!`,
-    enchant_10: `${nick} enchanted ${target} to +10!`,
+    enchant_10: `${nick} enchanted ${target} to +10!`, // old rows already in the DB (pre-v0.68) — text kept for compatibility
+    enchant_milestone: `${nick} enchanted ${target} to +${e.value}!`,
+    relic_found: `${nick} found the relic ${target}!`,
+    demonic_item_found: `${nick} won a demonic item, ${target}!`,
     prestige: `${nick} performed a Prestige (#${e.value})!`,
     castle_complete: `${nick} finished building the Castle!`,
     game_completed: `${nick} defeated the Guardian of Eternity — the game is complete!`
   };
   return (lang==='en' ? en : uk)[e.event_type] || '';
+}
+// Заточка демонічного/легендарного предмета на кожен НОВИЙ поріг +10
+// (10, 20, 30...) — гравець прямо попросив більше активу в стрічці
+// лідерборду. Звичайні/незвичайні/рідкісні/епічні рідкості свідомо не
+// репортуємо тут — не такі видовищні, спамили б стрічку дрібницями.
+// tierAfter*10 — НАЙВИЩИЙ поріг, досягнутий за цей виклик (якщо "На всі"
+// перескочив одразу кілька порогів за раз — репортимо один раз, за
+// найвищий, а не по разу на кожен пройдений поріг).
+function checkEnchantMilestoneEvent(it, enchantBefore){
+  if(it.rarity!=='legendary' && it.rarity!=='demonic') return;
+  const tierBefore = Math.floor(enchantBefore/10);
+  const tierAfter = Math.floor((it.enchant||0)/10);
+  if(tierAfter>tierBefore && tierAfter>0){
+    reportEvent('enchant_milestone', {targetName:L(it,'name'), targetRarity:it.rarity, value:tierAfter*10});
+  }
 }
 async function reportEvent(kind, extra){
   if(!sbReady || !sbClient || !sbPlayerId) return;
@@ -1838,6 +1861,10 @@ function grantRelic(){
   if(notOwned.length===0) return null;
   const relic = notOwned[randInt(0,notOwned.length-1)];
   state.relics[relic.id] = true;
+  // Стрічка подій лідерборду — гравець прямо попросив більше активу там:
+  // реліквія рідкісна й видовищна подія (лише 5 у грі, кожна раз назавжди),
+  // ідеально пасує для публічної стрічки.
+  reportEvent('relic_found', {targetName:L(relic,'name')});
   return relic;
 }
 let relicQuestTimer = 0;
@@ -2900,9 +2927,7 @@ function autoManageEnchant(dt){
       it.enchant = (it.enchant||0)+1;
       count++;
     }
-    if(count>0 && enchantBefore<10 && it.enchant>=10){
-      reportEvent('enchant_10', {targetName:L(it,'name'), targetRarity:it.rarity});
-    }
+    if(count>0) checkEnchantMilestoneEvent(it, enchantBefore);
     totalCount += count;
   }
   if(totalCount===0) return;
@@ -3256,6 +3281,9 @@ function grantDemonicItem(){
   addLog('log.bossWinDemonic', 'item', {name:L(inst,'name')});
   sfxItem('demonic');
   renderInventory();
+  // Лише ПЕРШЕ здобуття (не дублікат вище) — демонічний предмет із боса
+  // теж рідкісна подія, варта стрічки лідерборду.
+  reportEvent('demonic_item_found', {targetName:L(inst,'name'), targetRarity:'demonic'});
   return L(inst,'name');
 }
 
@@ -4195,15 +4223,20 @@ function gainXp(amount){
     // updateSkillTreeAffordability() вище.
     updateSkillTreeAffordability();
     checkLevelUnlocks(); // нові регіони на Карті Світу — за досягнутим рівнем, не за дистанцією
-    if(LEVEL_MILESTONE_EVENTS.includes(state.level)){
+    if(isLevelMilestone(state.level)){
       reportEvent('level_milestone', {value:state.level});
     }
   }
 }
 // Пороги, на яких у стрічку подій лідерборду летить "X досяг Y рівня!" —
 // свідомо НЕ кожен рівень (заспамило б стрічку й наштовхнулось би на
-// анти-спам тригер бази, events_validate, не частіше раз на 5с).
+// анти-спам тригер бази, events_validate, не частіше раз на 5с). Після
+// 10000 фіксований список закінчується — гравець попросив продовжити
+// кожні 1000 рівнів і далі (11000, 12000, ...), а не просто зупинитись.
 const LEVEL_MILESTONE_EVENTS = [50,100,200,300,500,750,1000,1500,2000,3000,5000,7500,10000];
+function isLevelMilestone(level){
+  return LEVEL_MILESTONE_EVENTS.includes(level) || (level>10000 && level%1000===0);
+}
 
 /* =====================================================================
    ЛУТ
@@ -6280,6 +6313,7 @@ function updateModalAfford(){
 function enchantItem(id){
   const it = state.inventory.find(x=>String(x.id)===id);
   if(!it) return;
+  const enchantBefore = it.enchant||0;
   const cur = enchantCurrencyOf(it);
   const cost = enchantCostOf(it);
   const free = hasRelic('miser_chains') && Math.random() < RELIC_FREE_ENCHANT_CHANCE;
@@ -6292,7 +6326,7 @@ function enchantItem(id){
   recomputeStats();
   addLog('log.enchanted', 'upgrade', {name:L(it,'name'), level:it.enchant});
   sfxEnchant();
-  if(it.enchant===10) reportEvent('enchant_10', {targetName:L(it,'name'), targetRarity:it.rarity});
+  checkEnchantMilestoneEvent(it, enchantBefore);
   renderModalBody(); renderInventory(); updateHud(); save();
 }
 function enchantItemMax(id){
@@ -6316,9 +6350,9 @@ function enchantItemMax(id){
   recomputeStats();
   addLog('log.enchantedMax', 'upgrade', {name:L(it,'name'), count, level:it.enchant});
   sfxEnchant();
-  // "На всі" може за один клік перескочити ПОНАД +10 — перевіряємо
-  // перетин порогу, а не точну рівність (як у звичайному enchantItem()).
-  if(enchantBefore<10 && it.enchant>=10) reportEvent('enchant_10', {targetName:L(it,'name'), targetRarity:it.rarity});
+  // "На всі" може за один клік перескочити ПОНАД один поріг +10 —
+  // checkEnchantMilestoneEvent() рахує саме перетин, не точну рівність.
+  checkEnchantMilestoneEvent(it, enchantBefore);
   renderModalBody(); renderInventory(); updateHud(); save();
 }
 function sellItem(id){

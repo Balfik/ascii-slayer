@@ -5,6 +5,23 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.68] — More leaderboard activity; the stat bar no longer scrolls, anywhere
+
+### Added
+- The leaderboard's live activity feed now reports finding a relic, and
+  winning a demonic item from a boss (first time only, not duplicates).
+- Enchanting a legendary or demonic item now posts to the feed at every
+  new +10 milestone (10, 20, 30, ...), not just once at +10 for any
+  rarity as before.
+- Level milestones in the feed used to stop at 10,000 — they now keep
+  going every 1,000 levels indefinitely past that.
+
+### Fixed
+- The first stat row (level, title, XP bar, and all six resources) still
+  needed horizontal scrolling to see everything, even on desktop. Split
+  into two rows — level/XP bar, then resources — so neither ever needs
+  to scroll.
+
 ## [0.67] — Library polish: real gear icons, a Relics category, an even taller mobile run window
 
 ### Changed
