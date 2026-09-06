@@ -5,6 +5,31 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.50] — Zones never lock, castle icon on the door tile, modal fix
+
+### Changed
+- World Map zones no longer lock at all. The "recommended level" shown
+  was always a friendlier, divided-by-10 number, while the actual
+  unlock check used the real (10x higher) threshold — so a level-29
+  character could still see a zone as locked despite being well past
+  its displayed recommended level. Rather than fix the mismatch,
+  removed the lock entirely: every zone (all named biomes plus a
+  handful of endless ones ahead) is always selectable, with the level
+  warning kept purely as a heads-up, not a gate.
+
+### Fixed
+- The castle construction site in town now has its 🏰 icon drawn right
+  on the door tile itself — the same treatment every other building
+  (Forge, Shop, Quest Board, etc.) already had — instead of only a
+  distant label above a growing, hard-to-read construction sketch.
+- The Cloud Save panel could occasionally close itself while typing,
+  especially on mobile: the "click outside closes the modal" handler
+  only checked where the click's release landed, and a mobile keyboard
+  animating into view can shift the page between press and release,
+  making a stationary tap register on the backdrop instead of the
+  field. Now requires both the press and the click to land on the
+  backdrop itself.
+
 ## [0.49] — Critical input fix, upcoming zones preview, castle icon
 
 ### Fixed

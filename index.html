@@ -558,7 +558,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.49';
+const GAME_VERSION = '0.50';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -3289,16 +3289,29 @@ function openWorldMap(){
   renderWorldMap();
   modalBackdrop.hidden = false;
 }
+// Максимальний тир, який показуємо/дозволяємо обрати на Карті Світу.
+// РАНІШЕ тут була сходинкова система розблокування (maxTierAnnounced,
+// bestLevel мав перевищити ПОВНИЙ biomeRecommendedLevel(tier)) — гравець
+// повідомив, що це виглядало як баг: показаний "рекомендований рівень"
+// у списку — ÷10 від реального порогу розблокування (так зроблено
+// навмисно, щоб число виглядало "дружнім" — 7 замість 70), тож гравець
+// на 29 рівні бачив зону з "рекомендований рівень: 7" і далі ЗАБЛОКОВАНУ
+// (бо реальний поріг — 70, а не 7). Прибрано повністю за прямим запитом
+// гравця: усі зони доступні одразу, ⚠-попередження лишається (за
+// показаним числом, як і раніше), але нічого не блокує вибір.
+function worldMapMaxTier(){
+  const namedMax = BIOMES.length-1;
+  return Math.max(namedMax, getTier()) + 5; // +5 "нескінченних" тірів про запас понад поточний
+}
 function renderWorldMap(){
-  const maxTier = Math.max(0, state.lifetime.maxTierAnnounced);
+  const showMax = worldMapMaxTier();
   const curTier = getTier(); // ефективний тир — з урахуванням обраної зони, якщо вона є
   let html = `<div style="margin-bottom:8px;color:var(--dim);font-size:12px;line-height:1.5;">${t('world.explain')}</div>`;
   html += `<div class="mrow">
     <div class="up-name">🚩 ${t('world.frontier')}${zoneTier===null?` <span class="lvl">${t('world.hereTag')}</span>`:''}<small>${t('world.frontierSmall',{dist:formatExact(distanceCols)})}</small></div>
     <button class="buy" data-action="travelFrontier">${t('world.releaseBtn')}</button>
   </div>`;
-  for(let tier=0; tier<=maxTier; tier++){
-    const lvl = biomeRecommendedLevel(tier);
+  for(let tier=0; tier<=showMax; tier++){
     // ⚠/червоний колір — за ПОКАЗАНИМ (÷10) числом, а не реальним lvl:
     // значок має зникати, коли персонаж досягає САМЕ того рівня, що
     // бачить на екрані, а не половини набагато більшого внутрішнього
@@ -3316,20 +3329,6 @@ function renderWorldMap(){
       <button class="buy" data-action="travelTier" data-id="${tier}">${t('world.travelBtn')}</button>
     </div>`;
   }
-  // Прев'ю НАСТУПНИХ (ще не відкритих) зон — раніше карта показувала
-  // ЛИШЕ вже відкриті тіри, тож новий гравець (лише стартова зона)
-  // не бачив узагалі ніякого натяку, що є куди рости й прогресувати.
-  // Без кнопки "Обрати регіон" (не можна піти туди, поки не відкрито) —
-  // лише назва й потрібний рівень, приглушено.
-  const WORLD_MAP_PREVIEW_COUNT = 5;
-  html += `<div style="margin:14px 0 4px;color:var(--purple);font-size:12px;letter-spacing:1px;">${t('world.upcomingHeader')}</div>`;
-  for(let tier=maxTier+1; tier<=maxTier+WORLD_MAP_PREVIEW_COUNT; tier++){
-    html += `<div class="mrow" style="border-left:3px solid ${biomeFloorColor(tier)};padding-left:6px;opacity:.55;">
-      <div class="up-name" style="color:${biomeTextColor(tier)}">🔒 ${biomeName(tier)}
-        <small>${t('world.recLevel',{lvl:formatNum(biomeRecommendedLevelDisplay(tier))})}</small>
-      </div>
-    </div>`;
-  }
   modalBody.innerHTML = html;
 }
 // ВАЖЛИВО: ці дві функції НІКОЛИ не чіпають distanceCols — лише фіксують
@@ -3341,7 +3340,7 @@ function renderWorldMap(){
 // Переродження → "Передова" (миттєво повертає стару bestDistance) →
 // одразу знову Переродитися за нею ж, без жодного реального прогресу.
 function travelToTier(tier){
-  tier = Math.max(0, Math.min(Number(tier), state.lifetime.maxTierAnnounced));
+  tier = Math.max(0, Math.min(Number(tier), worldMapMaxTier()));
   zoneTier = tier;
   // resetWorldAfterLoad(), а не просто `entities=[]` — вона ще й скидає
   // isFighting/fightTarget (та стрибок/спотикання/комбо). Без цього старий
@@ -4425,7 +4424,17 @@ function renderTown(){
     const row = TOWN_MAP[ty];
     for(let tx=0; tx<row.length; tx++){
       const ch = row[tx];
-      if(ch==='C') continue; // сам гліф не малюємо — тут стоїть фізична споруда Замку (renderCastleInTown)
+      if(ch==='C'){
+        // Замок сам собою не має чіткого одного гліфа на вході (на
+        // відміну від K/M/Q/P/W нижче — кожен з них суцільна яскрава
+        // буква прямо на тайлі, де стоїш) — лише розмита картинка
+        // конструкції та підпис високо над нею. Гравцю було не
+        // зрозуміло, куди саме йти. Малюємо 🏰 прямо на тому самому
+        // тайлі 'C', де й спрацьовує взаємодія (findNearbyBuilding) —
+        // той самий принцип, що й в інших будівель.
+        ctx.fillText('🏰', townXForCol(tx), townYForRow(ty));
+        continue;
+      }
       let color = '#173318';
       if(ch==='#') color = '#2a4a2a';
       else if(ch==='.') color = '#173318';
@@ -5593,7 +5602,19 @@ modalBody.addEventListener('click', (e)=>{
 document.getElementById('bossRetreatBtn').addEventListener('click', ()=>{ if(mode==='gauntlet') retreatGauntlet(); else retreatBoss(); });
 document.getElementById('bossContinueBtn').addEventListener('click', ()=>{ if(mode==='gauntlet') returnFromGauntlet(); else returnFromBoss(); });
 document.getElementById('modalClose').addEventListener('click', closeModal);
-modalBackdrop.addEventListener('click', (e)=>{ if(e.target===modalBackdrop) closeModal(); });
+// "Клік поза модалкою закриває її" — раніше перевіряли ЛИШЕ куди
+// прийшовся сам 'click' (тобто де відбувся відпуск). На мобільних це
+// іноді закривало модалку саму собою під час друку в полі: коли
+// з'являється віртуальна клавіатура, сторінка/модалка можуть трохи
+// зсунутись МІЖ натисканням і відпусканням пальця (клавіатура анімовано
+// виїжджає), і хоча палець фізично не рухався, під ним після зсуву
+// опинявся вже задній фон модалки, а не поле — click реєструвався на
+// modalBackdrop. Тепер закриваємо лише якщо і НАТИСКАННЯ, і клік
+// відбулись саме на фоні — реальний "тап поза модалкою" це проходить,
+// а зсув під час набору тексту вже ні.
+let modalBackdropPressedOnSelf = false;
+modalBackdrop.addEventListener('pointerdown', (e)=>{ modalBackdropPressedOnSelf = (e.target===modalBackdrop); });
+modalBackdrop.addEventListener('click', (e)=>{ if(e.target===modalBackdrop && modalBackdropPressedOnSelf) closeModal(); });
 
 /* =====================================================================
    АУДІО: SFX — процедурний чіптюн (без зовнішніх файлів), лише для
