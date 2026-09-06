@@ -5,6 +5,23 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.70] — Mobile run screen: entities back next to the road
+
+### Fixed
+- After 0.69, the player (background sky/mountains now correct) reported
+  the player, monsters, and coins were floating in the middle of empty
+  sky, disconnected from the road below. The spacing *between* the
+  game's three action rows was tied to the same large multiplier as the
+  sky/margins above them, so that gap had grown to nearly the height of
+  the whole sky. Split it into its own, much smaller multiplier — the
+  sky above the road stays just as tall, but the action rows themselves
+  now sit close together right above the ground, matching how they look
+  on desktop.
+- Bumped the mobile font size a bit further, since it was requested
+  again — slightly past the theoretical zero-overlap ceiling, so two
+  entities landing in adjacent columns may touch occasionally, but
+  nowhere near the severe overlap from before 0.69.
+
 ## [0.69] — Mobile run screen: proper scale, no more overlapping glyphs
 
 ### Fixed

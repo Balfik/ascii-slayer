@@ -614,7 +614,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.69';
+const GAME_VERSION = '0.70';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -876,9 +876,20 @@ const CELL_W_BASE = 16, CELL_H_BASE = 28;
 const TOP_PAD_BASE = 44, PAD_LEFT = 10, BOTTOM_PAD_BASE = 8;
 let CELL_W = CELL_W_BASE, CELL_H = CELL_H_BASE;
 let TOP_PAD = TOP_PAD_BASE, BOTTOM_PAD = BOTTOM_PAD_BASE;
+// ROW_GAP — ОКРЕМА від CELL_H відстань МІЖ трьома ігровими рядками
+// (повітря/земля/підлога), яку читає yForRow(). Раніше (перша спроба
+// фіксу) yForRow() брав ту саму величезну CELL_H, що й TOP_PAD/фон —
+// на мобільному це рознесло сутності (гравець/моби/монети — рядок
+// ROW_GROUND) ДУЖЕ далеко ВІД дороги (ROW_FLOOR), бо відстань між
+// рядками буквально дорівнювала висоті всього неба зверху. Виглядало,
+// за словами гравця, "ніби це в космосі летить". TOP_PAD (скільки неба
+// зверху) і ROW_GAP (наскільки далеко рядки один від одного) — це ДВІ
+// різні речі, і плутати їх — та сама помилка, що вже була зі шрифтом.
+const ROW_GAP_BASE = CELL_H_BASE;
+let ROW_GAP = ROW_GAP_BASE;
 const ROW_AIR = 0, ROW_GROUND = 1, ROW_FLOOR = 2;
 let INTERNAL_W = PAD_LEFT*2 + GRID_COLS*CELL_W;
-let INTERNAL_H = TOP_PAD + 3*CELL_H + BOTTOM_PAD;
+let INTERNAL_H = TOP_PAD + 3*ROW_GAP + BOTTOM_PAD;
 // ВАЖЛИВО (знайдено живим тестом на реальному телефоні): на екрані
 // шириною container_width канвас завжди розтягується по ширині
 // (width:100%), тож видима на екрані ширина ОДНІЄЇ колонки завжди ≈
@@ -902,16 +913,24 @@ function runFontPx(basePx){ return Math.round(basePx * RUN_FONT_SCALE); }
 function isMobileViewport(){ return window.innerWidth <= 760; } // той самий поріг, що й .panels вище
 function updateRunGeometryForViewport(){
   const mobile = isMobileViewport();
-  const heightScale = mobile ? 3.6 : 1; // висота вікна/відступи — сильний масштаб, гравцю подобається
-  // 1.3, не більше: ширина колонки (CELL_W, буферні пікселі) НЕ росте
-  // разом з висотою (геометрично не може — див. коментар вище), тож
-  // шрифт має лишатись у межах ~CELL_W/0.6≈27px (bold Courier New),
-  // інакше сусідні гліфи знову почнуть налазити одне на одне.
-  RUN_FONT_SCALE = mobile ? 1.3 : 1;
+  const heightScale = mobile ? 3.6 : 1; // TOP_PAD/BOTTOM_PAD/фон — скільки неба над дорогою й полів знизу
+  // ~1.4: трохи вище за попередню безпечну межу (~1.33 = CELL_W/0.6 для
+  // bold Courier New) — гравець двічі прямо попросив ще більший шрифт;
+  // легке дотикання сусідніх гліфів, коли дві сутності опиняються рівно
+  // в сусідніх колонках, — прийнятний компроміс заради помітно кращої
+  // читабельності, а не жахливе суцільне накладання, як було на ×3.6.
+  RUN_FONT_SCALE = mobile ? 1.4 : 1;
+  // rowGapScale — НАСКІЛЬКИ ДАЛЕКО рядки (повітря/земля/підлога) один
+  // від одного, ОКРЕМО від heightScale вище. Тримаємо близько до
+  // оригіналу (лише трохи більше — щоб не бути тісніше за десктоп), щоб
+  // гравець/моби/монети (ROW_GROUND) лишались ПОРУЧ із дорогою
+  // (ROW_FLOOR), а не десь у половині висоти вікна.
+  const rowGapScale = mobile ? 1.3 : 1;
   CELL_H = Math.round(CELL_H_BASE*heightScale);
+  ROW_GAP = Math.round(ROW_GAP_BASE*rowGapScale);
   TOP_PAD = Math.round(TOP_PAD_BASE*heightScale);
   BOTTOM_PAD = Math.round(BOTTOM_PAD_BASE*heightScale);
-  INTERNAL_H = TOP_PAD + 3*CELL_H + BOTTOM_PAD;
+  INTERNAL_H = TOP_PAD + 3*ROW_GAP + BOTTOM_PAD;
 }
 // Масштаб декоративного фону (гори/небо/сонце-місяць/хмари/лава) —
 // той самий, що й висота вікна (heightScale), а НЕ RUN_FONT_SCALE: ці
@@ -1703,7 +1722,7 @@ function setupCanvas(){
 }
 
 function xForCol(c){ return PAD_LEFT + c*CELL_W; }
-function yForRow(r){ return TOP_PAD + r*CELL_H + CELL_H*0.72; }
+function yForRow(r){ return TOP_PAD + r*ROW_GAP + ROW_GAP*0.72; }
 function townXForCol(tx){ return TOWN_PAD + tx*TCELL_W; }
 function townYForRow(ty){ return TOWN_PAD + ty*TCELL_H + TCELL_H*0.72; }
 
@@ -4614,8 +4633,8 @@ function updateRun(dt){
    ===================================================================== */
 function drawMonsterHp(col, hp, maxHp){
   const x = xForCol(col)-1;
-  const barY = yForRow(ROW_GROUND) - CELL_H*0.88;
-  const w = CELL_W-2, h = Math.max(3, Math.round(3*(CELL_H/CELL_H_BASE)));
+  const barY = yForRow(ROW_GROUND) - ROW_GAP*0.88;
+  const w = CELL_W-2, h = Math.max(3, Math.round(3*(ROW_GAP/ROW_GAP_BASE)));
   ctx.fillStyle = '#1a1a1a';
   ctx.fillRect(x,barY,w,h);
   const ratio = hp/maxHp;
@@ -4829,7 +4848,7 @@ function renderRun(){
       const heavy = Math.ceil(e.hp/Math.max(1,stats.attack)) > 1;
       if(heavy){
         ctx.fillStyle = 'rgba(255,40,40,0.15)';
-        ctx.fillRect(xForCol(col)-2, yForRow(ROW_GROUND)-CELL_H*0.8, CELL_W+4, CELL_H*0.95);
+        ctx.fillRect(xForCol(col)-2, yForRow(ROW_GROUND)-ROW_GAP*0.8, CELL_W+4, ROW_GAP*0.95);
       }
       ctx.fillStyle = heavy ? COLORS.heavy : e.mtype.color;
       ctx.fillText(e.mtype.glyph, xForCol(col), yForRow(ROW_GROUND));
