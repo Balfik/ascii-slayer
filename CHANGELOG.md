@@ -5,6 +5,28 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.62] — Skill Tree: the complete fix (not just clicks, hover too)
+
+### Fixed
+- 0.61 only gave the Skill Tree the "wait until the button is released"
+  guard (the click-race fix from 0.60) — the player reported every
+  button there still flickered on hover. That guard only engages on an
+  actual mouse-button press; plain hovering never triggers it, so
+  leveling up kept rebuilding the whole tree under a perfectly still
+  cursor.
+- Leveling up doesn't actually change any skill node (a node's level and
+  lock state depend on skills already learned and Prestige count, not
+  character level) — the only real changes are the skill points counter
+  and, as a result, whether a given button is now affordable. Fixed by
+  updating just that counter's text and toggling each existing button's
+  disabled state in place, without rebuilding anything. A full rebuild
+  still happens for the cases that actually change nodes: buying a
+  skill, and the Auto-Strategist automation.
+- Verified live: a level-1 character with heavy attack, hovering a node
+  button while real combat pushed it through four level-ups in three
+  seconds — the exact same button stayed in the DOM the entire time, and
+  clicking it afterward still worked normally.
+
 ## [0.61] — The real "buttons keep running away" bug (hover, not clicks) — and three more spots with the same flaw
 
 ### Fixed

@@ -558,7 +558,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.61';
+const GAME_VERSION = '0.62';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -3935,7 +3935,12 @@ function gainXp(amount){
     addLog('log.levelUp', 'levelup', {level:state.level});
     spawnFloatingText(PLAYER_COL, 'LVL UP!', '#ffd94d');
     sfxLevelUp();
-    renderSkillTreeIfOpen(); // щоб кнопки одразу розблокувались, якщо модалка відкрита
+    // Точково, не повний рендер: levelUp сам по собі не змінює жоден
+    // вузол дерева (рівень/розблокування залежать від state.skills/
+    // requires/requiresPrestige, а не від рівня персонажа) — лише
+    // кількість очок і, як наслідок, "по кишені" це чи ні. Див.
+    // updateSkillTreeAffordability() вище.
+    updateSkillTreeAffordability();
     checkLevelUnlocks(); // нові регіони на Карті Світу — за досягнутим рівнем, не за дистанцією
     if(LEVEL_MILESTONE_EVENTS.includes(state.level)){
       reportEvent('level_milestone', {value:state.level});
@@ -5283,7 +5288,7 @@ function skillLockInfo(node){
   return {locked:false, reason:null};
 }
 function renderSkillTree(){
-  let html = `<div style="margin-bottom:10px;color:var(--dim);font-size:12px;">${t('skills.pointsLine',{pts:state.skillPoints})}</div>`;
+  let html = `<div id="skillPointsLine" style="margin-bottom:10px;color:var(--dim);font-size:12px;">${t('skills.pointsLine',{pts:state.skillPoints})}</div>`;
   if(stats.autoSkillSpend){
     const autoSkillOn = !!state.settings.autoSkillSpendEnabled;
     html += `<div class="mrow" style="margin-bottom:8px;">
@@ -5313,6 +5318,32 @@ function renderSkillTree(){
     }
   }
   modalBody.innerHTML = html;
+}
+// Той самий принцип, що й updateQuestBoardProgressOnly() — звичайний
+// levelUp персонажа (gainXp()) НЕ змінює жоден вузол дерева навичок
+// (рівень вузла/розблокування залежать від state.skills/requires/
+// requiresPrestige, а не від рівня персонажа) — міняється ЛИШЕ кількість
+// доступних очок і, як наслідок, чи по кишені та чи інша кнопка. Раніше
+// gainXp() викликав ПОВНИЙ renderSkillTree() на кожен рівень (на високій
+// швидкості — по кілька разів на секунду), знищуючи й пересоздаючи geть
+// ВСІ кнопки дерева — саме це й виглядало як "кнопка тікає" при простому
+// наведенні миші (той самий клас бага, що на Дошці оголошень, v0.61).
+// Тут — точково: оновлюємо текст рядка з очками й перемикаємо лише
+// disabled на вже ІСНУЮЧИХ кнопках, жоден вузол не перестворюється.
+function updateSkillTreeAffordability(){
+  if(modalKind!=='skills') return;
+  const ptsEl = document.getElementById('skillPointsLine');
+  if(ptsEl) ptsEl.textContent = t('skills.pointsLine',{pts:state.skillPoints});
+  modalBody.querySelectorAll('button[data-action="skill"], button[data-action="skillMax"]').forEach(btn=>{
+    const node = findSkillNode(btn.dataset.id);
+    if(!node) return;
+    const lvl = skillLevel(node.id);
+    const maxed = lvl >= node.maxLevel;
+    const lock = skillLockInfo(node);
+    const cost = skillCost(node);
+    const canBuy = !maxed && !lock.locked && state.skillPoints >= cost;
+    btn.disabled = !canBuy;
+  });
 }
 function buySkill(id){
   const node = findSkillNode(id);
