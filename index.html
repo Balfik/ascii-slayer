@@ -614,7 +614,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.68';
+const GAME_VERSION = '0.69';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -879,18 +879,47 @@ let TOP_PAD = TOP_PAD_BASE, BOTTOM_PAD = BOTTOM_PAD_BASE;
 const ROW_AIR = 0, ROW_GROUND = 1, ROW_FLOOR = 2;
 let INTERNAL_W = PAD_LEFT*2 + GRID_COLS*CELL_W;
 let INTERNAL_H = TOP_PAD + 3*CELL_H + BOTTOM_PAD;
-// Перерахунок базового розміру шрифту run-екрана (та інших дрібніших
-// написів там-таки) пропорційно до поточного CELL_H — щоб текст ріс
-// разом з висотою рядків, а не лишався мікроскопічним у вищому вікні.
-function runFontPx(basePx){ return Math.round(basePx * (CELL_H/CELL_H_BASE)); }
+// ВАЖЛИВО (знайдено живим тестом на реальному телефоні): на екрані
+// шириною container_width канвас завжди розтягується по ширині
+// (width:100%), тож видима на екрані ширина ОДНІЄЇ колонки завжди ≈
+// container_width/GRID_COLS — і це геометрично НЕ залежить від того,
+// яке саме число ми поставимо в CELL_W/CELL_H всередині буфера (більший
+// CELL_W пропорційно збільшує й INTERNAL_W, а значить пропорційно
+// ЗМЕНШує масштаб показу — обидва ефекти скасовують одне одного). Тобто
+// саму ширину колонки на екрані збільшити нічим не можна, не змінюючи
+// GRID_COLS (а це вже геймплейна константа, чіпати не можна).
+// Через це РАНІШЕ (перша спроба) шрифт масштабувався РАЗОМ із CELL_H
+// (той самий множник) — і на мобільному гліфи (гравець показав скрін)
+// стали набагато ширшими за незмінну ширину колонки й почали жахливо
+// налазити один на одного ("гроші, моби... дуже кучно"). Правильний
+// підхід — ДВА окремих множники: CELL_H/TOP_PAD/BOTTOM_PAD ростуть
+// сильно (вікно справді вище, більше повітря між рядками — це гравцю
+// сподобалось), а розмір ШРИФТУ — окремий, значно скромніший множник
+// (RUN_FONT_SCALE), підібраний так, щоб гліфи ставали помітно більшими,
+// але й далі влазили в ту саму (незмінну) ширину колонки без накладання.
+let RUN_FONT_SCALE = 1;
+function runFontPx(basePx){ return Math.round(basePx * RUN_FONT_SCALE); }
 function isMobileViewport(){ return window.innerWidth <= 760; } // той самий поріг, що й .panels вище
 function updateRunGeometryForViewport(){
-  const scale = isMobileViewport() ? 3.6 : 1; // +50% понад попередні 2.4, за прямим проханням гравця
-  CELL_H = Math.round(CELL_H_BASE*scale);
-  TOP_PAD = Math.round(TOP_PAD_BASE*scale);
-  BOTTOM_PAD = Math.round(BOTTOM_PAD_BASE*scale);
+  const mobile = isMobileViewport();
+  const heightScale = mobile ? 3.6 : 1; // висота вікна/відступи — сильний масштаб, гравцю подобається
+  // 1.3, не більше: ширина колонки (CELL_W, буферні пікселі) НЕ росте
+  // разом з висотою (геометрично не може — див. коментар вище), тож
+  // шрифт має лишатись у межах ~CELL_W/0.6≈27px (bold Courier New),
+  // інакше сусідні гліфи знову почнуть налазити одне на одне.
+  RUN_FONT_SCALE = mobile ? 1.3 : 1;
+  CELL_H = Math.round(CELL_H_BASE*heightScale);
+  TOP_PAD = Math.round(TOP_PAD_BASE*heightScale);
+  BOTTOM_PAD = Math.round(BOTTOM_PAD_BASE*heightScale);
   INTERNAL_H = TOP_PAD + 3*CELL_H + BOTTOM_PAD;
 }
+// Масштаб декоративного фону (гори/небо/сонце-місяць/хмари/лава) —
+// той самий, що й висота вікна (heightScale), а НЕ RUN_FONT_SCALE: ці
+// елементи не "текст", їм не загрожує накладання одне на одного через
+// фіксовану ширину колонки, і вони МАЮТЬ рости разом із висотою вікна,
+// інакше на новому, набагато вищому мобільному канвасі виглядають
+// крихітними й загубленими у зайвому порожньому небі зверху.
+function runBgScale(){ return CELL_H/CELL_H_BASE; }
 const JUMP_DURATION_BASE = 0.42;
 // ТИМЧАСОВИЙ кап ефективної швидкості — див. коментар у recomputeStats().
 const MAX_EFFECTIVE_SPEED = 2000;
@@ -4633,6 +4662,14 @@ const BG_SUN_COLORS = ['#ffdf7a','#ffdf7a','#ffb87a','#ff9d6b','#8fffc0','#ff6b6
 function drawRunBackground(tier){
   const floor = biomeFloorColor(tier);
   const baseY = yForRow(ROW_FLOOR)-2;
+  // На мобільному вікно бігу набагато вище (updateRunGeometryForViewport()),
+  // а всі розміри/відступи нижче спершу були підібрані ПІД старий, низький
+  // десктопний INTERNAL_H — на новій висоті вони лишались тими самими
+  // абсолютними пікселями й губились крихітними цятками у зайвому
+  // порожньому небі. bg — множник ДЛЯ ФОНУ (той самий, що й висота вікна,
+  // НЕ той, що для шрифту рядка) — росте разом з CELL_H, тож гори/сонце/
+  // хмари знову займають ту саму ПРОПОРЦІЮ вікна, що й на десктопі.
+  const bg = runBgScale();
 
   // небо — вертикальний градієнт, тон низу залежить від біому
   const sky = ctx.createLinearGradient(0,0,0,INTERNAL_H);
@@ -4643,26 +4680,26 @@ function drawRunBackground(tier){
 
   // сонце/моторошний місяць у кутку — колір міняється разом з регіоном
   const sunColor = BG_SUN_COLORS[Math.min(tier, BG_SUN_COLORS.length-1)];
-  const sunX = INTERNAL_W-70, sunY = 26;
+  const sunX = INTERNAL_W-70*bg, sunY = 26*bg;
   ctx.save();
   ctx.globalAlpha = 0.5;
   ctx.fillStyle = sunColor;
-  ctx.beginPath(); ctx.arc(sunX,sunY,15,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(sunX,sunY,15*bg,0,Math.PI*2); ctx.fill();
   ctx.globalAlpha = 0.16;
-  ctx.beginPath(); ctx.arc(sunX,sunY,27,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(sunX,sunY,27*bg,0,Math.PI*2); ctx.fill();
   ctx.restore();
 
   // хмари — дрейфують незалежно від дистанції, ледь помітні
   ctx.save();
   ctx.globalAlpha = 0.14;
   ctx.fillStyle = '#cfe8ff';
-  drawScrollLayer(bgTime*6, 140, (x,seed)=>{
-    const jy = 12 + pseudoRand(seed)*15;
-    const s = 9 + pseudoRand(seed+1)*6;
+  drawScrollLayer(bgTime*6, 140*bg, (x,seed)=>{
+    const jy = (12 + pseudoRand(seed)*15)*bg;
+    const s = (9 + pseudoRand(seed+1)*6)*bg;
     ctx.beginPath();
-    ctx.ellipse(x+30, jy, s*1.6, s*0.6, 0, 0, Math.PI*2);
-    ctx.ellipse(x+44, jy-3, s*1.1, s*0.5, 0, 0, Math.PI*2);
-    ctx.ellipse(x+16, jy-2, s, s*0.5, 0, 0, Math.PI*2);
+    ctx.ellipse(x+30*bg, jy, s*1.6, s*0.6, 0, 0, Math.PI*2);
+    ctx.ellipse(x+44*bg, jy-3*bg, s*1.1, s*0.5, 0, 0, Math.PI*2);
+    ctx.ellipse(x+16*bg, jy-2*bg, s, s*0.5, 0, 0, Math.PI*2);
     ctx.fill();
   });
   ctx.restore();
@@ -4671,12 +4708,12 @@ function drawRunBackground(tier){
   ctx.save();
   ctx.globalAlpha = 0.5;
   ctx.fillStyle = shadeColor(floor, -18);
-  drawScrollLayer(distanceCols*CELL_W*0.15, 130, (x,seed)=>{
-    const h = 24 + pseudoRand(seed)*22;
+  drawScrollLayer(distanceCols*CELL_W*0.15, 130*bg, (x,seed)=>{
+    const h = (24 + pseudoRand(seed)*22)*bg;
     ctx.beginPath();
     ctx.moveTo(x, baseY);
-    ctx.lineTo(x+65, baseY-h);
-    ctx.lineTo(x+130, baseY);
+    ctx.lineTo(x+65*bg, baseY-h);
+    ctx.lineTo(x+130*bg, baseY);
     ctx.closePath();
     ctx.fill();
   });
@@ -4686,14 +4723,14 @@ function drawRunBackground(tier){
   ctx.save();
   ctx.globalAlpha = 0.4;
   ctx.fillStyle = shadeColor(floor, -26);
-  drawScrollLayer(distanceCols*CELL_W*0.45, 70, (x,seed)=>{
+  drawScrollLayer(distanceCols*CELL_W*0.45, 70*bg, (x,seed)=>{
     if(pseudoRand(seed+2) < 0.35) return;
-    const h = 15 + pseudoRand(seed)*10;
-    ctx.fillRect(x-1, baseY-h*0.35, 2, h*0.35);
+    const h = (15 + pseudoRand(seed)*10)*bg;
+    ctx.fillRect(x-1*bg, baseY-h*0.35, 2*bg, h*0.35);
     ctx.beginPath();
     ctx.moveTo(x, baseY-h);
-    ctx.lineTo(x-9, baseY-h*0.3);
-    ctx.lineTo(x+9, baseY-h*0.3);
+    ctx.lineTo(x-9*bg, baseY-h*0.3);
+    ctx.lineTo(x+9*bg, baseY-h*0.3);
     ctx.closePath();
     ctx.fill();
   });
@@ -4715,17 +4752,17 @@ function drawRunBackground(tier){
     ctx.fillRect(0, roadY, INTERNAL_W, INTERNAL_H-roadY);
     const crackCount = 6;
     for(let i=0;i<crackCount;i++){
-      const cw = 34 + (i%3)*10;
+      const cw = (34 + (i%3)*10)*bg;
       const cx = ((i*113 + bgTime*7) % (INTERNAL_W+cw)) - cw;
-      const cy = roadY + 5 + (i%2)*8 + ((i*31)%6);
+      const cy = roadY + (5 + (i%2)*8 + ((i*31)%6))*bg;
       const glow = 0.10 + 0.09*Math.sin(bgTime*1.1 + i*1.9);
       ctx.globalAlpha = Math.max(0, glow);
       ctx.fillStyle = '#c9351a';
-      ctx.fillRect(cx, cy, cw, 2);
+      ctx.fillRect(cx, cy, cw, 2*bg);
     }
     ctx.globalAlpha = 0.5;
     ctx.fillStyle = '#5a5a5a';
-    ctx.fillRect(0, roadY, INTERNAL_W, 3);
+    ctx.fillRect(0, roadY, INTERNAL_W, 3*bg);
     ctx.restore();
   }
 

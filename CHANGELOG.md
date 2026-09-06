@@ -5,6 +5,21 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.69] — Mobile run screen: proper scale, no more overlapping glyphs
+
+### Fixed
+- The taller mobile run window (0.65/0.67) scaled its font size by the
+  same factor as the window's height, which made glyphs wide enough to
+  overlap their neighbors — coins, monsters, and numbers all crowded
+  together. Text now uses its own, much more modest scale, sized to fit
+  the row's actual on-screen width instead of growing with the window's
+  height.
+- The decorative background (sun/moon, clouds, mountains, trees, the
+  end-game lava cracks) previously stayed pinned at their old, small
+  desktop sizes and positions, looking lost in the taller canvas's extra
+  sky. They now scale up together with the window height, filling the
+  same proportion of the screen as they do on desktop.
+
 ## [0.68] — More leaderboard activity; the stat bar no longer scrolls, anywhere
 
 ### Added
