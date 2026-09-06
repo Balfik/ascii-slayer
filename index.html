@@ -558,7 +558,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.53';
+const GAME_VERSION = '0.54';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -6744,12 +6744,27 @@ window.addEventListener('resize', setupCanvas);
 /* =====================================================================
    ГОЛОВНИЙ ЦИКЛ
    ===================================================================== */
+// Тимчасова діагностика продуктивності (v0.54) — НІЯК не змінює
+// поведінку гри, лише вимірює час (performance.now(), сам по собі
+// майже безкоштовний виклик) і виводить у консоль ДЕТАЛЬНИЙ розклад,
+// якщо один update() зайняв підозріло довго (>80мс, тобто ЯВНО довше за
+// звичайний кадр ~16мс). Мета: наступного разу, коли гра зависне на
+// екстремальному рівні, гравець зможе відкрити консоль браузера (F12)
+// і скинути мені РЕАЛЬНІ цифри — де саме йде час — замість того, щоб я
+// й далі гадав і, як минулого разу, випадково ламав реальний геймплей
+// заради "оптимізації" неправильного місця.
 function update(dt){
+  const __t0 = performance.now();
   updateRelics(dt);
+  const __t1 = performance.now();
   autoManageQuests(dt);
+  const __t2 = performance.now();
   autoManageEnchant(dt);
+  const __t3 = performance.now();
   autoManageUpgrade(dt);
+  const __t4 = performance.now();
   autoManageSkillSpend(dt);
+  const __t5 = performance.now();
   if(mode==='town'){
     updateTown(dt);
   } else if(mode==='boss'){
@@ -6759,7 +6774,23 @@ function update(dt){
   } else {
     updateRun(dt);
   }
+  const __t6 = performance.now();
   updateHud();
+  const __t7 = performance.now();
+  const __total = __t7-__t0;
+  if(__total > 80){
+    console.warn('[ASCII SLAYER perf] повільний кадр: '+__total.toFixed(1)+'мс', {
+      mode,
+      updateRelics: (__t1-__t0).toFixed(1)+'мс',
+      autoManageQuests: (__t2-__t1).toFixed(1)+'мс',
+      autoManageEnchant: (__t3-__t2).toFixed(1)+'мс',
+      autoManageUpgrade: (__t4-__t3).toFixed(1)+'мс',
+      autoManageSkillSpend: (__t5-__t4).toFixed(1)+'мс',
+      modeUpdate: (__t6-__t5).toFixed(1)+'мс',
+      updateHud: (__t7-__t6).toFixed(1)+'мс',
+      entitiesCount: (typeof entities!=='undefined') ? entities.length : 'n/a'
+    });
+  }
 }
 function loop(ts){
   if(!lastTs) lastTs = ts;

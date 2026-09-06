@@ -5,6 +5,23 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.54] — Performance diagnostics (no gameplay change)
+
+### Added
+- Reported: the browser hung again at an extreme level — this time
+  while standing still in town with the Boss Portal open, not while
+  running/fighting, so the previous fix (the kill sound) can't be the
+  cause here. Tried reproducing with several plausible scenarios
+  (skills still actively leveling rather than already maxed, a huge
+  gold/skill-point surplus, standing idle in town) without success.
+  Rather than keep guessing and risk another regression like 0.52's,
+  added lightweight always-on timing diagnostics: if a single game-loop
+  tick takes longer than 80ms, a detailed breakdown (time spent in each
+  automation, the mode-specific update, HUD refresh, entity count) is
+  logged to the browser console. No behavior change — purely
+  observability, so the next occurrence can be diagnosed with real data
+  instead of speculation.
+
 ## [0.53] — Revert 0.52's spawn cap, fix the real cause of the lag
 
 ### Fixed
