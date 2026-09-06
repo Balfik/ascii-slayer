@@ -558,7 +558,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.57';
+const GAME_VERSION = '0.58';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -927,7 +927,7 @@ const I18N = {
     'gauntlet.retreatBtn':'🏳 Завершити', 'gauntlet.continueBtn':'🏘 У місто',
     'gauntlet.header':'Гаунтлет', 'gauntlet.startBtn':'🌀 Почати Гаунтлет',
     'gauntlet.desc':'Хвилі монстрів одна за одною, дедалі важчі — скільки протримаєшся за 90с?',
-    'gauntlet.descSmall':'Повна нагорода від {n} зачищених хвиль, менше — часткова. Шанс на реліквію — 5%, і ще один незалежний прокид за кожні 10 хвиль понад поріг',
+    'gauntlet.descSmall':'Повна нагорода від {n} зачищених хвиль, менше — часткова. Шанс на реліквію — 15%, і ще один незалежний прокид за кожні 10 хвиль понад поріг',
     'gauntlet.resultTitle':'Зачищено хвиль: {waves}',
     'gauntlet.waveLabel':'Хвиля {n}',
     'log.gauntletLocked':'Гаунтлет відкриється на {lvl} рівні персонажа',
@@ -1091,7 +1091,7 @@ const I18N = {
     'shop.notSellable':'не продається',
     'shop.notSellableTitle':'Демонічні предмети — постійна колекція, не продаються',
     'stat.atk':'Атака', 'stat.spd':'Швидкість', 'stat.atkSpeed':'Швидкість атаки', 'stat.goldPct':'Золото',
-    'skills.pointsLine':'Очки навичок: {pts} (даються по 1 за кожен рівень персонажа). Кожна навичка має до {max} рівнів — прокачується довго й потроху.',
+    'skills.pointsLine':'Очки навичок: {pts} (даються по 1 за кожен рівень персонажа).',
     'skills.max':'МАКС',
     'skills.lockedSuffix':' · спершу вивчи попередню навичку в гілці',
     'skills.lockedPrestigeSuffix':' · потрібне хоча б одне Переродження',
@@ -1145,7 +1145,7 @@ const I18N = {
     'theme.arcane.hint':'Заповни Бестіарій повністю, щоб розблокувати',
     'theme.crystal.name':'Кришталева', 'theme.crystal.desc':'Розблоковано за всі 100/100 досягнень.',
     'theme.crystal.hint':'Здобудь усі досягнення, щоб розблокувати',
-    'char.relicsExplain':'Випадають з невеликим шансом (5%) за перемогу над босом (👹 Портал Босів) або за повністю зачищений Гаунтлет — кожна реліквія унікальна, здобувається лише раз.',
+    'char.relicsExplain':'Випадають з невеликим шансом за перемогу над босом (👹 Портал Босів, 10%) або за повністю зачищений Гаунтлет (15%, і додаткові прокиди за довгі забіги) — кожна реліквія унікальна, здобувається лише раз.',
     'modal.bestiaryTitle':'БЕСТІАРІЙ', 'bestiary.tabMonsters':'Монстри', 'bestiary.tabBosses':'Боси', 'bestiary.tabRecords':'Рекорди', 'bestiary.tabMilestones':'Віхи',
     'modal.castleTitle':'ЗАМОК', 'castle.levelLine':'Рівень {lvl} / {max}',
     'castle.explain':'Збирай деревину на дорозі, камінь і залізо — з убитих монстрів, а золото/кристали/душі — як завжди. Кожна збудована частина замку лишається з тобою назавжди й дає постійний бонус.',
@@ -1213,7 +1213,7 @@ const I18N = {
     'gauntlet.retreatBtn':'🏳 End Run', 'gauntlet.continueBtn':'🏘 To town',
     'gauntlet.header':'Gauntlet', 'gauntlet.startBtn':'🌀 Start Gauntlet',
     'gauntlet.desc':'Waves of monsters, one after another, ever harder — how long can you last in 90s?',
-    'gauntlet.descSmall':'Full reward from {n} cleared waves, less otherwise. Relic chance is 5%, plus one more independent roll per 10 waves beyond the threshold',
+    'gauntlet.descSmall':'Full reward from {n} cleared waves, less otherwise. Relic chance is 15%, plus one more independent roll per 10 waves beyond the threshold',
     'gauntlet.resultTitle':'Waves cleared: {waves}',
     'gauntlet.waveLabel':'Wave {n}',
     'log.gauntletLocked':'The Gauntlet unlocks at character level {lvl}',
@@ -1377,7 +1377,7 @@ const I18N = {
     'shop.notSellable':'not sellable',
     'shop.notSellableTitle':'Demonic items are a permanent collection — not sellable',
     'stat.atk':'Attack', 'stat.spd':'Speed', 'stat.atkSpeed':'Attack Speed', 'stat.goldPct':'Gold',
-    'skills.pointsLine':'Skill points: {pts} (1 per character level). Each skill has up to {max} levels — a long, gradual climb.',
+    'skills.pointsLine':'Skill points: {pts} (1 per character level).',
     'skills.max':'MAX',
     'skills.lockedSuffix':' · learn the previous skill in this branch first',
     'skills.lockedPrestigeSuffix':' · requires at least one Rebirth',
@@ -1431,7 +1431,7 @@ const I18N = {
     'theme.arcane.hint':'Fill out the entire Bestiary to unlock',
     'theme.crystal.name':'Crystal', 'theme.crystal.desc':'Unlocked by earning all 100/100 achievements.',
     'theme.crystal.hint':'Earn every achievement to unlock',
-    'char.relicsExplain':'Drop with a small chance (5%) from defeating a boss (👹 Boss Portal) or from a fully-cleared Gauntlet run — each relic is unique, obtainable only once.',
+    'char.relicsExplain':'Drop with a small chance from defeating a boss (👹 Boss Portal, 10%) or from a fully-cleared Gauntlet run (15%, plus extra rolls for long runs) — each relic is unique, obtainable only once.',
     'modal.bestiaryTitle':'BESTIARY', 'bestiary.tabMonsters':'Monsters', 'bestiary.tabBosses':'Bosses', 'bestiary.tabRecords':'Records', 'bestiary.tabMilestones':'Milestones',
     'modal.castleTitle':'CASTLE', 'castle.levelLine':'Level {lvl} / {max}',
     'castle.explain':'Gather wood on the road, stone and iron from defeated monsters, and gold/crystals/souls as usual. Every completed part of the castle stays with you forever and grants a permanent bonus.',
@@ -1720,7 +1720,12 @@ const RELIC_POOL = [
     desc:'25% шанс уникнути спотикання в ямі, навіть якщо не встиг стрибнути',
     desc_en:"25% chance to avoid a pit stumble, even without jumping in time"}
 ];
-const RELIC_DROP_CHANCE = 0.05;       // шанс дропу ще НЕ здобутої реліквії за перемогу над босом
+// Шанс дропу ще НЕ здобутої реліквії — окремо для босів і Гаунтлета
+// (гравець програв багато боїв узагалі без жодної реліквії на 5%,
+// підняли обидва, Гаунтлет вище — там довший і складніший забіг,
+// а не одна коротка сутичка).
+const RELIC_DROP_CHANCE_BOSS = 0.10;
+const RELIC_DROP_CHANCE_GAUNTLET = 0.15;
 const RELIC_COOLDOWN_SKIP_CHANCE = 0.15;
 const RELIC_FREE_ENCHANT_CHANCE = 0.20;
 const RELIC_PIT_AVOID_CHANCE = 0.25;
@@ -3064,7 +3069,7 @@ function endBossFight(won, retreated){
     const demonicChance = boss.demonicChance * (hasRelic('hunter_medallion') ? 2 : 1);
     if(Math.random() < demonicChance){
       result.demonicName = grantDemonicItem();
-    } else if(Math.random() < RELIC_DROP_CHANCE){
+    } else if(Math.random() < RELIC_DROP_CHANCE_BOSS){
       const relic = grantRelic();
       if(relic){ result.relicName = L(relic,'name'); addLog('log.relicFound', 'item', {name:L(relic,'name')}); sfxItem('demonic'); }
     }
@@ -3318,7 +3323,7 @@ function endGauntlet(retreated){
   if(fullReward){
     const relicRolls = 1 + Math.floor((wavesCleared - GAUNTLET_MIN_WAVES_FOR_FULL_REWARD) / 10);
     for(let i=0; i<relicRolls; i++){
-      if(Math.random() < RELIC_DROP_CHANCE){
+      if(Math.random() < RELIC_DROP_CHANCE_GAUNTLET){
         const relic = grantRelic();
         if(relic){ relicName = L(relic,'name'); addLog('log.relicFound', 'item', {name:relicName}); }
         break;
@@ -5138,7 +5143,7 @@ function skillLockInfo(node){
   return {locked:false, reason:null};
 }
 function renderSkillTree(){
-  let html = `<div style="margin-bottom:10px;color:var(--dim);font-size:12px;">${t('skills.pointsLine',{pts:state.skillPoints, max:MAX_SKILL_LEVEL.toLocaleString(lang==='en'?'en-US':'uk-UA')})}</div>`;
+  let html = `<div style="margin-bottom:10px;color:var(--dim);font-size:12px;">${t('skills.pointsLine',{pts:state.skillPoints})}</div>`;
   if(stats.autoSkillSpend){
     const autoSkillOn = !!state.settings.autoSkillSpendEnabled;
     html += `<div class="mrow" style="margin-bottom:8px;">
@@ -5186,6 +5191,12 @@ function buySkill(id){
   addLog('log.skillLeveled', 'upgrade', {name:L(node,'name'), level:state.skills[id]});
   sfxEnchant();
   renderSkillTree();
+  // Панель "Прокачка" (upgradesBody) завжди видима, поза модалкою — і
+  // показує рядок-перемикач для навички "Автотренер" (a4), щойно вона
+  // вивчена. Без цього виклику той рядок з'являвся тільки випадково,
+  // коли щось ІНШЕ пізніше викликало renderUpgrades() (напр. ручна
+  // покупка прокачки за золото) — гравець це й помітив.
+  renderUpgrades();
   updateHud();
   save();
 }
@@ -5212,6 +5223,7 @@ function buySkillMax(id){
   addLog('log.skillLeveledMax', 'upgrade', {name:L(node,'name'), count, level:state.skills[id]});
   sfxEnchant();
   renderSkillTree();
+  renderUpgrades(); // див. коментар у buySkill() вище
   updateHud();
   save();
 }

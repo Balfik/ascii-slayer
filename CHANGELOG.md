@@ -5,6 +5,26 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.58] — Three small fixes: upgrade panel, skill tree text, relic odds
+
+### Fixed
+- The "Auto-upgrade for gold" toggle (from the "Auto-Trainer" automation
+  skill) only showed up in the always-visible Upgrades panel by
+  accident, whenever something else happened to refresh that panel
+  later (like manually buying an upgrade) — learning the skill itself
+  didn't refresh it. It now appears immediately the moment the skill is
+  bought.
+- The Skill Tree's intro line claimed every skill "has up to 9,999
+  levels — a long, gradual climb", which isn't true for the one-level
+  automation skills. Removed that sentence.
+
+### Changed
+- Relic drop chance from defeating a boss vs. clearing a Gauntlet run
+  used to share one flat 5%. Split into two separate rates: 10% for
+  bosses, 15% for a full Gauntlet clear (a longer, harder run earns
+  better odds) — updated after feedback that a long stretch of boss
+  kills and Gauntlet runs produced zero relics.
+
 ## [0.57] — Temporary speed cap (2000) while the deeper cause is tracked down
 
 ### Changed
