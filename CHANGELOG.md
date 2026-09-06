@@ -5,6 +5,32 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.55] — Found and fixed the actual cause of the freezing
+
+### Fixed
+- The player sent console output from 0.54's diagnostics: frames kept
+  getting slower (80ms up to 618ms), every automation measured near
+  zero, and the browser eventually had to be force-closed. That pointed
+  straight at entity processing during the run.
+- The real bug: at high speed, the player can pass multiple monsters
+  that each need more than one hit within the very same frame. The
+  encounter logic unconditionally overwrote the single "current fight"
+  reference for each one in turn — leaving every monster but the last
+  permanently stuck in a "fighting" state that nothing ever resolved or
+  removed, since movement (and therefore its on-screen position) had
+  stopped advancing. Every such moment leaked a few entities forever; at
+  high speed this happens often, so the entity list grew without bound
+  over a play session — exactly matching the reported pattern of
+  gradually worsening frames ending in a full hang.
+- Fixed: if the player is already fighting something else that frame, a
+  newly-reached monster is simply left alone and reconsidered next
+  frame once the current fight ends, instead of hijacking the fight
+  slot. Verified with an isolated reproduction (15 monsters reached in
+  one frame: 14 permanently leaked before the fix, 0 after) and a live
+  ~30-second test built specifically to trigger the bug (attack too low
+  to one-shot monsters, extreme speed) — no slowdown, no console
+  warnings, normal combat and progress throughout.
+
 ## [0.54] — Performance diagnostics (no gameplay change)
 
 ### Added
