@@ -5,6 +5,23 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.71] — Run window 50% taller; fixed the overflowing fight-status line
+
+### Changed
+- The mobile run window's overall height is up another 50% from 0.70,
+  addressing the height it lost as a side effect of that version's
+  entity-spacing fix. The row spacing and font-size multipliers that
+  fix stabilized are left untouched, so entities stay right next to the
+  road and glyphs stay legible — only the sky/margin above and below
+  the action grew.
+
+### Fixed
+- The fight-status line shown during a run-mode encounter (target
+  name — hp/maxHp and its bar) could overflow the screen width on
+  mobile with a long target name, getting silently clipped. It now
+  uses a smaller font and a shorter bar on narrow screens, with an
+  ellipsis fallback for anything still too long.
+
 ## [0.70] — Mobile run screen: entities back next to the road
 
 ### Fixed

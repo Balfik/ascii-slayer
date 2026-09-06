@@ -145,7 +145,16 @@
     text-align:center;color:var(--danger);font-size:13px;margin-bottom:6px;
     letter-spacing:1px;
     height:18px;line-height:18px;overflow:hidden;white-space:nowrap;
+    text-overflow:ellipsis;
     visibility:hidden;
+  }
+  /* Рядок бою (ім'я цілі — hp/maxHp [шкала]) на вузькому екрані з
+     фіксованим font-size:13px+letter-spacing банально не влазив у ширину
+     вікна на довгих іменах (боси теж можуть бути fightTarget) — і через
+     overflow:hidden просто обрізався/зникав. Менший шрифт без
+     letter-spacing і коротша шкала (див. updateHud()) дають запас. */
+  @media (max-width:760px){
+    #fightBar{ font-size:10px; letter-spacing:0; }
   }
   #comboWrap{ visibility:hidden; }
 
@@ -614,7 +623,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.70';
+const GAME_VERSION = '0.71';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -913,7 +922,14 @@ function runFontPx(basePx){ return Math.round(basePx * RUN_FONT_SCALE); }
 function isMobileViewport(){ return window.innerWidth <= 760; } // той самий поріг, що й .panels вище
 function updateRunGeometryForViewport(){
   const mobile = isMobileViewport();
-  const heightScale = mobile ? 3.6 : 1; // TOP_PAD/BOTTOM_PAD/фон — скільки неба над дорогою й полів знизу
+  // heightScale 3.6→6.5: гравець прямо попросив "розмір вікна збільшити
+  // на 50%" від того, що вже було у v0.70 (INTERNAL_H=295px). ROW_GAP
+  // (звідки й прийшов "космос") у цей множник свідомо НЕ входить —
+  // рахуємо тільки TOP_PAD/BOTTOM_PAD/фон, тому весь приріст іде в
+  // "повітря" над/під дорогою (реально вище вікно), а не в дистанцію
+  // між сутностями й дорогою (яку окремо зафіксували щойно в ROW_GAP).
+  // 44*6.5 + 3*36(ROW_GAP, незмінний) + 8*6.5 ≈ 446px ≈ 295*1.51.
+  const heightScale = mobile ? 6.5 : 1; // TOP_PAD/BOTTOM_PAD/фон — скільки неба над дорогою й полів знизу
   // ~1.4: трохи вище за попередню безпечну межу (~1.33 = CELL_W/0.6 для
   // bold Courier New) — гравець двічі прямо попросив ще більший шрифт;
   // легке дотикання сусідніх гліфів, коли дві сутності опиняються рівно
@@ -6752,7 +6768,7 @@ function updateHud(){
   const fb = document.getElementById('fightBar');
   if(mode==='run' && isFighting && fightTarget){
     fb.style.visibility = 'visible';
-    const barW = 20;
+    const barW = isMobileViewport() ? 12 : 20;
     const ratio = Math.max(0, fightTarget.hp/fightTarget.maxHp);
     const filledF = Math.max(0, Math.min(barW, Math.round(ratio*barW)));
     fb.textContent = `⚔ ${L(fightTarget.mtype,'name')} — ${Math.max(0,Math.ceil(fightTarget.hp))}/${fightTarget.maxHp} [${'#'.repeat(filledF)}${'-'.repeat(barW-filledF)}]`;
