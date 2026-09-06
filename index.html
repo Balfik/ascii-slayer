@@ -119,6 +119,7 @@
   #achievementsBtn{color:var(--gold);}
   #prestigeBtn, #characterBtn{color:var(--crystal);}
   #bestiaryBtn{color:var(--text);}
+  #libraryBtn{color:var(--legendary);}
   #bossPortalBtn{color:#ff6b6b;}
   #worldMapHudBtn{color:var(--accent);}
   #leaderboardBtn{color:var(--crystal);}
@@ -280,6 +281,23 @@
   button.buy-max.active{border-color:var(--accent);color:var(--accent);background:#1b3a22;}
   .forge-sort{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-bottom:10px;}
   .forge-sort-label{color:var(--dim);font-size:11px;margin-right:2px;}
+
+  /* Бібліотека — "розворот книжки": зображення зліва, текст справа;
+     на вузьких екранах переносяться одне під одне (flex-wrap). */
+  .library-book{
+    display:flex;gap:16px;align-items:flex-start;
+    background:#0f1a10;border:1px solid var(--border);border-radius:8px;
+    padding:14px;margin-bottom:10px;flex-wrap:wrap;
+  }
+  .library-portrait{
+    flex:0 0 140px;height:140px;border-radius:8px;
+    display:flex;align-items:center;justify-content:center;
+    border:1px solid var(--border);overflow:hidden;
+  }
+  .library-text{flex:1 1 240px;min-width:200px;}
+  .library-entry-title{color:var(--gold);font-size:16px;letter-spacing:.5px;margin-bottom:8px;}
+  .library-entry-body{color:var(--text);font-size:13px;line-height:1.6;}
+  .library-pager{display:flex;align-items:center;justify-content:center;gap:14px;}
 
   .inv-item, .log-row{
     padding:5px 0 5px 8px;border-left:3px solid var(--border);margin-bottom:5px;font-size:12px;
@@ -483,6 +501,7 @@
     <button id="questsBtn" data-i18n="btn.quests">📜 Квести</button>
     <button id="characterBtn" data-i18n="btn.character">📋 Персонаж</button>
     <button id="bestiaryBtn" data-i18n="btn.bestiary">📖 Бестіарій</button>
+    <button id="libraryBtn" data-i18n="btn.library">📚 Бібліотека</button>
     <button id="bossPortalBtn" data-i18n="btn.bossPortal">👹 Портал Босів</button>
     <button id="worldMapHudBtn" data-i18n="btn.worldMap">🗺 Карта Світу</button>
     <button id="leaderboardBtn" data-i18n="btn.leaderboard">🌍 Лідерборд</button>
@@ -576,7 +595,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.65';
+const GAME_VERSION = '0.66';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -851,7 +870,7 @@ const TOWN_MAP = [
   "#........::P.~~~~~~#",
   "#........::..~~~~~~#",
   "#........::..C~~~~~#",
-  "#........::..~~~~~~#",
+  "#.L......::..~~~~~~#",
   "#........::........#",
   "#########GG#########"
 ];
@@ -933,7 +952,12 @@ const I18N = {
     'btn.bossportal':'👹 Портал Босів',
     'modal.bossportalTitle':'ПОРТАЛ БОСІВ',
     'town.worldmap':'[E] Карта Світу', 'town.castle':'[E] Замок', 'town.castleLabel':'🏰 ЗАМОК',
+    'town.library':'[E] Бібліотека',
     'modal.worldmapTitle':'КАРТА СВІТУ',
+    'modal.libraryTitle':'БІБЛІОТЕКА', 'btn.library':'📚 Бібліотека',
+    'library.tab.world':'🌍 Світ', 'library.tab.castle':'🏰 Замок', 'library.tab.monsters':'👹 Монстри',
+    'library.tab.bosses':'💀 Боси', 'library.tab.items':'⚔ Спорядження',
+    'library.pageOf':'{cur} / {total}',
     'touch.up':'Вперед', 'touch.down':'Назад', 'touch.left':'Ліворуч', 'touch.right':'Праворуч',
     'touch.interact':'Взаємодія', 'touch.jump':'Стрибок',
     'footer.visitorCountTitle':'Кількість гравців у публічній базі лідерборду (реальні дані, не кеш)',
@@ -1224,7 +1248,12 @@ const I18N = {
     'btn.bossportal':'👹 Boss Portal',
     'modal.bossportalTitle':'BOSS PORTAL',
     'town.worldmap':'[E] World Map', 'town.castle':'[E] Castle', 'town.castleLabel':'🏰 CASTLE',
+    'town.library':'[E] Library',
     'modal.worldmapTitle':'WORLD MAP',
+    'modal.libraryTitle':'LIBRARY', 'btn.library':'📚 Library',
+    'library.tab.world':'🌍 World', 'library.tab.castle':'🏰 Castle', 'library.tab.monsters':'👹 Monsters',
+    'library.tab.bosses':'💀 Bosses', 'library.tab.items':'⚔ Gear',
+    'library.pageOf':'{cur} / {total}',
     'touch.up':'Up', 'touch.down':'Down', 'touch.left':'Left', 'touch.right':'Right',
     'touch.interact':'Interact', 'touch.jump':'Jump',
     'footer.visitorCountTitle':'Number of players in the public leaderboard database (real data, not cached)',
@@ -1822,6 +1851,97 @@ const BOSS_DESC = {
   b800:  {desc:'Старший за саму гру. Пам\'ятає часи, коли Кінця Усього ще не було.',                desc_en:'Older than the game itself. Remembers a time before The End of All.'},
   b1000: {desc:'Останній рубіж. Далі — тільки цифри без кінця.',                                    desc_en:'The final boundary. Beyond it — only endless numbers.'},
   final_guardian: {desc:'Стереже все, що ти збудував і зібрав. Пробудиться лише тоді, коли справді буде що захищати.', desc_en:'Guards everything you built and gathered. It wakes only once there is truly something worth defending.'}
+};
+
+/* =====================================================================
+   БІБЛІОТЕКА — розширений лор: світ, Замок, монстри, боси, спорядження.
+   На відміну від MONSTER_DESC/BOSS_DESC вище (короткі рядки для
+   Бестіарію, не чіпаємо їх), тут довші, "історичні" тексти — окремі
+   об'єкти, ключовані так само (за m.key / b.id / it.name), щоб не
+   плутати дві різні за призначенням колекції тексту.
+   ===================================================================== */
+const LIBRARY_WORLD_PAGES = [
+  {title:'Світ, що біжить', title_en:'A world that runs',
+    body:'Ніхто не пам\'ятає, коли все почалося. Одного дня ти просто прокинувся вже на бігу — з мечем у руці й монстром просто перед носом — і з тих пір зупинитись якось... не виходить. Дорога тягнеться праворуч нескінченно: спочатку через тихі Околиці села, потім — все важче, все дивніше, аж поки називати регіони по-людськи стає марно, і лишається просто рахувати їх номерами. Хтось назвав це місце «Кінець Усього». Ніхто не заперечив, бо ніхто насправді не знає, де він — цей кінець — і чи є він узагалі. Може, дорога просто ніколи не закінчується. Може, в цьому й весь сенс.',
+    body_en:"Nobody remembers when it started. One day you simply woke up already running — sword in hand, a monster right in front of your nose — and somehow, stopping hasn't really been an option since. The road stretches out to the right forever: first through the quiet Village Outskirts, then harder, then stranger, until naming the regions like a person stops making sense and all that's left is counting them by number. Someone called this place 'The End of All.' Nobody argued, because nobody actually knows where that end is — or whether it exists at all. Maybe the road just never ends. Maybe that's the whole point."},
+  {title:'Монстри, золото та інші незручності', title_en:'Monsters, gold, and other inconveniences',
+    body:'Монстри трапляються дорогою здебільшого не тому, що тебе ненавидять, а тому, що стоять там, де й так є лише один шлях. Золото й кристали сиплються з їхніх кишень так охоче, ніби вони самі не проти позбутися тягаря. Час від часу трапляються ями — і тут доводиться визнати чесно: якщо в тебе колись і був план, стрибати через них точно в нього не входило.',
+    body_en:"Monsters show up along the way — mostly not because they hate you, but because they're standing where the road happens to be, and there's only one road. Gold and crystals spill out of their pockets so readily it's like they weren't too attached to the weight anyway. Pits show up now and then too — and here's the honest truth: if you ever had a plan, jumping over them definitely wasn't part of it."}
+];
+const LIBRARY_CASTLE_PAGES = [
+  {title:'Руїни, що чекали', title_en:'Ruins that waited',
+    body:'Замок на околиці лежав у руїнах ще до того, як ти взагалі прийшов у ці краї — жодного каменя на камені, тільки порожня ділянка й напис на брамі, який давно вицвів. Хто його зруйнував — демони, час, чи власна необережність колишніх господарів — тепер уже й не з\'ясувати; лишились тільки чутки, і в кожній чутці винен хтось інший. Ти відбудовуєш його не тому, що хтось попросив, а тому, що золото й дерево все одно треба кудись діти, а порожня ділянка муляла око. Кожен новий камінь — це трохи більше причин вважати, що цього разу він встоїть.',
+    body_en:"The castle at the edge of town was already in ruins before you ever showed up in these parts — not one stone left standing, just an empty plot and a sign over the gate too faded to read. Who tore it down — demons, time, or the previous owners' own carelessness — is anyone's guess by now; only rumors remain, and in every rumor, it's somebody else's fault. You're rebuilding it not because anyone asked, but because the gold and lumber had to go somewhere anyway, and an empty plot was starting to bother you. Every new stone is one more reason to believe that this time, it'll actually hold."}
+];
+const LIBRARY_MONSTER_LORE = {
+  rat: {body:'Найслабша істота на дорозі — і водночас найчисленніша, бо там, де є один щур, завжди знайдеться ще дев\'ятеро його родичів, які просто ще не вилізли. Легенда каже, що перший щур на цій дорозі був звичайним польовим гризуном, поки не наївся чогось світного в покинутому льоху. З тих пір популяція росте швидше, ніж хтось встигає її проріджувати — і, здається, це саме твоя робота.',
+    body_en:"The weakest thing on the road — and the most numerous, since wherever there's one rat, nine more relatives just haven't crawled out yet. Legend says the first rat on this road was an ordinary field rodent until it ate something glowing in an abandoned cellar. The population's grown faster than anyone can thin it out ever since — and, apparently, that's exactly your job now."},
+  goblin: {body:'Сам на сам гоблін тікає від власної тіні — але варто з\'явитися ще двом, і раптом у нього виявляється план, засідка й навіть нахабство поглузувати. Носить зброю, яку сам не кував, і лати, які сам не носив на плечах — усе десь «знайшов», за його словами. Найкращий спосіб перевірити його хоробрість — це той момент, коли він лишається без прикриття.',
+    body_en:"Alone, a goblin flees its own shadow — but add two more, and suddenly it's got a plan, an ambush, and even the nerve to talk trash. It wears gear it never forged and armor it never earned, all supposedly 'found' somewhere, according to it. The best way to test its courage is the exact moment it's left without backup."},
+  orc: {body:'У орка є один план на всі випадки життя, і цей план — вдарити сильніше за те, що щойно вдарило його. Хитрість і стратегія — це слова, яких він, найімовірніше, ніколи не чув, а якби почув — все одно вирішив би питання кулаками. Дивовижно, що з таким підходом вони взагалі доживають до дорослого віку — але, з іншого боку, довго думати їм ніколи й не доводиться.',
+    body_en:"An orc has exactly one plan for every situation in life, and that plan is to hit back harder than whatever just hit it. Cunning and strategy are words it's probably never heard, and if it had, it would've settled the matter with its fists anyway. It's a wonder they live to adulthood at all — then again, they never have to think for very long."},
+  troll: {body:'Рана, що вбила б будь-кого іншого на цій дорозі, для троля — просто привід почухатись. Ніхто достеменно не знає, з чого зроблена його шкіра, але чутки про «непробивну» броню з тролячої шкіри ходять по кожному ринку, до якого ти коли-небудь заходив. Головна слабкість — не броня, а терпіння: рано чи пізно регенерація не встигає за ударами, і саме на це варто розраховувати.',
+    body_en:"A wound that would finish off anyone else on this road is, for a troll, just an excuse to scratch. Nobody knows for certain what its hide is made of, but rumors of 'unbreakable' troll-leather armor turn up at every market you've ever passed through. Its real weakness isn't the armor — it's patience: sooner or later, regeneration stops keeping up with the hits, and that's exactly what you should be counting on."},
+  boss: {body:'Колись очолював звичайну банду розбійників на поверхні — грабував каравани, вимагав данину, звичайна кар\'єра. Потім заліз надто глибоко в печеру за легендарним скарбом, і звідти вийшов... не зовсім той самий. Про сам скарб історія мовчить — може, знайшов, може, ні, а може, скарб знайшов його першим. Тепер він просто стоїть на дорозі, найсильніший серед звичайних істот, і чекає, поки хтось спробує пройти повз.',
+    body_en:"Once led an ordinary bandit crew on the surface — robbed caravans, demanded tribute, standard career path. Then it climbed too deep into a cave chasing some legendary treasure, and came back out... not quite the same. The story stays quiet about the treasure itself — maybe it found it, maybe not, or maybe the treasure found it first. Now it just stands in the road, the strongest of the ordinary creatures, waiting for someone to try and get past."}
+};
+const LIBRARY_BOSS_LORE = {
+  b50: {body:'Щойно вирвався з Безодні. Ще навіть не встиг вигадати собі гучний титул чи фірмовий регіт — просто вискочив на поверхню, побачив перше живе створіння і вирішив, що це, мабуть, і є «робота демона». Старші демони називають таких «підмайстрами» і не сприймають всерйоз — але тобі, який стоїть навпроти нього прямо зараз, від цього не легше.',
+    body_en:"Freshly escaped from the Abyss. Hasn't even had time to come up with a menacing title or a signature laugh yet — just popped up to the surface, spotted the first living thing around, and decided that must be 'a demon's job.' Older demons call these ones 'apprentices' and don't take them seriously — not that it helps you much, standing in front of one right now."},
+  b100: {body:'Спить на купі золота так довго, що саме золото вже почало проростати мохом. Будити його не рекомендується нікому, включно з іншими драконами — але ти, звісно, все одно прийшов саме за цим. Кажуть, він навіть не пам\'ятає, звідки взялося все це золото — просто одного разу прокинувся, а воно вже було тут, і відтоді він просто... лишився.',
+    body_en:"Sleeps on a pile of gold for so long that moss has started growing on the gold itself. Waking it up is advised against by literally everyone, other dragons included — but you, of course, came here to do exactly that. Word is it doesn't even remember where all that gold came from — it just woke up one day and the pile was already there, so it... stayed."},
+  b175: {body:'На відміну від молодших родичів, золото його не цікавить узагалі — він харчується дечим ситнішим. Що ближче підходиш, то помітніше він... радіє, і це, чесно кажучи, найтривожніша частина всього бою. Ветерани дороги радять просто не думати про це надто довго й бити першим.',
+    body_en:"Unlike its younger relatives, it couldn't care less about gold — it feeds on something far more filling. The closer you get, the more visibly it seems to... enjoy itself, which is honestly the most unsettling part of the whole fight. Road veterans recommend not thinking about that part too hard, and striking first."},
+  b250: {body:'Колись охороняв величну цивілізацію. Тепер охороняє її руїни — ті самі, які сам і влаштував, коли щось (ніхто не уточнює, що саме) пішло не так. Він і досі вважає, що виконує свій обов\'язок бездоганно; просто тепер обов\'язок звузився до «нікого сюди не пускати», і виконує він це буквально.',
+    body_en:"Once guarded a magnificent civilization. Now it guards the ruins of it — the very ones it caused itself, when something (nobody specifies exactly what) went wrong. It still believes it's carrying out its duty flawlessly; the duty's just been narrowed down to 'let absolutely nobody through,' and it executes that part to the letter."},
+  b400: {body:'Живе десь у просторі, який офіційно не називається «небом», бо неба там, строго кажучи, немає. Дихає чимось, що виглядає як вогонь, гріє як вогонь, але, за словами тих, хто вижив, «точно не вогонь» — і на цьому опис зазвичай закінчується, бо описувати далі вже нікому.',
+    body_en:"Lives somewhere that technically doesn't qualify as 'sky,' because there isn't one there, strictly speaking. Breathes something that looks like fire, burns like fire, but according to survivors is 'definitely not fire' — and that's usually where the description ends, because there's rarely anyone left to describe further."},
+  b600: {body:'Для нього ти навіть не суперник — швидше дрібна незручність, на кшталт камінця в чоботі, тільки цей камінець вирішив показати характер. Легіони демонів виконують накази одним порухом його руки; тобі пощастить, якщо він взагалі помітить, що ти тут стоїш, перш ніж усе закінчиться.',
+    body_en:"You're not even competition to it — more of a minor inconvenience, like a pebble in a boot, except this pebble decided to develop an attitude. Legions of demons follow its orders with a single gesture; you'll be lucky if it even notices you're standing there before it's all over."},
+  b800: {body:'Був тут ще до того, як дорога взагалі стала нескінченною — коли «Кінець Усього» був просто чутками, а не реальним місцем на карті. Скільки саме йому років, не наважується вгадувати навіть він сам; каже лише, що пам\'ятає час, «коли тут росла трава», і ніхто не має підстав йому не вірити.',
+    body_en:"Was here before the road even became infinite — back when 'The End of All' was just a rumor, not an actual place on the map. It won't even hazard a guess at its own age; it only says it remembers a time 'when there was grass here,' and nobody has any grounds to doubt it."},
+  b1000: {body:'Названий так не через скромність — просто чесно: далі справді нема нічого, крім чисел, що ростуть вічно. Він і сам це знає, і, здається, це його трохи гнітить: яка користь бути «володарем кінця», якщо за тобою простягається нескінченність без жодної межі, яку можна було б насправді захищати.',
+    body_en:"Named that way not out of modesty — just honesty: past it, there really is nothing but numbers that keep climbing forever. It knows this too, and it seems to weigh on it a little: what's the point of being 'lord of the end' if what stretches out behind you is an infinity with no actual boundary left to defend."},
+  final_guardian: {body:'Не прокидається заради випадкових мандрівників — тільки заради тих, хто справді щось збудував: цілий замок, повну колекцію реліквій, і роки (годинники?) вкладеної впертості. До того моменту він просто чекає, нерухомо, як частина архітектури. Коли ти нарешті стоїш перед ним — це не випадковість, а підсумок усього, що ти зробив, аби взагалі сюди дійти.',
+    body_en:"Doesn't wake for random travelers — only for those who've actually built something: a whole castle, a complete set of relics, years (hours?) of stubborn effort poured in. Until that moment, it simply waits, motionless, like part of the architecture. By the time you're finally standing in front of it, that's no accident — it's the sum of everything you did just to get here."}
+};
+const LIBRARY_ITEM_LORE = {
+  "Іржавий меч": {body:'Хтось загубив цей меч так давно, що іржа вже стала частиною його особистості. Ріже він приблизно так само добре, як переконує людей у своїй гостроті — тобто не дуже, але щось та й ріже. Перший меч у кар\'єрі кожного, хто коли-небудь тримав зброю в руках, і останній меч тих, хто вирішив, що «і так зійде».',
+    body_en:"Someone lost this sword so long ago that the rust has basically become part of its personality. It cuts about as well as it convinces people it's sharp — which is to say, not very, but something does get cut. The first sword in every fighter's career, and the last sword of everyone who decided 'good enough' was good enough."},
+  "Полотняні чоботи": {body:'Пошиті з такого тонкого полотна, що більше нагадують шкарпетки з амбіціями. Носити їх у дощ — окрема пригода, але бігти в них справді трохи легше, ніж босоніж, а це вже якийсь прогрес. Виробник обіцяв «швидкість вітру» — по факту вийшов легкий протяг.',
+    body_en:"Sewn from linen so thin it's more of a sock with ambitions. Wearing them in the rain is its own little adventure, but you really do run a bit easier in them than barefoot, which counts as progress. The maker promised 'the speed of wind' — what you actually got was a light breeze."},
+  "Тупий кинджал": {body:'Настільки тупий, що ним радше можна намазати масло на хліб, ніж когось поранити. Проте б\'є він часто — компенсує відсутність гостроти чистою наполегливістю. У народі відомий як «кинджал для тих, хто вірить у кількість, а не якість».',
+    body_en:"So dull you could spread butter on bread with it before you'd wound anyone. Still, it strikes often — making up for the lack of edge with sheer persistence. Known among the locals as 'the dagger for people who believe in quantity over quality.'"},
+  "Гострий меч": {body:'Нарешті меч, який дійсно ріже, а не просто натякає на це. Виготовлений майстром, який, за легендою, точив його так довго, що забув, навіщо взагалі бралися за роботу. Тримати його приємно навіть просто в руках — сам процес бою вже опціональний.',
+    body_en:"Finally, a sword that actually cuts instead of just implying it might. Forged by a smith who, legend has it, spent so long sharpening it that he forgot what the job was originally for. Just holding it feels good — the actual fighting part becomes almost optional."},
+  "Чоботи бігуна": {body:'Легкі, зручні, і, що найголовніше, справді зроблені для бігу, а не просто названі так у рекламі. У попередньому власнику пробудили таку впевненість, що той спробував втекти від власних боргів — не спрацювало, але чоботи в цьому не винні.',
+    body_en:"Light, comfortable, and — crucially — actually built for running, not just named that way in an ad. They gave a previous owner so much confidence he tried to outrun his own debts. Didn't work, but the boots weren't the problem."},
+  "Спритний кинджал": {body:'Легкий, як пір\'їнка, і майже такий же непомітний в ударі — супротивник часто розуміє, що його вдарили, лише постфактум. Ідеальний вибір для тих, хто вважає, що краще вдарити п\'ять разів по-тихому, ніж один раз голосно.',
+    body_en:"Light as a feather, and nearly as unnoticeable on the way in — opponents often realize they've been struck only after the fact. The ideal choice for anyone who'd rather land five quiet hits than one loud one."},
+  "Амулет удачі": {body:'Простий на вигляд кулон, який чомусь завжди призводить до того, що гаманець важчає, а власник — усміхненіший. Ніхто не знає точно, як він працює, включно з тим, хто його зробив; можливо, це просто добре відполірований камінь і величезний збіг обставин, що повторюється щоразу.',
+    body_en:"A plain-looking pendant that somehow always leaves the wallet heavier and the owner grinning. Nobody's sure exactly how it works, including whoever made it; it might just be a well-polished rock and an enormous coincidence that keeps repeating itself."},
+  "Меч воїна": {body:'Не найкрасивіший меч на дорозі, зате точно найнадійніший — саме таким озброюють тих, кому справді треба повертатися додому живим. Балансування ідеальне, руків\'я стерте до зручної форми сотнями попередніх власників, кожен з яких, вочевидь, теж повернувся.',
+    body_en:"Not the prettiest sword on the road, but definitely the most dependable — it's what you hand to someone who genuinely needs to make it home alive. Perfectly balanced, the grip worn smooth by hundreds of previous owners, every one of whom, apparently, also made it home."},
+  "Крила Гермеса": {body:'Не справжні крила — радше пара черевиків із гордою назвою і легким натяком на політ. Втім, швидкість вони дають цілком реальну, і той, хто носить їх, і справді починає бігати так, ніби боги трохи підштовхують у спину.',
+    body_en:"Not actual wings — more a pair of boots with a proud name and a faint suggestion of flight. The speed, though, is very real, and whoever wears them does start running like the gods are giving them a little push from behind."},
+  "Клинок дракона": {body:'Викуваний із луски дракона, що вже давно нікому не загрожує — переплавленої в клинок, гострий настільки, що сумніви в його походженні відпадають самі собою. Тримає в собі щось від колишнього власника: легкий запах сірки й звичку залишати опіки там, де мав би бути просто поріз.',
+    body_en:"Forged from the scale of a dragon that's long since stopped threatening anyone — melted down into a blade sharp enough that questions about its origin quietly stop mattering. It keeps something of its previous owner: a faint smell of sulfur, and a habit of leaving burns where a simple cut should be."},
+  "Корона швидкості": {body:'Корона, яку носять не заради статусу, а заради того, щоб узагалі встигнути хоч щось зробити раніше за всіх. Той, хто вигадав вкласти прискорення саме в головний убір, вочевидь, дуже поспішав кудись сам — і, судячи з результату, встиг.',
+    body_en:"A crown worn not for status, but so you can actually get something done before everyone else. Whoever decided to put acceleration into a piece of headwear was clearly in a hurry to get somewhere themselves — and judging by the result, they made it."},
+  "Клинок Вічності": {body:'Кажуть, цей клинок існував завжди — до того, як з\'явився перший коваль, і буде існувати після того, як зникне останній. Перевірити це неможливо, зате перевірити, наскільки він ріже, можна прямо зараз, і результат промовистіший за будь-яку легенду.',
+    body_en:"Said to have existed before the first blacksmith and to keep existing long after the last one's gone. That part's impossible to verify — how sharp it actually is, though, you can check right now, and the result speaks louder than any legend."},
+  "Крила Фенікса": {body:'Ці крила згоряли й відроджувалися разом зі своїм першим власником стільки разів, що вогонь просто здався й лишив їх у спокої. Швидкість, яку вони дають, здається майже неможливою — ніби бігти означає щоразу народжуватися заново, тільки без незручного попелу.',
+    body_en:"These wings burned and reformed alongside their first owner so many times that fire eventually gave up and left them alone. The speed they give feels almost impossible — like running means being reborn each time, minus the inconvenient ashes."},
+  "Корона Королів": {body:'Носили її десятки королів — і кожен з них, за дивним збігом, ставав дедалі багатшим, поки її не втрачав. Зроблена з металу, який навіть не має офіційної назви, бо жоден ювелір ще не наважився заявити права на його вивчення.',
+    body_en:"Dozens of kings wore it — and, by a strange coincidence, every one of them grew richer right up until they lost it. Made from a metal that doesn't even have an official name yet, since no jeweler has dared to claim the research rights."},
+  "Клинок Пекла": {body:'Викуваний не в кузні, а буквально в полум\'ї — і досі трохи пахне сіркою, скільки б разів його не полірували. Заточується не золотом, а Душами Демонів, що, чесно кажучи, саме по собі мало б насторожити більше, ніж насторожує.',
+    body_en:"Forged not in a smithy but literally in flame — and it still smells faintly of sulfur no matter how many times it's polished. Upgraded not with gold but with Demon Souls, which, honestly, should probably raise more concern than it does."},
+  "Крила Азазеля": {body:'Позичені (украдені, якщо чесно) у демона, який, за легендою, і досі десь ходить пішки й дуже цим незадоволений. Швидкість, яку вони дають, межує з тим, що фізика вважала б неможливим — втім, фізика тут узагалі дорадчий голос, не більше.',
+    body_en:"Borrowed (stolen, if we're being honest) from a demon who, legend says, still gets around on foot and is deeply unhappy about it. The speed they provide borders on what physics would call impossible — though physics is more of an advisory voice around here anyway."},
+  "Корона Диявола": {body:'Той, хто носить цю корону, ніколи не бідує — щоправда, ціна за це золото зазвичай з\'ясовується вже значно пізніше, десь у дрібному шрифті угоди, яку ніхто не читав. Поки що, утім, усе виглядає чудово.',
+    body_en:"Whoever wears this crown never wants for gold — though the price for it usually turns up much later, somewhere in the fine print of a deal nobody read. So far, though, everything looks great."},
+  "Серце Безодні": {body:'Досі б\'ється, хоча зупинилося на боці свого попереднього власника ще кілька століть тому. Кожен удар пришвидшує твій власний клинок — і, якщо прислухатись достатньо уважно, чути, як воно самé трохи прискорюється разом із тобою.',
+    body_en:"Still beats, even though it stopped on its previous owner's side several centuries ago. Every beat quickens your own blade — and if you listen closely enough, you can hear it speeding up a little right along with you."}
 };
 
 /* Переродження: постійний бонус за Очко Слави, і скільки метрів треба
@@ -4676,7 +4796,7 @@ function findNearbyBuilding(){
   for(let ty=0; ty<TOWN_MAP.length; ty++){
     for(let tx=0; tx<TOWN_MAP[ty].length; tx++){
       const ch = TOWN_MAP[ty][tx];
-      if(ch==='K' || ch==='M' || ch==='Q' || ch==='P' || ch==='W' || ch==='C'){
+      if(ch==='K' || ch==='M' || ch==='Q' || ch==='P' || ch==='W' || ch==='C' || ch==='L'){
         const dx = townPos.x-(tx+0.5), dy = townPos.y-(ty+0.5);
         if(Math.hypot(dx,dy) < 1.15) return {type:ch, tx, ty};
       }
@@ -4709,6 +4829,7 @@ function interactBuilding(){
   else if(nearBuilding.type==='P') openBossPortal();
   else if(nearBuilding.type==='W') openWorldMap();
   else if(nearBuilding.type==='C') openCastle();
+  else if(nearBuilding.type==='L') openLibrary();
 }
 
 // Смолоскипи — суто декоративний оверлей (НЕ в TOWN_MAP, щоб не ламати
@@ -4845,6 +4966,7 @@ function renderTown(){
       else if(ch==='Q') color = '#c77dff';
       else if(ch==='P') color = '#ff2d4d';
       else if(ch==='W') color = '#4dffb8';
+      else if(ch==='L') color = '#ff9d1f';
       ctx.fillStyle = color;
       ctx.fillText(ch, townXForCol(tx), townYForRow(ty));
     }
@@ -4876,7 +4998,7 @@ function renderTown(){
     ctx.save();
     ctx.font = "13px 'Courier New', monospace";
     ctx.fillStyle = '#ffd94d';
-    const label = nearBuilding.type==='K' ? t('town.forge') : (nearBuilding.type==='M' ? t('town.shop') : (nearBuilding.type==='Q' ? t('town.questboard') : (nearBuilding.type==='P' ? t('town.bossportal') : (nearBuilding.type==='C' ? t('town.castle') : t('town.worldmap')))));
+    const label = nearBuilding.type==='K' ? t('town.forge') : (nearBuilding.type==='M' ? t('town.shop') : (nearBuilding.type==='Q' ? t('town.questboard') : (nearBuilding.type==='P' ? t('town.bossportal') : (nearBuilding.type==='C' ? t('town.castle') : (nearBuilding.type==='L' ? t('town.library') : t('town.worldmap'))))));
     ctx.fillText(label, townXForCol(nearBuilding.tx)-14, townYForRow(nearBuilding.ty)-22);
     ctx.restore();
   }
@@ -5256,6 +5378,7 @@ function renderModalBody(){
   if(modalKind==='bossportal'){ renderBossPortal(); return; }
   if(modalKind==='worldmap'){ renderWorldMap(); return; }
   if(modalKind==='bestiary'){ renderBestiary(); return; }
+  if(modalKind==='library'){ renderLibrary(); return; }
   if(modalKind==='castle'){ renderCastle(); return; }
   if(modalKind==='shop'){ renderShop(); return; }
   if(modalKind==='cloud'){ renderCloudModal(); return; }
@@ -5863,6 +5986,109 @@ function renderBestiary(){
   modalBody.innerHTML = html;
 }
 
+/* =====================================================================
+   БІБЛІОТЕКА — "книжка": вкладки-категорії вгорі, зліва зображення,
+   справа опис/історія, знизу пагінація (один моб/бос/предмет/сторінка
+   лору = одна "сторінка книжки" в межах категорії). Дані — LIBRARY_*
+   вище, поряд з MONSTER_DESC/BOSS_DESC.
+   ===================================================================== */
+const LIBRARY_TABS = ['world','castle','monsters','bosses','items'];
+let libraryTab = 'world';
+let libraryPage = 0;
+function openLibrary(){
+  modalKind = 'library';
+  modalTitle.textContent = t('modal.libraryTitle');
+  libraryTab = 'world';
+  libraryPage = 0;
+  renderLibrary();
+  modalBackdrop.hidden = false;
+}
+// Іконки статів предметів — прості векторні (inline SVG), tint кольором
+// рідкості (currentColor), щоб не тягнути жодних зовнішніх файлів:
+// меч (atk), крило/чобіт (spd), блискавка (atkSpeed), самоцвіт (goldPct).
+const LIBRARY_ITEM_ICON_PATH = {
+  atk: '<path d="M22 78 L64 36 L70 22 L78 30 L64 36 L64 36" stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M60 40 L26 74" stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round"/><path d="M70 22 L82 18 L78 30 Z" fill="currentColor"/>',
+  spd: '<path d="M18 66 Q45 20 82 32 Q60 44 62 70 Q42 52 18 66 Z" fill="currentColor" opacity="0.9"/>',
+  atkSpeed: '<path d="M56 8 L24 54 L44 54 L36 92 L78 42 L52 42 Z" fill="currentColor"/>',
+  goldPct: '<circle cx="50" cy="58" r="26" fill="none" stroke="currentColor" stroke-width="6"/><path d="M50 18 L60 38 L40 38 Z" fill="currentColor"/>'
+};
+function libraryItemIconSvg(stat, color){
+  const path = LIBRARY_ITEM_ICON_PATH[stat] || LIBRARY_ITEM_ICON_PATH.atk;
+  return `<svg viewBox="0 0 100 100" width="104" height="104" style="color:${color};filter:drop-shadow(0 0 10px ${color}99);">${path}</svg>`;
+}
+function libraryPortrait(innerHtml, glowColor){
+  return `<div class="library-portrait" style="background:radial-gradient(circle, ${glowColor||'#4dffb8'}22, transparent 72%);">${innerHtml}</div>`;
+}
+// Дані для поточної категорії — {title, body, imageHtml}[]. Монстри/боси/
+// предмети беруться напряму з існуючих MONSTER_TYPES/BOSS_TIERS/ITEM_POOL
+// (той самий каталог, що й у Бестіарії/Кузні) — Бібліотека нічого не
+// дублює, лише додає довший текст і "портрет".
+function libraryEntriesForTab(tab){
+  if(tab==='world'){
+    return LIBRARY_WORLD_PAGES.map(p=>({title:L(p,'title'), body:L(p,'body'), imageHtml:libraryPortrait(`<span style="font-size:72px;">🌍</span>`, '#4dffb8')}));
+  }
+  if(tab==='castle'){
+    return LIBRARY_CASTLE_PAGES.map(p=>({title:L(p,'title'), body:L(p,'body'), imageHtml:libraryPortrait(`<span style="font-size:72px;">🏰</span>`, '#ff9d1f')}));
+  }
+  if(tab==='monsters'){
+    return MONSTER_TYPES.map(m=>({
+      title:L(m,'name'),
+      body:L(LIBRARY_MONSTER_LORE[m.key],'body'),
+      imageHtml:libraryPortrait(`<span style="color:${m.color};font-family:'Courier New',monospace;font-size:64px;font-weight:bold;text-shadow:0 0 18px ${m.color}99;">${m.glyph}</span>`, m.color)
+    }));
+  }
+  if(tab==='bosses'){
+    return BOSS_TIERS.map(b=>{
+      const shape = BOSS_SHAPES[b.shape];
+      return {
+        title:L(b,'name'),
+        body:L(LIBRARY_BOSS_LORE[b.id],'body'),
+        imageHtml:libraryPortrait(`<pre style="color:${shape.color};font-size:14px;line-height:1.25;text-shadow:0 0 14px ${shape.color}77;margin:0;">${shape.art.join('\n')}</pre>`, shape.color)
+      };
+    });
+  }
+  if(tab==='items'){
+    return [...ITEM_POOL, ...DEMONIC_ITEM_POOL].map(it=>{
+      const color = rarityColor(it.rarity);
+      const lore = LIBRARY_ITEM_LORE[it.name];
+      return {
+        title:`${L(it,'name')} <span class="lvl" style="color:${color};">${rarityLabel(it.rarity)}</span>`,
+        body: lore ? L(lore,'body') : '',
+        imageHtml:libraryPortrait(libraryItemIconSvg(it.stat, color), color)
+      };
+    });
+  }
+  return [];
+}
+function libraryTabBtn(key){
+  return `<button class="buy-max${libraryTab===key?' active':''}" data-action="libraryTab" data-tab="${key}">${t('library.tab.'+key)}</button>`;
+}
+function renderLibrary(){
+  const entries = libraryEntriesForTab(libraryTab);
+  const total = entries.length;
+  libraryPage = Math.max(0, Math.min(total-1, libraryPage));
+  const entry = entries[libraryPage] || {title:'', body:'', imageHtml:''};
+  let html = `<div class="forge-sort">${LIBRARY_TABS.map(libraryTabBtn).join('')}</div>`;
+  html += `<div class="library-book">
+    ${entry.imageHtml}
+    <div class="library-text">
+      <div class="library-entry-title">${entry.title}</div>
+      <div class="library-entry-body">${entry.body}</div>
+    </div>
+  </div>`;
+  html += `<div class="library-pager">
+    <button class="buy-max" data-action="libraryPrevPage" ${libraryPage<=0?'disabled':''}>◀</button>
+    <span style="color:var(--dim);font-size:12px;">${t('library.pageOf',{cur:total?libraryPage+1:0, total})}</span>
+    <button class="buy-max" data-action="libraryNextPage" ${libraryPage>=total-1?'disabled':''}>▶</button>
+  </div>`;
+  modalBody.innerHTML = html;
+}
+function changeLibraryPage(delta){
+  const total = libraryEntriesForTab(libraryTab).length;
+  libraryPage = Math.max(0, Math.min(total-1, libraryPage+delta));
+  renderLibrary();
+}
+
 /* --- Замок --- */
 function openCastle(){
   modalKind = 'castle';
@@ -6079,6 +6305,9 @@ modalBody.addEventListener('click', (e)=>{
   else if(btn.dataset.action==='questRefresh') refreshQuestOffers();
   else if(btn.dataset.action==='forgeSort'){ forgeSortKey = btn.dataset.stat || null; renderModalBody(); }
   else if(btn.dataset.action==='bestiaryTab'){ bestiaryTab = btn.dataset.tab; renderBestiary(); }
+  else if(btn.dataset.action==='libraryTab'){ libraryTab = btn.dataset.tab; libraryPage = 0; renderLibrary(); }
+  else if(btn.dataset.action==='libraryPrevPage') changeLibraryPage(-1);
+  else if(btn.dataset.action==='libraryNextPage') changeLibraryPage(1);
   else if(btn.dataset.action==='prestigeModalTab'){ prestigeModalTab = btn.dataset.tab; renderPrestigeModal(); }
   else if(btn.dataset.action==='prestigeSkill') buyPrestigeSkill(btn.dataset.id);
   else if(btn.dataset.action==='prestigeSkillMax') buyPrestigeSkillMax(btn.dataset.id);
@@ -7045,6 +7274,7 @@ document.getElementById('prestigeBtn').addEventListener('click', ()=>{ ensureAud
 document.getElementById('questsBtn').addEventListener('click', ()=>{ ensureAudio(); openQuestBoard(); });
 document.getElementById('characterBtn').addEventListener('click', ()=>{ ensureAudio(); openCharacterSheet(); });
 document.getElementById('bestiaryBtn').addEventListener('click', ()=>{ ensureAudio(); openBestiary(); });
+document.getElementById('libraryBtn').addEventListener('click', ()=>{ ensureAudio(); openLibrary(); });
 document.getElementById('bossPortalBtn').addEventListener('click', ()=>{ ensureAudio(); openBossPortal(); });
 document.getElementById('worldMapHudBtn').addEventListener('click', ()=>{ ensureAudio(); openWorldMap(); });
 document.getElementById('leaderboardBtn').addEventListener('click', ()=>{ ensureAudio(); openLeaderboard(); });

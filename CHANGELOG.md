@@ -5,6 +5,25 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.66] — NEW: the Library — the game's lore (world, Castle, monsters, bosses, gear)
+
+### Added
+- A new Library feature: a book-style modal with category tabs up top,
+  a portrait on the left, description/history on the right, and page
+  navigation at the bottom — one monster, boss, item, or lore page per
+  "page" of the book. Reachable from the main menu (a new button) and as
+  a walk-up building in town's bottom-left corner, using the same [E]
+  interaction as the Forge, Shop, Quest Board, and the rest.
+- Five categories: **World** (2 pages — who you are, what's going on,
+  why "The End of All"), **Castle** (why it was destroyed, why it's
+  being rebuilt), **Monsters** (5 pages, one per monster type, portrait
+  = its glyph in a colored frame), **Bosses** (9 pages, portrait = the
+  existing hand-drawn ASCII art already used for boss fights), and
+  **Gear** (18 pages — every weapon and armor piece in the game, each
+  with a small vector icon tinted by rarity and a short, deliberately
+  funny history).
+- Fully localized (Ukrainian/English) like the rest of the game.
+
 ## [0.65] — Mobile layout: no more scrolling stat bars, a taller run window, left-aligned menu
 
 ### Changed
