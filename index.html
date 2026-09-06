@@ -558,7 +558,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.56';
+const GAME_VERSION = '0.57';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -790,6 +790,8 @@ const ROW_AIR = 0, ROW_GROUND = 1, ROW_FLOOR = 2;
 const INTERNAL_W = PAD_LEFT*2 + GRID_COLS*CELL_W;
 const INTERNAL_H = TOP_PAD + 3*CELL_H + BOTTOM_PAD;
 const JUMP_DURATION_BASE = 0.42;
+// ТИМЧАСОВИЙ кап ефективної швидкості — див. коментар у recomputeStats().
+const MAX_EFFECTIVE_SPEED = 2000;
 const PIT_WIDTH = 2;
 const STUMBLE_DURATION = 0.6;
 
@@ -3735,7 +3737,17 @@ function recomputeStats(){
   atkSpeed += castleB.atkSpeedFlat;
 
   stats.attack = atk;
-  stats.speed = spd;
+  // ТИМЧАСОВЕ обмеження швидкості (v0.57), поки триває пошук справжньої
+  // причини лагів/зависань на екстремальних рівнях: чим вища stats.speed,
+  // тим більше distanceCols проходить за кадр (updateRun), а отже тим
+  // більше сутностей одразу опиняються "досяжними" й обробляються за
+  // один кадр (updateSpawns/processEntities) — це і є пряме джерело
+  // навантаження на кожен кадр незалежно від того, ЯКА саме частина коду
+  // виявиться справжнім вузьким місцем. Гравець прямо попросив цей кап
+  // після того, як точкові фікси (v0.53/v0.55/v0.56) не прибрали
+  // зависання повністю — щоб мати робочий запобіжник ПРЯМО ЗАРАЗ, поки
+  // триває глибше розслідування. НЕ прибирати без прямого запиту гравця.
+  stats.speed = Math.min(spd, MAX_EFFECTIVE_SPEED);
   stats.atkSpeed = atkSpeed;
   stats.goldMult = goldMult;
   stats.dropChance = Math.min(0.5, 0.08 + dropBonus);

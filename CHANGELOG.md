@@ -5,6 +5,23 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.57] — Temporary speed cap (2000) while the deeper cause is tracked down
+
+### Changed
+- New console data showed frames still running slow constantly (80-125ms),
+  but this time every automation step measured near-zero — the 0.55 and
+  0.56 fixes genuinely removed the two causes they targeted, but a third
+  one remains, hidden in fields the game's own diagnostics don't expand
+  by default. Rather than keep guessing at point fixes, effective run
+  speed is now capped at 2000 (`MAX_EFFECTIVE_SPEED`), applied once in
+  stat recalculation after every skill/item/prestige/castle bonus is
+  totaled. Speed drives how much distance is covered per frame, which
+  drives how many entities can be reached and processed in that same
+  frame — capping it directly bounds that per-frame cost regardless of
+  where exactly the remaining slowdown turns out to live.
+- This is a stopgap, not a root-cause fix, and is expected to stay in
+  place for now.
+
 ## [0.56] — Second contributor to the lag: redundant saves in quest automation
 
 ### Fixed
