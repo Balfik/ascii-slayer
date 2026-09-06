@@ -5,6 +5,18 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.48] — Fix: login/password fields instantly lost focus
+
+### Fixed
+- In the Cloud Save panel, clicking into the username or password field
+  immediately lost focus — typing was only possible while holding the
+  mouse button down. Cause: a long-standing, unconditional "unstick the
+  cursor" handler (fixing a real, separate hover-cursor bug) blurred
+  whatever element had focus on every mouse-button release anywhere on
+  the page. That was harmless before 0.47 since the game had no text
+  inputs at all — losing focus off a button is invisible. Fixed by never
+  blurring an INPUT or TEXTAREA; buttons still get the original fix.
+
 ## [0.47] — Cloud save (username + password, no email)
 
 ### Added

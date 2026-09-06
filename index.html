@@ -558,7 +558,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.47';
+const GAME_VERSION = '0.48';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -4553,8 +4553,17 @@ new MutationObserver(()=>{
 // лишитись "активним" після зникнення з DOM, і форсуємо перерахунок
 // курсора без потреби в реальному русі миші.
 function forceCursorRefresh(){
-  if(document.activeElement && document.activeElement !== document.body){
-    document.activeElement.blur();
+  // НІКОЛИ не знімай фокус із текстового поля вводу — на відміну від
+  // кнопки, що зникла з DOM, тут активний елемент справжній і потрібен
+  // (гравець щойно клікнув у поле логіну/пароля, щоб туди друкувати).
+  // Без цього винятку document.addEventListener('pointerup', ...) нижче
+  // знімав фокус із ЛЮБОГО щойно сфокусованого поля одразу на відпускання
+  // кнопки миші — раніше в грі взагалі не було текстових полів, тому
+  // це ніяк не проявлялось, аж доки не з'явились поля логіну/пароля в
+  // модалці хмарних збережень.
+  const ae = document.activeElement;
+  if(ae && ae !== document.body && ae.tagName!=='INPUT' && ae.tagName!=='TEXTAREA'){
+    ae.blur();
   }
   document.body.style.cursor = 'wait';
   requestAnimationFrame(()=>{ document.body.style.cursor = ''; });
