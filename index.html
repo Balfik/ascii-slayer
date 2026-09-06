@@ -93,6 +93,16 @@
   }
   .hud.hud-fixed::-webkit-scrollbar{height:4px;}
   .hud.hud-fixed span{flex-shrink:0;}
+  /* Стабільна ширина статів — і на десктопі теж (не лише в мобільному
+     блоці нижче): числа проходять через formatNum() і можуть коротшати/
+     довшати на символ-два щоразу, коли перетинають поріг скорочення
+     (999.9к -> 1.0м і т.п.) — навіть у моноширинному шрифті це трохи
+     зсуває сам gap/розташування, і весь рядок правіше від зміненого
+     стата "стрибає". min-width під найдовший реалістичний вивід
+     (іконка + "999.9млрд") прибирає це майже повністю — гравець
+     помітив і на десктопі, не лише в адаптиві. */
+  .hud.hud-fixed .hud-stat{min-width:84px;}
+  .hud.hud-fixed .hud-stat-wide{min-width:180px;}
   #xpbar{color:var(--gold);letter-spacing:1px;}
   #comboWrap{color:var(--gold);}
   #comboWrap b{color:var(--gold);}
@@ -217,6 +227,13 @@
       flex-wrap:wrap; overflow-x:visible;
       font-size:11.5px; gap:4px 10px; padding:6px 10px;
     }
+    /* Базова min-width (.hud-stat/.hud-stat-wide, вище в файлі) діє й тут —
+       додатково: на мобільному довгі складені рядки (LV з титулом, смуга
+       досвіду, ATK/SPD/A.SPD, дистанція) отримують ОКРЕМУ повну лінію
+       (flex-basis:100%) замість спільної з кимось — їм узагалі нема з
+       ким "боротись" за перенос, тож жодного стрибка. На десктопі (nowrap)
+       цей flex-basis нічого не ламає — рядок і так один. */
+    .hud.hud-fixed .hud-stat-wide{flex:1 1 100%;}
     /* 3) Кнопки нижнього меню — на десктопі вирівняні по центру
        (успадковано від .hud), через що короткі останні рядки виглядають
        "розкидано". На мобільному вирівнюємо по лівому краю — рядок за
@@ -463,18 +480,18 @@
   </header>
 
   <div class="hud hud-fixed">
-    <span>LV <b id="lvl">1</b> <span id="rankTitle" style="color:var(--purple);font-size:11px;"></span></span>
-    <span id="xpbar">[--------------------] 0/20</span>
-    <span>💰 <b id="gold" style="color:var(--gold)">0</b></span>
-    <span>◆ <b id="crystals" style="color:var(--crystal)">0</b></span>
-    <span>👹 <b id="souls" style="color:var(--demonic)">0</b></span>
-    <span>🪵 <b id="wood" style="color:#c9a876">0</b></span>
-    <span>🪨 <b id="stone" style="color:#a8a8a8">0</b></span>
-    <span>⛏ <b id="iron" style="color:#c9a876">0</b></span>
+    <span class="hud-stat hud-stat-wide">LV <b id="lvl">1</b> <span id="rankTitle" style="color:var(--purple);font-size:11px;"></span></span>
+    <span class="hud-stat hud-stat-wide" id="xpbar">[--------------------] 0/20</span>
+    <span class="hud-stat">💰 <b id="gold" style="color:var(--gold)">0</b></span>
+    <span class="hud-stat">◆ <b id="crystals" style="color:var(--crystal)">0</b></span>
+    <span class="hud-stat">👹 <b id="souls" style="color:var(--demonic)">0</b></span>
+    <span class="hud-stat">🪵 <b id="wood" style="color:#c9a876">0</b></span>
+    <span class="hud-stat">🪨 <b id="stone" style="color:#a8a8a8">0</b></span>
+    <span class="hud-stat">⛏ <b id="iron" style="color:#c9a876">0</b></span>
   </div>
   <div class="hud hud-fixed">
-    <span><span data-i18n="hud.distanceLabel">Дистанція</span>: <b id="dist">0</b> м</span>
-    <span>ATK <b id="statAtk">0</b> · SPD <b id="statSpd">0</b> · A.SPD <b id="statAs">0</b>/с</span>
+    <span class="hud-stat hud-stat-wide"><span data-i18n="hud.distanceLabel">Дистанція</span>: <b id="dist">0</b> м</span>
+    <span class="hud-stat hud-stat-wide">ATK <b id="statAtk">0</b> · SPD <b id="statSpd">0</b> · A.SPD <b id="statAs">0</b>/с</span>
   </div>
   <div class="hud row2">
     <span><span data-i18n="hud.regionLabel">Регіон</span>: <b id="biome">-</b> <span id="zoneModeTag"></span></span>
@@ -595,7 +612,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.66';
+const GAME_VERSION = '0.67';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -845,7 +862,7 @@ let INTERNAL_H = TOP_PAD + 3*CELL_H + BOTTOM_PAD;
 function runFontPx(basePx){ return Math.round(basePx * (CELL_H/CELL_H_BASE)); }
 function isMobileViewport(){ return window.innerWidth <= 760; } // той самий поріг, що й .panels вище
 function updateRunGeometryForViewport(){
-  const scale = isMobileViewport() ? 2.4 : 1;
+  const scale = isMobileViewport() ? 3.6 : 1; // +50% понад попередні 2.4, за прямим проханням гравця
   CELL_H = Math.round(CELL_H_BASE*scale);
   TOP_PAD = Math.round(TOP_PAD_BASE*scale);
   BOTTOM_PAD = Math.round(BOTTOM_PAD_BASE*scale);
@@ -956,7 +973,7 @@ const I18N = {
     'modal.worldmapTitle':'КАРТА СВІТУ',
     'modal.libraryTitle':'БІБЛІОТЕКА', 'btn.library':'📚 Бібліотека',
     'library.tab.world':'🌍 Світ', 'library.tab.castle':'🏰 Замок', 'library.tab.monsters':'👹 Монстри',
-    'library.tab.bosses':'💀 Боси', 'library.tab.items':'⚔ Спорядження',
+    'library.tab.bosses':'💀 Боси', 'library.tab.items':'⚔ Спорядження', 'library.tab.relics':'◆ Реліквії',
     'library.pageOf':'{cur} / {total}',
     'touch.up':'Вперед', 'touch.down':'Назад', 'touch.left':'Ліворуч', 'touch.right':'Праворуч',
     'touch.interact':'Взаємодія', 'touch.jump':'Стрибок',
@@ -1252,7 +1269,7 @@ const I18N = {
     'modal.worldmapTitle':'WORLD MAP',
     'modal.libraryTitle':'LIBRARY', 'btn.library':'📚 Library',
     'library.tab.world':'🌍 World', 'library.tab.castle':'🏰 Castle', 'library.tab.monsters':'👹 Monsters',
-    'library.tab.bosses':'💀 Bosses', 'library.tab.items':'⚔ Gear',
+    'library.tab.bosses':'💀 Bosses', 'library.tab.items':'⚔ Gear', 'library.tab.relics':'◆ Relics',
     'library.pageOf':'{cur} / {total}',
     'touch.up':'Up', 'touch.down':'Down', 'touch.left':'Left', 'touch.right':'Right',
     'touch.interact':'Interact', 'touch.jump':'Jump',
@@ -1902,7 +1919,7 @@ const LIBRARY_BOSS_LORE = {
     body_en:"Was here before the road even became infinite — back when 'The End of All' was just a rumor, not an actual place on the map. It won't even hazard a guess at its own age; it only says it remembers a time 'when there was grass here,' and nobody has any grounds to doubt it."},
   b1000: {body:'Названий так не через скромність — просто чесно: далі справді нема нічого, крім чисел, що ростуть вічно. Він і сам це знає, і, здається, це його трохи гнітить: яка користь бути «володарем кінця», якщо за тобою простягається нескінченність без жодної межі, яку можна було б насправді захищати.',
     body_en:"Named that way not out of modesty — just honesty: past it, there really is nothing but numbers that keep climbing forever. It knows this too, and it seems to weigh on it a little: what's the point of being 'lord of the end' if what stretches out behind you is an infinity with no actual boundary left to defend."},
-  final_guardian: {body:'Не прокидається заради випадкових мандрівників — тільки заради тих, хто справді щось збудував: цілий замок, повну колекцію реліквій, і роки (годинники?) вкладеної впертості. До того моменту він просто чекає, нерухомо, як частина архітектури. Коли ти нарешті стоїш перед ним — це не випадковість, а підсумок усього, що ти зробив, аби взагалі сюди дійти.',
+  final_guardian: {body:'Не прокидається заради випадкових мандрівників — тільки заради тих, хто справді щось збудував: цілий замок, повну колекцію реліквій, і роки (години?) вкладеної впертості. До того моменту він просто чекає, нерухомо, як частина архітектури. Коли ти нарешті стоїш перед ним — це не випадковість, а підсумок усього, що ти зробив, аби взагалі сюди дійти.',
     body_en:"Doesn't wake for random travelers — only for those who've actually built something: a whole castle, a complete set of relics, years (hours?) of stubborn effort poured in. Until that moment, it simply waits, motionless, like part of the architecture. By the time you're finally standing in front of it, that's no accident — it's the sum of everything you did just to get here."}
 };
 const LIBRARY_ITEM_LORE = {
@@ -1942,6 +1959,18 @@ const LIBRARY_ITEM_LORE = {
     body_en:"Whoever wears this crown never wants for gold — though the price for it usually turns up much later, somewhere in the fine print of a deal nobody read. So far, though, everything looks great."},
   "Серце Безодні": {body:'Досі б\'ється, хоча зупинилося на боці свого попереднього власника ще кілька століть тому. Кожен удар пришвидшує твій власний клинок — і, якщо прислухатись достатньо уважно, чути, як воно самé трохи прискорюється разом із тобою.',
     body_en:"Still beats, even though it stopped on its previous owner's side several centuries ago. Every beat quickens your own blade — and if you listen closely enough, you can hear it speeding up a little right along with you."}
+};
+const LIBRARY_RELIC_LORE = {
+  patience_crystal: {body:'Кристал, який ніби сам вирішує, коли тобі вже досить чекати. Ніхто не бачив, щоб він робив щось видиме — просто раз на кілька боїв кулдаун Порталу Босів тихо зникає, ніби брама сама зглянулась. Знайдений біля боса, який, судячи з усього, чекав на щось так довго, що зрештою навчився прискорювати час навколо себе.',
+    body_en:"A crystal that seems to decide on its own when you've waited long enough. Nobody's ever seen it actually do anything visible — every few fights, the Boss Portal's cooldown just quietly disappears, as if the gate itself took pity. Found near a boss that, judging by everything, had been waiting for something so long it eventually learned to speed up time around itself."},
+  travelers_clock: {body:'Годинник, що не показує часу — натомість щохвилини сам собою присувається прогрес якогось квесту, ніби хтось невидимий біжить за тебе, поки ти зайнятий іншим. Легенда каже, він належав мандрівнику, що так поспішав скрізь встигнути, що зрештою навчив сам час допомагати йому з дрібними дорученнями.',
+    body_en:"A clock that doesn't tell time — instead, once a minute, some quest's progress nudges forward on its own, like an invisible someone is running the errand for you while you're busy elsewhere. Legend says it belonged to a traveler in such a hurry to be everywhere at once that he eventually taught time itself to help out with the small chores."},
+  hunter_medallion: {body:'Медальйон із вигравіюваним півмісяцем — знак мисливця, який колись бачив демонів наскрізь навіть у повній темряві. Носити його — все одно, що подвоїти власну удачу саме там, де вона найпотрібніша: демони раптом стають удвічі щедрішими на речі, які самі воліли б лишити собі.',
+    body_en:"A medallion engraved with a crescent moon — the mark of a hunter who once saw straight through demons even in total darkness. Wearing it is like doubling your own luck exactly where it matters most: demons suddenly grow twice as generous with things they'd probably rather have kept for themselves."},
+  miser_chains: {body:'Кайдани, зняті зі скнари настільки жадібного, що навіть закутий у них примудрявся економити. Одягнувши їх, час від часу помічаєш, що заточка предмета обійшлася безкоштовно — ніби сам ланцюг непомітно підмінює рахунок.',
+    body_en:"Shackles taken off a miser so cheap he managed to economize even while chained up. Wear them, and every so often you'll notice an enchant went through for free — as if the chain itself quietly swaps out the bill now and then."},
+  jumper_talisman: {body:'Талісман тих, хто стрибав так часто й так невдало, що зрештою навіть яма почала його поважати. Носиш його — і деякі падіння просто... не рахуються, ніби дорога вирішила один раз заплющити очі.',
+    body_en:"The talisman of someone who jumped so often, and so badly, that even the pits eventually started respecting him. Wear it, and some falls just... don't count, like the road decided to look away just this once."}
 };
 
 /* Переродження: постійний бонус за Очко Слави, і скільки метрів треба
@@ -5992,7 +6021,7 @@ function renderBestiary(){
    лору = одна "сторінка книжки" в межах категорії). Дані — LIBRARY_*
    вище, поряд з MONSTER_DESC/BOSS_DESC.
    ===================================================================== */
-const LIBRARY_TABS = ['world','castle','monsters','bosses','items'];
+const LIBRARY_TABS = ['world','castle','monsters','bosses','items','relics'];
 let libraryTab = 'world';
 let libraryPage = 0;
 function openLibrary(){
@@ -6003,17 +6032,49 @@ function openLibrary(){
   renderLibrary();
   modalBackdrop.hidden = false;
 }
-// Іконки статів предметів — прості векторні (inline SVG), tint кольором
-// рідкості (currentColor), щоб не тягнути жодних зовнішніх файлів:
-// меч (atk), крило/чобіт (spd), блискавка (atkSpeed), самоцвіт (goldPct).
+// Іконки предметів — прості векторні (inline SVG), tint кольором рідкості
+// (currentColor), щоб не тягнути жодних зовнішніх файлів. НАВМИСНО за
+// НАЗВОЮ предмета, не за статом: "Крила Гермеса" (spd) виглядають як
+// крила, а не як чобіт, "Корона швидкості" (spd) — як корона. Кожна з
+// 18 позицій ITEM_POOL/DEMONIC_ITEM_POOL має СВОЮ унікальну форму (не
+// один спільний шаблон на 4 стати, як було раніше — гравець прямо
+// попросив "унікальні картинки для кожного").
 const LIBRARY_ITEM_ICON_PATH = {
-  atk: '<path d="M22 78 L64 36 L70 22 L78 30 L64 36 L64 36" stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M60 40 L26 74" stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round"/><path d="M70 22 L82 18 L78 30 Z" fill="currentColor"/>',
-  spd: '<path d="M18 66 Q45 20 82 32 Q60 44 62 70 Q42 52 18 66 Z" fill="currentColor" opacity="0.9"/>',
-  atkSpeed: '<path d="M56 8 L24 54 L44 54 L36 92 L78 42 L52 42 Z" fill="currentColor"/>',
-  goldPct: '<circle cx="50" cy="58" r="26" fill="none" stroke="currentColor" stroke-width="6"/><path d="M50 18 L60 38 L40 38 Z" fill="currentColor"/>'
+  "Іржавий меч": '<path d="M52 12 L38 78" stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round"/><path d="M28 78 L60 78" stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round"/><path d="M42 78 L38 95" stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round"/><circle cx="37" cy="97" r="4" fill="currentColor"/><path d="M47 33 L40 37 M45 49 L38 53" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.7"/>',
+  "Полотняні чоботи": '<path d="M40 15 L40 55 L28 55 Q20 55 20 65 L20 78 L78 78 L78 65 Q78 58 68 58 L52 58 L52 15 Z" stroke="currentColor" stroke-width="5" fill="none" stroke-linejoin="round"/><path d="M28 66 L36 66 M42 70 L50 70" stroke="currentColor" stroke-width="2" opacity="0.6" fill="none"/>',
+  "Тупий кинджал": '<path d="M50 20 Q42 45 50 60" stroke="currentColor" stroke-width="7" fill="none" stroke-linecap="round"/><path d="M36 62 L64 62" stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round"/><path d="M50 62 L50 88" stroke="currentColor" stroke-width="7" fill="none" stroke-linecap="round"/><circle cx="50" cy="91" r="5" fill="currentColor"/>',
+  "Гострий меч": '<path d="M50 10 L50 78" stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round"/><path d="M28 78 L72 78" stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round"/><path d="M50 78 L50 95" stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round"/><circle cx="50" cy="97" r="4" fill="currentColor"/><path d="M56 18 L56 60" stroke="currentColor" stroke-width="2" opacity="0.5" fill="none"/>',
+  "Чоботи бігуна": '<path d="M42 15 L42 50 L30 58 Q20 62 20 72 L20 80 L80 80 L80 68 Q80 60 68 58 L54 55 L54 15 Z" stroke="currentColor" stroke-width="5" fill="none" stroke-linejoin="round"/><path d="M6 60 L18 60 M2 68 L16 68 M6 76 L18 76" stroke="currentColor" stroke-width="3" opacity="0.7" fill="none" stroke-linecap="round"/>',
+  "Спритний кинджал": '<path d="M50 15 Q56 30 50 42 Q44 54 50 65" stroke="currentColor" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M40 67 L60 67" stroke="currentColor" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M50 67 L50 88" stroke="currentColor" stroke-width="5" fill="none" stroke-linecap="round"/><circle cx="50" cy="90" r="3" fill="currentColor"/>',
+  "Амулет удачі": '<path d="M35 8 Q50 18 65 8" stroke="currentColor" stroke-width="4" fill="none" stroke-linecap="round"/><circle cx="50" cy="55" r="26" fill="none" stroke="currentColor" stroke-width="5"/><path d="M50 40 L58 55 L50 70 L42 55 Z" fill="currentColor"/>',
+  "Меч воїна": '<path d="M42 12 L42 75 M58 12 L58 75" stroke="currentColor" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M22 78 L78 78" stroke="currentColor" stroke-width="7" fill="none" stroke-linecap="round"/><path d="M50 78 L50 96" stroke="currentColor" stroke-width="7" fill="none" stroke-linecap="round"/><path d="M44 84 L56 84 M44 90 L56 90" stroke="currentColor" stroke-width="3" fill="none"/><circle cx="50" cy="97" r="5" fill="currentColor"/>',
+  "Крила Гермеса": '<path d="M50 58 Q20 48 15 15 Q35 25 45 48 Z" fill="currentColor" opacity="0.9"/><path d="M50 58 Q80 48 85 15 Q65 25 55 48 Z" fill="currentColor" opacity="0.9"/><path d="M46 58 L54 58 L51 92 L49 92 Z" fill="currentColor"/>',
+  "Клинок дракона": '<path d="M30 85 Q45 20 68 10" stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round"/><path d="M64 18 L70 14 L66 22 L72 20 L66 28" stroke="currentColor" stroke-width="3" fill="none" stroke-linejoin="round" stroke-linecap="round"/><path d="M22 82 L38 90" stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round"/><path d="M25 92 L20 98" stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round"/><circle cx="18" cy="99" r="4" fill="currentColor"/>',
+  "Корона швидкості": '<path d="M22 65 L26 35 L40 50 L50 25 L60 50 L74 35 L78 65 Z" fill="none" stroke="currentColor" stroke-width="5" stroke-linejoin="round"/><path d="M22 65 L78 65" stroke="currentColor" stroke-width="5" fill="none"/><path d="M4 42 L14 42 M2 52 L12 52" stroke="currentColor" stroke-width="3" opacity="0.7" fill="none" stroke-linecap="round"/>',
+  "Клинок Вічності": '<path d="M50 8 L50 76" stroke="currentColor" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M50 3 L54 11 L46 11 Z" fill="currentColor"/><path d="M30 78 L70 78" stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round"/><circle cx="30" cy="78" r="3" fill="currentColor"/><circle cx="70" cy="78" r="3" fill="currentColor"/><path d="M50 78 L50 94" stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round"/><circle cx="50" cy="96" r="4" fill="none" stroke="currentColor" stroke-width="2"/>',
+  "Крила Фенікса": '<path d="M50 60 Q15 55 8 20 Q30 22 42 42 Q30 30 20 15 Q40 20 50 45 Z" fill="currentColor"/><path d="M50 60 Q85 55 92 20 Q70 22 58 42 Q70 30 80 15 Q60 20 50 45 Z" fill="currentColor"/>',
+  "Корона Королів": '<path d="M18 68 L22 30 L34 48 L50 20 L66 48 L78 30 L82 68 Z" fill="none" stroke="currentColor" stroke-width="5" stroke-linejoin="round"/><path d="M18 68 L82 68" stroke="currentColor" stroke-width="6" fill="none"/><circle cx="50" cy="55" r="5" fill="currentColor"/><circle cx="32" cy="58" r="3" fill="currentColor"/><circle cx="68" cy="58" r="3" fill="currentColor"/>',
+  "Клинок Пекла": '<path d="M50 15 L44 35 L52 45 L42 60 L50 78" stroke="currentColor" stroke-width="6" fill="none" stroke-linejoin="round" stroke-linecap="round"/><path d="M25 78 L40 70 M75 78 L60 70" stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round"/><path d="M50 78 L50 95" stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round"/><circle cx="50" cy="97" r="4" fill="currentColor"/>',
+  "Крила Азазеля": '<path d="M50 60 L15 50 L10 35 L25 40 L18 25 L35 35 L30 20 L50 45 Z" fill="currentColor"/><path d="M50 60 L85 50 L90 35 L75 40 L82 25 L65 35 L70 20 L50 45 Z" fill="currentColor"/>',
+  "Корона Диявола": '<path d="M20 68 L26 40 Q30 20 34 40 L42 55 L50 30 L58 55 L66 40 Q70 20 74 40 L80 68 Z" fill="none" stroke="currentColor" stroke-width="5" stroke-linejoin="round"/><path d="M20 68 L80 68" stroke="currentColor" stroke-width="6" fill="none"/>',
+  "Серце Безодні": '<path d="M50 82 C20 60 15 35 32 25 C42 19 50 28 50 35 C50 28 58 19 68 25 C85 35 80 60 50 82 Z" fill="currentColor" opacity="0.9"/><path d="M50 35 L46 50 L54 55 L48 70" stroke="#0a0a0a" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.55"/>'
 };
-function libraryItemIconSvg(stat, color){
-  const path = LIBRARY_ITEM_ICON_PATH[stat] || LIBRARY_ITEM_ICON_PATH.atk;
+function libraryItemIconSvg(name, color){
+  const path = LIBRARY_ITEM_ICON_PATH[name] || '<circle cx="50" cy="50" r="30" fill="none" stroke="currentColor" stroke-width="5"/>';
+  return `<svg viewBox="0 0 100 100" width="104" height="104" style="color:${color};filter:drop-shadow(0 0 10px ${color}99);">${path}</svg>`;
+}
+// Реліквії — теж унікальна форма кожна: кристал/годинник/медальйон/
+// ланцюг/талісман, замість службових символів ◆/◷/☾/⛓/⋀ з RELIC_POOL
+// (ті лишаються — використовуються деінде для короткого позначення).
+const LIBRARY_RELIC_ICON_PATH = {
+  patience_crystal: '<path d="M50 15 L70 40 L50 90 L30 40 Z" fill="currentColor" fill-opacity="0.25" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/><path d="M30 40 L70 40 M50 15 L38 40 M50 15 L62 40" stroke="currentColor" stroke-width="3" fill="none"/>',
+  travelers_clock: '<circle cx="50" cy="55" r="30" fill="none" stroke="currentColor" stroke-width="5"/><path d="M50 55 L50 38 M50 55 L62 62" stroke="currentColor" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M42 15 L58 15" stroke="currentColor" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M50 15 L50 25" stroke="currentColor" stroke-width="4" fill="none"/>',
+  hunter_medallion: '<circle cx="50" cy="52" r="30" fill="none" stroke="currentColor" stroke-width="5"/><path d="M60 38 A16 16 0 1 0 60 66 A12 12 0 1 1 60 38 Z" fill="currentColor"/><path d="M40 12 L50 22 L60 12" stroke="currentColor" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+  miser_chains: '<circle cx="35" cy="30" r="12" fill="none" stroke="currentColor" stroke-width="5"/><circle cx="55" cy="45" r="12" fill="none" stroke="currentColor" stroke-width="5"/><circle cx="40" cy="65" r="12" fill="none" stroke="currentColor" stroke-width="5"/><circle cx="62" cy="78" r="12" fill="none" stroke="currentColor" stroke-width="5"/>',
+  jumper_talisman: '<path d="M50 15 L75 55 L60 55 L60 90 L40 90 L40 55 L25 55 Z" fill="currentColor"/>'
+};
+function libraryRelicIconSvg(id, color){
+  const path = LIBRARY_RELIC_ICON_PATH[id] || '<circle cx="50" cy="50" r="30" fill="none" stroke="currentColor" stroke-width="5"/>';
   return `<svg viewBox="0 0 100 100" width="104" height="104" style="color:${color};filter:drop-shadow(0 0 10px ${color}99);">${path}</svg>`;
 }
 function libraryPortrait(innerHtml, glowColor){
@@ -6054,7 +6115,17 @@ function libraryEntriesForTab(tab){
       return {
         title:`${L(it,'name')} <span class="lvl" style="color:${color};">${rarityLabel(it.rarity)}</span>`,
         body: lore ? L(lore,'body') : '',
-        imageHtml:libraryPortrait(libraryItemIconSvg(it.stat, color), color)
+        imageHtml:libraryPortrait(libraryItemIconSvg(it.name, color), color)
+      };
+    });
+  }
+  if(tab==='relics'){
+    return RELIC_POOL.map(r=>{
+      const lore = LIBRARY_RELIC_LORE[r.id];
+      return {
+        title:L(r,'name'),
+        body: lore ? L(lore,'body') : L(r,'desc'),
+        imageHtml:libraryPortrait(libraryRelicIconSvg(r.id, '#c77dff'), '#c77dff')
       };
     });
   }

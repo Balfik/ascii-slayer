@@ -5,6 +5,27 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.67] — Library polish: real gear icons, a Relics category, an even taller mobile run window
+
+### Changed
+- Gear icons previously reused just 4 generic shapes based on the
+  item's stat (sword/wing/lightning/gem) — fair feedback that it looked
+  random and lazy. Redrawn as 18 fully unique icons keyed to each item's
+  actual name: the wing-named items look like wings (not boots, even
+  though they mechanically boost speed), the crown-named ones look like
+  crowns (including the speed one), and the six different swords each
+  have a distinct blade and hilt.
+- Added a Relics category to the Library (5 pages) with the same
+  unique-icon-plus-history treatment as Gear, including new lore text
+  for each relic instead of just its mechanical effect description.
+- The mobile run window is another 50% taller on top of 0.65's increase.
+- Stat numbers still shifted slightly as large values changed length
+  (on both mobile and desktop) — short stats (gold, crystals, souls,
+  wood, stone, iron) now reserve a stable minimum width, and longer
+  composite lines (level, XP bar, ATK/SPD/A.SPD, distance) get their own
+  full row on mobile so they never compete for wrapping space.
+- Fixed a wording typo in the Guardian of Eternity's lore entry.
+
 ## [0.66] — NEW: the Library — the game's lore (world, Castle, monsters, bosses, gear)
 
 ### Added
