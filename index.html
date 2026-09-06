@@ -558,7 +558,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.60';
+const GAME_VERSION = '0.61';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -2361,6 +2361,18 @@ function renderQuestBoardIfOpen(){
   if(modalPointerDown){ pendingQuestBoardRender = true; return; }
   renderQuestBoard();
 }
+// Той самий гард, що й renderQuestBoardIfOpen() вище — для Дерева навичок.
+// renderSkillTree() теж перемальовується у ФОНІ без жодного кліку гравця:
+// gainXp() робить це на кожен levelUp (на високій швидкості — кілька разів
+// на секунду), autoManageSkillSpend() (навичка "Автостратег") — раз на
+// секунду. Обидва місця раніше викликали renderSkillTree() напряму,
+// замінюючи всі кнопки вузлів дерева, поки гравець саме туди й цілиться
+// мишею — той самий клас бага, що й був на Дошці оголошень.
+function renderSkillTreeIfOpen(){
+  if(modalKind!=='skills') return;
+  if(modalPointerDown){ pendingSkillTreeRender = true; return; }
+  renderSkillTree();
+}
 
 /* Щоденний бонус-квест — окремий від звичайних 3 пропозицій, завжди один,
    не займає слот MAX_ACTIVE_QUESTS, ціль і нагорода відчутно більші,
@@ -2476,20 +2488,49 @@ function refreshQuestOffers(){
   renderQuestBoard();
   save();
 }
-// Дистанційні квести оновлюють прогрес КОЖЕН кадр під час бігу (updateRun
-// викликає це щоразу, поки гравець не б'ється й не спотикається). Якщо
-// Дошка оголошень відкрита в цей момент — повний renderQuestBoard()
-// (заміна innerHTML усієї модалки, разом із кнопками "Прийняти") теж
-// викликався б щокадру. Браузери "проковтують" клік, якщо елемент під
-// курсором замінюється між mousedown і mouseup — тобто кнопки в модалці
-// ставали практично некликабельними, поки триває забіг з активним
-// дистанційним квестом. Виправлено троттлінгом: живий прогрес-бар і
-// так оновлюється достатньо плавно раз на ~400мс (роздільність бару —
-// лише 14 символів, частіше все одно непомітно), а щойно ЗАВЕРШЕНИЙ
-// квест (стан справді змінився, з'явилась кнопка "Забрати") рендериться
-// миттєво, без троттлінгу.
+// Дистанційні/вбивчі квести оновлюють прогрес КОЖЕН кадр під час бігу
+// (updateRun викликає це щоразу, поки гравець не б'ється й не спотикається).
+// РАНІШЕ (до v0.61) кожен такий тік викликав ПОВНИЙ renderQuestBoard() —
+// заміну modalBody.innerHTML цілком, разом із кнопками "Прийняти"/
+// "Забрати". Навіть із троттлінгом (~раз на 400мс) це означало: щопівсекунди
+// стара кнопка під курсором знищується, а нова створюється на ТОМУ Ж
+// місці — і браузер сам генерує СВІЖУ пару pointerover/mouseover на цій
+// новій кнопці, БЕЗ жодного реального руху миші (підтверджено діагностикою
+// прямо в грі гравця: кожні ~400мс DOM_ЗМІНИЛОСЬ, і одразу за ним — новий
+// pointerover на тій самій кнопці). Це і виглядало як "кнопка тікає"/
+// "курсор ніби забрали й навели знову" — постійне блимання hover, а не
+// проблема з самим кліком.
+//
+// ФІКС (v0.61): для звичайного тіку прогресу (нічого структурно не
+// змінилось — просто число в барі підросло) оновлюємо ЛИШЕ текст
+// конкретного прогрес-бару напряму (updateQuestBoardProgressOnly()),
+// кнопок узагалі не чіпаючи — hover на них більше ніколи не збивається.
+// Повний renderQuestBoard() лишається тільки для СПРАВЖНІХ структурних
+// змін (квест щойно ЗАВЕРШИВСЯ — з'явилась кнопка "Забрати") — рідкісна
+// подія, і для неї далі діє захист modalPointerDown/pendingQuestBoardRender
+// (не чіпати DOM, поки гравець тримає кнопку — див. renderQuestBoardIfOpen()
+// вище і pointerup-обробник нижче).
 let lastQuestBoardRenderTs = 0;
 const QUEST_BOARD_RENDER_THROTTLE_MS = 400;
+function updateQuestBoardProgressOnly(){
+  if(!state.quests) return;
+  if(state.quests.daily && !state.quests.daily.claimed && !state.quests.daily.quest.completed){
+    const dq = state.quests.daily.quest;
+    const el = document.getElementById('dailyQuestProgressText');
+    if(el){
+      const ratio = dq.progress/dq.target;
+      el.textContent = `${asciiBar(ratio,14)} ${Math.min(dq.progress,dq.target).toFixed(0)}/${dq.target}`;
+    }
+  }
+  for(const q of state.quests.active){
+    if(q.completed) continue;
+    const el = modalBody.querySelector(`[data-progress-uid="${q.uid}"]`);
+    if(el){
+      const ratio = q.progress/q.target;
+      el.textContent = `${asciiBar(ratio,14)} ${Math.min(q.progress,q.target).toFixed(0)}/${q.target}`;
+    }
+  }
+}
 function updateQuestProgress(typeId, amount){
   if(amount<=0 || !state.quests) return;
   let any = false;
@@ -2521,17 +2562,16 @@ function updateQuestProgress(typeId, amount){
   if(any){
     renderQuestLog();
     if(modalKind==='questboard'){
-      if(modalPointerDown){
-        // Гравець саме тримає кнопку натиснутою (mousedown стався, mouseup
-        // ще ні) — НЕ чіпаємо DOM просто зараз, інакше саме ця кнопка може
-        // зникнути з-під пальця/курсора й клік "з'їсться". Долетить, щойно
-        // pointerup спрацює (глобальний обробник вище).
-        pendingQuestBoardRender = true;
+      if(justCompleted){
+        // Структурна зміна (з'явиться кнопка "Забрати") — повний, безпечно
+        // відкладений рендер через той самий гард, що й кнопки-дії.
+        renderQuestBoardIfOpen();
       } else {
+        // Просто число підросло — точкове оновлення тексту, кнопки не чіпаємо.
         const now = performance.now();
-        if(justCompleted || now-lastQuestBoardRenderTs >= QUEST_BOARD_RENDER_THROTTLE_MS){
+        if(now-lastQuestBoardRenderTs >= QUEST_BOARD_RENDER_THROTTLE_MS){
           lastQuestBoardRenderTs = now;
-          renderQuestBoard();
+          updateQuestBoardProgressOnly();
         }
       }
     }
@@ -2667,7 +2707,7 @@ function autoManageEnchant(dt){
   recomputeStats();
   addLog('log.autoEnchanted', 'upgrade', {count:totalCount});
   sfxEnchant();
-  if(modalKind==='forge') renderModalBody();
+  renderForgeIfOpen();
   renderInventory();
   // НАВМИСНО без updateHud()/save() тут: update(dt) і так викликає
   // updateHud() БЕЗУМОВНО щокадру одразу після цієї функції (тут воно
@@ -2703,7 +2743,7 @@ function autoManageUpgrade(dt){
   if(totalCount===0) return;
   recomputeStats();
   addLog('log.autoUpgraded', 'upgrade', {count:totalCount});
-  renderUpgrades();
+  renderUpgradesSafe();
   // Без updateHud()/save() — див. коментар у autoManageEnchant() вище.
 }
 let autoSkillSpendTimer = 0;
@@ -2739,7 +2779,7 @@ function autoManageSkillSpend(dt){
   recomputeStats();
   if(stats.noJumpQuests) purgeJumpQuestOffers(); // той самий побічний ефект, що й buySkillMax()
   addLog('log.autoSkillSpend', 'upgrade', {count:totalCount});
-  if(modalKind==='skills') renderSkillTree();
+  renderSkillTreeIfOpen();
   // Без updateHud()/save() — див. коментар у autoManageEnchant() вище.
 }
 function asciiBar(ratio, width){
@@ -2798,7 +2838,7 @@ function renderQuestBoard(){
   html += `<div style="margin:0 0 12px;padding:8px;border:1px solid var(--gold);border-radius:6px;background:#2a230f;">
     <div style="color:var(--gold);font-size:12px;letter-spacing:1px;margin-bottom:6px;">🌟 ${t('quests.dailyHeader')}</div>
     <div class="mrow" style="border:none;padding:0;">
-      <div class="up-name">${questType(dq.typeId).icon} ${questDisplayName(dq)}<small>${questDisplayDesc(dq)} · ${t('quests.rewardLine',{gold:dq.rewardGold, crystals:dq.rewardCrystals, xp:dq.rewardXp})}${state.quests.daily.claimed?'':` · ${asciiBar(dqRatio,14)} ${Math.min(dq.progress,dq.target).toFixed(0)}/${dq.target}`}</small></div>
+      <div class="up-name">${questType(dq.typeId).icon} ${questDisplayName(dq)}<small>${questDisplayDesc(dq)} · ${t('quests.rewardLine',{gold:dq.rewardGold, crystals:dq.rewardCrystals, xp:dq.rewardXp})}${state.quests.daily.claimed?'':` · <span id="dailyQuestProgressText">${asciiBar(dqRatio,14)} ${Math.min(dq.progress,dq.target).toFixed(0)}/${dq.target}</span>`}</small></div>
       ${dqActionHtml}
     </div>
   </div>`;
@@ -2828,7 +2868,7 @@ function renderQuestBoard(){
       const qt = questType(q.typeId);
       const ratio = q.progress/q.target;
       return `<div class="mrow">
-        <div class="up-name">${qt.icon} ${questDisplayName(q)}<small>${questDisplayDesc(q)} · ${asciiBar(ratio,14)} ${Math.min(q.progress,q.target).toFixed(0)}/${q.target}</small></div>
+        <div class="up-name">${qt.icon} ${questDisplayName(q)}<small>${questDisplayDesc(q)} · <span data-progress-uid="${q.uid}">${asciiBar(ratio,14)} ${Math.min(q.progress,q.target).toFixed(0)}/${q.target}</span></small></div>
         ${q.completed ? `<button class="buy" data-action="questTurnIn" data-id="${q.uid}">${t('quests.turnInBtn')}</button>` : ''}
       </div>`;
     }).join('');
@@ -3895,7 +3935,7 @@ function gainXp(amount){
     addLog('log.levelUp', 'levelup', {level:state.level});
     spawnFloatingText(PLAYER_COL, 'LVL UP!', '#ffd94d');
     sfxLevelUp();
-    if(modalKind==='skills') renderSkillTree(); // щоб кнопки одразу розблокувались, якщо модалка відкрита
+    renderSkillTreeIfOpen(); // щоб кнопки одразу розблокувались, якщо модалка відкрита
     checkLevelUnlocks(); // нові регіони на Карті Світу — за досягнутим рівнем, не за дистанцією
     if(LEVEL_MILESTONE_EVENTS.includes(state.level)){
       reportEvent('level_milestone', {value:state.level});
@@ -4883,22 +4923,60 @@ document.addEventListener('pointerup', forceCursorRefresh, true);
 // узагалі не існує, бо ми просто ЧЕКАЄМО pointerup, перш ніж чіпати DOM.
 let modalPointerDown = false;
 let pendingQuestBoardRender = false;
+let pendingSkillTreeRender = false;
+let pendingForgeRender = false;
 modalBody.addEventListener('pointerdown', ()=>{ modalPointerDown = true; });
 document.addEventListener('pointerup', ()=>{
   modalPointerDown = false;
+  // КРИТИЧНО: жоден з цих рендерів НЕ виконується тут-таки, синхронно.
+  // pointerup стається ДО 'click' (той диспетчиться браузером трохи
+  // пізніше в тій самій взаємодії) — синхронний рендер тут замінював би
+  // modalBody.innerHTML і від'єднував САМЕ ту кнопку, яку щойно
+  // відпустили, ще ДО того, як 'click' встигав дійти до делегованого
+  // обробника на modalBody (подія не спливає з від'єднаного вузла —
+  // клік просто мовчки губився). setTimeout(...,0) відкладає рендер на
+  // наступний макротаск, коли 'click' уже гарантовано відпрацював.
   if(pendingQuestBoardRender && modalKind==='questboard'){
     pendingQuestBoardRender = false;
-    // КРИТИЧНО: НЕ рендеримо тут-таки, синхронно. pointerup стається ДО
-    // 'click' (той диспетчиться браузером трохи пізніше в тій самій
-    // взаємодії) — синхронний renderQuestBoard() тут замінював би
-    // modalBody.innerHTML і від'єднував САМЕ ту кнопку, яку щойно
-    // відпустили, ще ДО того, як 'click' встигав дійти до делегованого
-    // обробника на modalBody (подія не спливає з від'єднаного вузла —
-    // клік просто мовчки губився). setTimeout(...,0) відкладає рендер на
-    // наступний макротаск, коли 'click' уже гарантовано відпрацював.
     setTimeout(()=>{ if(modalKind==='questboard') renderQuestBoard(); }, 0);
   }
+  if(pendingSkillTreeRender && modalKind==='skills'){
+    pendingSkillTreeRender = false;
+    setTimeout(()=>{ if(modalKind==='skills') renderSkillTree(); }, 0);
+  }
+  if(pendingForgeRender && modalKind==='forge'){
+    pendingForgeRender = false;
+    setTimeout(()=>{ if(modalKind==='forge') renderModalBody(); }, 0);
+  }
 }, true);
+// Той самий гард ще раз — для Кузні (автоматизація "Автоковаль",
+// autoManageEnchant()). Кузня рендериться через загальний renderModalBody()
+// (немає окремої renderForge()), тому власний хелпер, а не переюз
+// renderQuestBoardIfOpen()/renderSkillTreeIfOpen().
+function renderForgeIfOpen(){
+  if(modalKind!=='forge') return;
+  if(modalPointerDown){ pendingForgeRender = true; return; }
+  renderModalBody();
+}
+// "Прокачка" (upgradesBody) — ЗАВЖДИ видима панель, поза системою
+// модалок (modalKind/modalBody) узагалі, тож потрібен ОКРЕМИЙ, незалежний
+// pointerdown/pointerup гард — той самий клас бага (автоматизація
+// "Автотренер" replaced усі кнопки "Купити" в цій панелі раз/сек,
+// навіть коли гравець саме туди й дивиться мишею).
+let upgradesBodyPointerDown = false;
+let pendingUpgradesRender = false;
+document.getElementById('upgradesBody').addEventListener('pointerdown', ()=>{ upgradesBodyPointerDown = true; });
+document.addEventListener('pointerup', ()=>{
+  upgradesBodyPointerDown = false;
+  if(pendingUpgradesRender){
+    pendingUpgradesRender = false;
+    setTimeout(renderUpgrades, 0);
+  }
+}, true);
+function renderUpgradesSafe(){
+  if(upgradesBodyPointerDown){ pendingUpgradesRender = true; return; }
+  renderUpgrades();
+}
 
 function statLabelOf(stat){
   return t('stat.'+stat) || stat;

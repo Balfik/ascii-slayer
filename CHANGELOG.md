@@ -5,6 +5,36 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.61] — The real "buttons keep running away" bug (hover, not clicks) — and three more spots with the same flaw
+
+### Fixed
+- After 0.60 shipped, the player said it was still happening, then gave
+  the key detail: they weren't clicking at all, just hovering — the
+  button highlights, then flickers as if the cursor had been lifted and
+  put back down. A console script (event + mutation logging) they ran
+  at my request showed the exact pattern: every ~400ms the board's DOM
+  changed, and a fresh `pointerover`/`mouseover` fired on the very same
+  button moments later, with no `pointerout` in between — proof the
+  browser was re-detecting hover because the element itself had been
+  replaced under a perfectly still cursor.
+- The cause: routine quest-progress ticking (which needs no automation
+  skill at all — just an ever-present daily quest of a matching type
+  while running) was rebuilding the *entire* Quest Board, buttons
+  included, every ~400ms just to update one progress bar's number.
+  Fixed by patching only that number's text node directly; a full
+  rebuild now only happens for genuine structural changes (a quest
+  completing and its claim button appearing).
+- The player then noticed the same flicker in the Skill Tree, and rightly
+  pushed back on framing this as an "automation" bug — it isn't, there.
+  Leveling up (from ordinary play, no automation skill required) forces
+  a full Skill Tree redraw on every level, which at high speed can
+  happen several times a second. Found and fixed the same flaw in two
+  more places while at it: the Forge (from the Auto-Enchant skill) and
+  the always-visible Upgrades panel (from the Auto-Train skill) — both
+  of those *do* involve automation. All three now defer their redraw
+  until the player releases whatever they're holding, the same guard
+  already proven on the Quest Board.
+
 ## [0.60] — The actual fix for the Quest Board's click-eaten bug
 
 ### Fixed
