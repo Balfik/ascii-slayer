@@ -5,6 +5,21 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.65] — Mobile layout: no more scrolling stat bars, a taller run window, left-aligned menu
+
+### Changed
+- The stat bars (level/gold/... and distance/ATK/SPD) used to require
+  horizontal scrolling on narrow screens to see everything. They now
+  wrap onto multiple lines instead, with slightly smaller text — nothing
+  is hidden behind a scrollbar anymore.
+- The run window used to become a sliver just a few pixels tall on
+  narrow screens, since it scales to the container's full width at a
+  fixed, very wide desktop aspect ratio. It's now noticeably taller on
+  mobile, with correspondingly bigger glyphs, HP bars, and text —
+  desktop is unaffected.
+- The bottom button menu no longer centers its buttons on mobile; they
+  now align left, row by row, instead of looking scattered.
+
 ## [0.64] — World Map: browse much further ahead, jump straight to a zone
 
 ### Changed

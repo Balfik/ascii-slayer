@@ -203,7 +203,25 @@
     grid-template-columns:repeat(auto-fit, minmax(210px, 1fr));
     gap:10px;
   }
-  @media (max-width:760px){ .panels{grid-template-columns:1fr;} }
+  @media (max-width:760px){
+    .panels{grid-template-columns:1fr;}
+    /* 1) Рядки статів (LV/золото/... і Дистанція/ATK/SPD) на десктопі
+       навмисно НЕ переносяться (hud-fixed: nowrap+overflow-x:auto), щоб
+       великі числа не ламали висоту вікна — на вузькому екрані це саме
+       й давало горизонтальний скрол, і частина інформації була не видна
+       без нього. На мобільному натомість дозволяємо перенос на кілька
+       рядків (переносити — це нормально, важливо бачити ВСЕ одразу, без
+       скролу) і трохи зменшуємо шрифт/відступи, щоб рядків було менше. */
+    .hud.hud-fixed{
+      flex-wrap:wrap; overflow-x:visible;
+      font-size:11.5px; gap:4px 10px; padding:6px 10px;
+    }
+    /* 3) Кнопки нижнього меню — на десктопі вирівняні по центру
+       (успадковано від .hud), через що короткі останні рядки виглядають
+       "розкидано". На мобільному вирівнюємо по лівому краю — рядок за
+       рядком, без центрування. */
+    .hud.row2{ justify-content:flex-start; }
+  }
 
   .panel{
     background:var(--panel);
@@ -558,7 +576,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.64';
+const GAME_VERSION = '0.65';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -784,11 +802,36 @@ function generateNickname(){
    ===================================================================== */
 const GRID_COLS = 60;
 const PLAYER_COL = 8;
-const CELL_W = 16, CELL_H = 28;
-const TOP_PAD = 44, PAD_LEFT = 10, BOTTOM_PAD = 8;
+// CELL_W/CELL_H/TOP_PAD/BOTTOM_PAD — БАЗОВІ (десктопні) значення. На
+// десктопі вікно бігу зумисно дуже широке й низьке (980×136, ~7.2:1) —
+// canvas розтягується по ширині контейнера (width:100%), а висота йде
+// за aspect-ratio, тож на вузькому мобільному екрані ця ж пропорція
+// перетворює вікно бігу на ниточку в кілька пікселів заввишки. Гравець
+// прямо попросив: зробити вікно вищим на мобільному (як міське) і
+// елементи в ньому більшими — updateRunGeometryForViewport() нижче
+// масштабує ЛИШЕ вертикальні величини (не GRID_COLS/CELL_W — ширина й
+// так розтягується по контейнеру незалежно від них). screenCol()/
+// геймплейна логіка ніде НЕ читає ці pixel-константи (лише малювання),
+// тож зміна їх безпечна й не впливає на саму гру, тільки на вигляд.
+const CELL_W_BASE = 16, CELL_H_BASE = 28;
+const TOP_PAD_BASE = 44, PAD_LEFT = 10, BOTTOM_PAD_BASE = 8;
+let CELL_W = CELL_W_BASE, CELL_H = CELL_H_BASE;
+let TOP_PAD = TOP_PAD_BASE, BOTTOM_PAD = BOTTOM_PAD_BASE;
 const ROW_AIR = 0, ROW_GROUND = 1, ROW_FLOOR = 2;
-const INTERNAL_W = PAD_LEFT*2 + GRID_COLS*CELL_W;
-const INTERNAL_H = TOP_PAD + 3*CELL_H + BOTTOM_PAD;
+let INTERNAL_W = PAD_LEFT*2 + GRID_COLS*CELL_W;
+let INTERNAL_H = TOP_PAD + 3*CELL_H + BOTTOM_PAD;
+// Перерахунок базового розміру шрифту run-екрана (та інших дрібніших
+// написів там-таки) пропорційно до поточного CELL_H — щоб текст ріс
+// разом з висотою рядків, а не лишався мікроскопічним у вищому вікні.
+function runFontPx(basePx){ return Math.round(basePx * (CELL_H/CELL_H_BASE)); }
+function isMobileViewport(){ return window.innerWidth <= 760; } // той самий поріг, що й .panels вище
+function updateRunGeometryForViewport(){
+  const scale = isMobileViewport() ? 2.4 : 1;
+  CELL_H = Math.round(CELL_H_BASE*scale);
+  TOP_PAD = Math.round(TOP_PAD_BASE*scale);
+  BOTTOM_PAD = Math.round(BOTTOM_PAD_BASE*scale);
+  INTERNAL_H = TOP_PAD + 3*CELL_H + BOTTOM_PAD;
+}
 const JUMP_DURATION_BASE = 0.42;
 // ТИМЧАСОВИЙ кап ефективної швидкості — див. коментар у recomputeStats().
 const MAX_EFFECTIVE_SPEED = 2000;
@@ -1550,13 +1593,14 @@ function currentCanvasSize(){
   return {w:INTERNAL_W,h:INTERNAL_H};
 }
 function setupCanvas(){
+  updateRunGeometryForViewport(); // до currentCanvasSize() — впливає на INTERNAL_H у режимі 'run'
   const {w,h} = currentCanvasSize();
   const dpr = window.devicePixelRatio || 1;
   canvas.width = w*dpr;
   canvas.height = h*dpr;
   canvas.style.aspectRatio = `${w}/${h}`;
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  ctx.font = "bold 20px 'Courier New', monospace";
+  ctx.font = `bold ${runFontPx(20)}px 'Courier New', monospace`;
   ctx.textBaseline = 'alphabetic';
 }
 
@@ -4360,14 +4404,14 @@ function updateRun(dt){
 function drawMonsterHp(col, hp, maxHp){
   const x = xForCol(col)-1;
   const barY = yForRow(ROW_GROUND) - CELL_H*0.88;
-  const w = CELL_W-2, h = 3;
+  const w = CELL_W-2, h = Math.max(3, Math.round(3*(CELL_H/CELL_H_BASE)));
   ctx.fillStyle = '#1a1a1a';
   ctx.fillRect(x,barY,w,h);
   const ratio = hp/maxHp;
   ctx.fillStyle = ratio>0.5 ? '#4dff88' : (ratio>0.25 ? '#ffd94d' : '#ff5252');
   ctx.fillRect(x,barY, Math.max(0,w*ratio), h);
   ctx.save();
-  ctx.font = "10px 'Courier New', monospace";
+  ctx.font = `${runFontPx(10)}px 'Courier New', monospace`;
   ctx.fillStyle = '#cfe8d4';
   ctx.fillText(String(Math.max(0,Math.ceil(hp))), x-1, barY-3);
   ctx.restore();
@@ -4534,9 +4578,9 @@ function renderRun(){
   // того, як персонаж уже пройшов число, яке бачить на екрані.
   if(state.level < biomeRecommendedLevelDisplay(tier)){
     ctx.save();
-    ctx.font = "11px 'Courier New', monospace";
+    ctx.font = `${runFontPx(11)}px 'Courier New', monospace`;
     ctx.fillStyle = 'rgba(255,82,82,0.65)';
-    ctx.fillText('⚠ '+t('world.recLevel',{lvl:formatNum(biomeRecommendedLevelDisplay(tier))}), PAD_LEFT, 14);
+    ctx.fillText('⚠ '+t('world.recLevel',{lvl:formatNum(biomeRecommendedLevelDisplay(tier))}), PAD_LEFT, runFontPx(14));
     ctx.restore();
   }
 
@@ -4604,10 +4648,10 @@ function renderRun(){
   }
   if(hasCompanion()){
     const bob = Math.sin(bgTime*3)*2;
-    ctx.font = "bold 14px 'Courier New', monospace";
+    ctx.font = `bold ${runFontPx(14)}px 'Courier New', monospace`;
     ctx.fillStyle = companionPulse>0 ? '#ffffff' : COMPANION_COLOR;
     ctx.fillText('c', xForCol(PLAYER_COL-2), yForRow(ROW_GROUND)+bob);
-    ctx.font = "bold 20px 'Courier New', monospace";
+    ctx.font = `bold ${runFontPx(20)}px 'Courier New', monospace`;
   }
 
   for(const t of floatingTexts){
