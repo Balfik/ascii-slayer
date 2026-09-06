@@ -558,7 +558,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.48';
+const GAME_VERSION = '0.49';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -887,7 +887,7 @@ const I18N = {
     'town.bossportal':'[E] Портал Босів',
     'btn.bossportal':'👹 Портал Босів',
     'modal.bossportalTitle':'ПОРТАЛ БОСІВ',
-    'town.worldmap':'[E] Карта Світу', 'town.castle':'[E] Замок', 'town.castleLabel':'ЗАМОК',
+    'town.worldmap':'[E] Карта Світу', 'town.castle':'[E] Замок', 'town.castleLabel':'🏰 ЗАМОК',
     'modal.worldmapTitle':'КАРТА СВІТУ',
     'touch.up':'Вперед', 'touch.down':'Назад', 'touch.left':'Ліворуч', 'touch.right':'Праворуч',
     'touch.interact':'Взаємодія', 'touch.jump':'Стрибок',
@@ -908,6 +908,7 @@ const I18N = {
     'world.travelBtn':'🗺 Обрати регіон',
     'world.releaseBtn':'🔓 Зняти фіксацію',
     'world.hereTag':'(ти тут)',
+    'world.upcomingHeader':'НАСТУПНІ ЗОНИ (ще заблоковано)',
     'log.traveled':'🗺 Складність зафіксована на регіоні «{name}»',
     'log.traveledFrontier':'🗺 Складність знову слідує за твоєю справжньою дистанцією',
     'boss.locked':'Потрібен {lvl} рівень персонажа',
@@ -1166,7 +1167,7 @@ const I18N = {
     'town.bossportal':'[E] Boss Portal',
     'btn.bossportal':'👹 Boss Portal',
     'modal.bossportalTitle':'BOSS PORTAL',
-    'town.worldmap':'[E] World Map', 'town.castle':'[E] Castle', 'town.castleLabel':'CASTLE',
+    'town.worldmap':'[E] World Map', 'town.castle':'[E] Castle', 'town.castleLabel':'🏰 CASTLE',
     'modal.worldmapTitle':'WORLD MAP',
     'touch.up':'Up', 'touch.down':'Down', 'touch.left':'Left', 'touch.right':'Right',
     'touch.interact':'Interact', 'touch.jump':'Jump',
@@ -1187,6 +1188,7 @@ const I18N = {
     'world.travelBtn':'🗺 Pick region',
     'world.releaseBtn':'🔓 Unpin',
     'world.hereTag':'(you are here)',
+    'world.upcomingHeader':'UPCOMING ZONES (still locked)',
     'log.traveled':'🗺 Difficulty pinned to region «{name}»',
     'log.traveledFrontier':'🗺 Difficulty now follows your true distance again',
     'boss.locked':'Requires character level {lvl}',
@@ -3312,6 +3314,20 @@ function renderWorldMap(){
         <small style="color:${hard?'var(--danger)':'var(--dim)'}">${t('world.recLevel',{lvl:formatNum(biomeRecommendedLevelDisplay(tier))})}${hard?' ⚠':''}</small>
       </div>
       <button class="buy" data-action="travelTier" data-id="${tier}">${t('world.travelBtn')}</button>
+    </div>`;
+  }
+  // Прев'ю НАСТУПНИХ (ще не відкритих) зон — раніше карта показувала
+  // ЛИШЕ вже відкриті тіри, тож новий гравець (лише стартова зона)
+  // не бачив узагалі ніякого натяку, що є куди рости й прогресувати.
+  // Без кнопки "Обрати регіон" (не можна піти туди, поки не відкрито) —
+  // лише назва й потрібний рівень, приглушено.
+  const WORLD_MAP_PREVIEW_COUNT = 5;
+  html += `<div style="margin:14px 0 4px;color:var(--purple);font-size:12px;letter-spacing:1px;">${t('world.upcomingHeader')}</div>`;
+  for(let tier=maxTier+1; tier<=maxTier+WORLD_MAP_PREVIEW_COUNT; tier++){
+    html += `<div class="mrow" style="border-left:3px solid ${biomeFloorColor(tier)};padding-left:6px;opacity:.55;">
+      <div class="up-name" style="color:${biomeTextColor(tier)}">🔒 ${biomeName(tier)}
+        <small>${t('world.recLevel',{lvl:formatNum(biomeRecommendedLevelDisplay(tier))})}</small>
+      </div>
     </div>`;
   }
   modalBody.innerHTML = html;
@@ -6420,13 +6436,21 @@ sfxVolSlider.addEventListener('input', ()=>{
    ===================================================================== */
 const HANDLED_CODES = new Set(['KeyW','KeyA','KeyS','KeyD','Space','KeyE','KeyT','ArrowUp','ArrowDown','ArrowLeft','ArrowRight']);
 document.addEventListener('keydown', (e)=>{
+  if(e.code==='Escape') closeModal(); // закриває модалку навіть під час друку в полі — не заважає вводу тексту
+  // Гравець друкує в текстове поле (напр. логін/пароль у хмарних
+  // збереженнях) — ігрові клавіші (W/A/S/D/E/T/Space/стрілки) НЕ повинні
+  // ані preventDefault(), ані рухати персонажа/відкривати місто: інакше
+  // саме ці букви "зникають" при друкуванні (буквально e.preventDefault()
+  // блокував введення літер a/s/d/w/e/t і пробілу в будь-яке поле на
+  // сторінці, незалежно від фокуса).
+  const ae = document.activeElement;
+  if(ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA')) return;
   ensureAudio();
   if(HANDLED_CODES.has(e.code)) e.preventDefault();
   keysDown[e.code] = true;
   if(e.code==='Space') tryJump();
   if(e.code==='KeyT') toggleTown();
   if(e.code==='KeyE' && mode==='town') interactBuilding();
-  if(e.code==='Escape') closeModal();
 });
 document.addEventListener('keyup', (e)=>{ keysDown[e.code] = false; });
 document.addEventListener('pointerdown', ensureAudio, {once:true});

@@ -5,6 +5,28 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.49] — Critical input fix, upcoming zones preview, castle icon
+
+### Fixed
+- **Critical**: typing into the username/password fields silently
+  dropped letters — w, a, s, d, e, t and space specifically, and typing
+  was essentially unusable on mobile. Cause: the game's global keyboard
+  handler for movement/jump/interact called preventDefault() on those
+  keys unconditionally, anywhere on the page, including inside text
+  fields. Invisible before 0.47 since the game had no text inputs at
+  all. Now skipped entirely while a text field has focus (Escape still
+  closes modals as before).
+
+### Added
+- The World Map now previews the next 5 not-yet-unlocked zones (name +
+  recommended level, locked icon) below the ones you've already opened,
+  so there's always visibility into what's ahead — previously a new
+  character only saw the starting zone with no indication more existed.
+- The castle construction site in town now has a 🏰 icon on its
+  always-visible label, matching the icon-prefixed style used
+  everywhere else in the game, so it reads clearly as a building to
+  walk up to and interact with.
+
 ## [0.48] — Fix: login/password fields instantly lost focus
 
 ### Fixed
