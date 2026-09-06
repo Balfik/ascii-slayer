@@ -558,7 +558,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.59';
+const GAME_VERSION = '0.60';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -2846,7 +2846,22 @@ function renderQuestBoard(){
       </div>`;
     }).join('');
   }
+  // ПОПЕРЕДНЯ ГІПОТЕЗА (v0.60, спростована прямим тестом): думав, що
+  // innerHTML скидає scrollTop прокручуваної .modal-body, і саме це
+  // виглядає як "кнопки тікають". Пряма перевірка (element.innerHTML =
+  // element.innerHTML) показала, що scrollTop НЕ скидається сам по собі —
+  // отже це НЕ справжня причина. Справжня причина знайдена й виправлена
+  // окремо, у pointerup-обробнику нижче (modalPointerDown/
+  // pendingQuestBoardRender) — там renderQuestBoard() раніше викликався
+  // СИНХРОННО просто на pointerup, ще ДО того, як браузер встигав
+  // розіслати 'click', і від'єднував саме натиснуту кнопку до того, як
+  // клік доходив до делегованого обробника. Збереження scrollTop тут
+  // лишаємо як дешеву, нешкідливу підстраховку (раптом якийсь інший
+  // рендер колись таки зробить контент коротшим за поточний scrollTop) —
+  // не єдиний і не головний фікс.
+  const scrollTop = modalBody.scrollTop;
   modalBody.innerHTML = html;
+  modalBody.scrollTop = scrollTop;
 }
 
 /* =====================================================================
@@ -4873,7 +4888,15 @@ document.addEventListener('pointerup', ()=>{
   modalPointerDown = false;
   if(pendingQuestBoardRender && modalKind==='questboard'){
     pendingQuestBoardRender = false;
-    renderQuestBoard();
+    // КРИТИЧНО: НЕ рендеримо тут-таки, синхронно. pointerup стається ДО
+    // 'click' (той диспетчиться браузером трохи пізніше в тій самій
+    // взаємодії) — синхронний renderQuestBoard() тут замінював би
+    // modalBody.innerHTML і від'єднував САМЕ ту кнопку, яку щойно
+    // відпустили, ще ДО того, як 'click' встигав дійти до делегованого
+    // обробника на modalBody (подія не спливає з від'єднаного вузла —
+    // клік просто мовчки губився). setTimeout(...,0) відкладає рендер на
+    // наступний макротаск, коли 'click' уже гарантовано відпрацював.
+    setTimeout(()=>{ if(modalKind==='questboard') renderQuestBoard(); }, 0);
   }
 }, true);
 

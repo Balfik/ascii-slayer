@@ -5,6 +5,28 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.60] — The actual fix for the Quest Board's click-eaten bug
+
+### Fixed
+- 0.59's fix (guarding four more functions with the existing "don't touch
+  the DOM while a button is held" check) turned out to be necessary but
+  not sufficient — the player reported it was still happening. The real
+  cause: the guard's own deferred re-render fired synchronously the
+  instant `pointerup` fired, which is *before* the browser dispatches
+  the subsequent `click` event in the same interaction. That re-render
+  replaces the Quest Board's content, detaching the exact button just
+  released — so when `click` tries to fire and bubble up to the shared
+  delegated handler, its target is no longer in the document and the
+  event never arrives. The click silently does nothing, every time a
+  background update (quest progress ticking, or the Auto-Quests skill)
+  happened to touch the board while a button was held.
+- Fixed by deferring that re-render past the current event loop turn
+  (`setTimeout(..., 0)`), so `click` is always fully handled first.
+  Verified with an isolated reproduction of just the event mechanism
+  (synchronous replace loses the click, deferred replace keeps it), and
+  live in the game: holding a board button through a background update
+  and releasing it now reliably performs the button's action.
+
 ## [0.59] — Gauntlet reward bug, guaranteed relic at wave 80, quest-board click fix
 
 ### Fixed
