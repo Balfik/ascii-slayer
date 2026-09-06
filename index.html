@@ -558,7 +558,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.58';
+const GAME_VERSION = '0.59';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -927,7 +927,7 @@ const I18N = {
     'gauntlet.retreatBtn':'🏳 Завершити', 'gauntlet.continueBtn':'🏘 У місто',
     'gauntlet.header':'Гаунтлет', 'gauntlet.startBtn':'🌀 Почати Гаунтлет',
     'gauntlet.desc':'Хвилі монстрів одна за одною, дедалі важчі — скільки протримаєшся за 90с?',
-    'gauntlet.descSmall':'Повна нагорода від {n} зачищених хвиль, менше — часткова. Шанс на реліквію — 15%, і ще один незалежний прокид за кожні 10 хвиль понад поріг',
+    'gauntlet.descSmall':'Повна нагорода від {n} зачищених хвиль, менше — часткова. Шанс на реліквію — 15%, і ще один незалежний прокид за кожні 10 хвиль понад поріг; від {g} хвиль реліквія гарантована',
     'gauntlet.resultTitle':'Зачищено хвиль: {waves}',
     'gauntlet.waveLabel':'Хвиля {n}',
     'log.gauntletLocked':'Гаунтлет відкриється на {lvl} рівні персонажа',
@@ -1213,7 +1213,7 @@ const I18N = {
     'gauntlet.retreatBtn':'🏳 End Run', 'gauntlet.continueBtn':'🏘 To town',
     'gauntlet.header':'Gauntlet', 'gauntlet.startBtn':'🌀 Start Gauntlet',
     'gauntlet.desc':'Waves of monsters, one after another, ever harder — how long can you last in 90s?',
-    'gauntlet.descSmall':'Full reward from {n} cleared waves, less otherwise. Relic chance is 15%, plus one more independent roll per 10 waves beyond the threshold',
+    'gauntlet.descSmall':'Full reward from {n} cleared waves, less otherwise. Relic chance is 15%, plus one more independent roll per 10 waves beyond the threshold; guaranteed from {g} waves',
     'gauntlet.resultTitle':'Waves cleared: {waves}',
     'gauntlet.waveLabel':'Wave {n}',
     'log.gauntletLocked':'The Gauntlet unlocks at character level {lvl}',
@@ -2344,8 +2344,22 @@ function purgeJumpQuestOffers(){
   state.quests.offers = state.quests.offers.filter(o=>o.typeId!=='jump');
   if(state.quests.offers.length !== before){
     ensureQuestOffers();
-    if(modalKind==='questboard') renderQuestBoard();
+    renderQuestBoardIfOpen();
   }
+}
+// Єдина точка, звідки БУДЬ-яка фонова (не-клікова) зміна квестів торкається
+// Дошки оголошень — щоб не повторювати захист від "з'їденого" кліка (баг:
+// поки гравець тримає кнопку натиснутою в цій модалці, повний перемальовок
+// innerHTML міняє DOM-вузол під пальцем/курсором, і клік губиться) окремо
+// в кожній функції. modalPointerDown/pendingQuestBoardRender визначені
+// нижче (обробники pointerdown/pointerup) — і читаються тут лише в МОМЕНТ
+// виклику (у рантаймі, після повного завантаження скрипта), тож порядок
+// оголошення в файлі не важливий, як і для аналогічної перевірки в
+// updateQuestProgress() нижче.
+function renderQuestBoardIfOpen(){
+  if(modalKind!=='questboard') return;
+  if(modalPointerDown){ pendingQuestBoardRender = true; return; }
+  renderQuestBoard();
 }
 
 /* Щоденний бонус-квест — окремий від звичайних 3 пропозицій, завжди один,
@@ -2388,7 +2402,7 @@ function turnInDailyQuest(auto){
   if(state.quests.history.length > 50) state.quests.history.length = 50;
   addLog('log.questReward', 'upgrade', {gold:q.rewardGold, crystals:q.rewardCrystals, xp:q.rewardXp});
   sfxCoin();
-  if(modalKind==='questboard') renderQuestBoard();
+  renderQuestBoardIfOpen();
   renderQuestLog();
   // auto=true: викликано з autoManageQuests() — див. коментар у turnInQuest()
   // вище щодо того, чому save()/updateHud() тут пропускаються.
@@ -2535,10 +2549,14 @@ function acceptQuest(uid, auto){
   state.quests.active.push(q);
   addLog('log.questAccepted', 'upgrade', {name:questDisplayName(q)});
   ensureQuestOffers();
-  // renderQuestBoard() пише в спільний modalBody — оновлюємо його тільки
-  // якщо саме дошка оголошень зараз відкрита, інакше автоприйняття квестів
-  // (навичка "Автоквести") могло б затерти вміст іншої відкритої модалки.
-  if(modalKind==='questboard') renderQuestBoard();
+  // renderQuestBoardIfOpen() пише в спільний modalBody лише якщо саме
+  // дошка оголошень зараз відкрита (інакше автоприйняття квестів —
+  // навичка "Автоквести" — могло б затерти вміст іншої відкритої модалки),
+  // і відкладає сам перемальовок, поки гравець фізично тримає кнопку в
+  // цій модалці натиснутою (див. коментар над функцією) — без цього
+  // фонове автоприйняття могло підмінити DOM-кнопку прямо під натиснутим
+  // пальцем/курсором і "з'їсти" клік гравця.
+  renderQuestBoardIfOpen();
   renderQuestLog();
   // auto=true: викликано з autoManageQuests() (тік раз/сек, потенційно
   // кілька викликів за один тік). save() — це синхронний JSON.stringify()
@@ -2571,7 +2589,7 @@ function turnInQuest(uid, auto){
   if(state.quests.history.length > 50) state.quests.history.length = 50;
   addLog('log.questReward', 'upgrade', {gold:q.rewardGold, crystals:q.rewardCrystals, xp:q.rewardXp});
   sfxCoin();
-  if(modalKind==='questboard') renderQuestBoard();
+  renderQuestBoardIfOpen();
   renderQuestLog();
   // auto=true: те саме обґрунтування, що й у acceptQuest() вище —
   // updateHud() тут теж зайвий, бо update(dt) і так викликає його
@@ -2892,7 +2910,7 @@ function renderBossPortal(){
   let html = `<div style="margin:0 0 12px;padding:8px;border:1px solid var(--purple);border-radius:6px;background:#1a0f2a;">
     <div style="color:var(--purple);font-size:12px;letter-spacing:1px;margin-bottom:6px;">🌀 ${t('gauntlet.header')}</div>
     <div class="mrow" style="border:none;padding:0;${gLocked?'opacity:.6;':''}">
-      <div class="up-name">${t('gauntlet.desc')}<small>${t('gauntlet.descSmall',{n:GAUNTLET_MIN_WAVES_FOR_FULL_REWARD})}</small></div>
+      <div class="up-name">${t('gauntlet.desc')}<small>${t('gauntlet.descSmall',{n:GAUNTLET_MIN_WAVES_FOR_FULL_REWARD, g:GAUNTLET_GUARANTEED_RELIC_WAVES})}</small></div>
       ${gStatusHtml}
     </div>
   </div>`;
@@ -3233,6 +3251,10 @@ const GAUNTLET_COOLDOWN_HOURS = 3;
 const GAUNTLET_MIN_LEVEL = 10;
 const GAUNTLET_WAVE_SCALE = 1.15;
 const GAUNTLET_MIN_WAVES_FOR_FULL_REWARD = 5;
+// Від цієї кількості зачищених хвиль реліквія (якщо лишилась не здобута)
+// гарантована на 100%, без прокиду — гравець прямо попросив: "якщо пройшов
+// 80 хвилю, то 100% повинен отримувати реліквію".
+const GAUNTLET_GUARANTEED_RELIC_WAVES = 80;
 let gauntletFight = null;  // {wave, mtype, hp, maxHp, timeLeft, attackTimer, attackFlash}
 let gauntletResult = null; // {wavesCleared, gold, crystals, xp, relicName, cooldownSkipped}
 function gauntletOnCooldown(){ return state.gauntletCooldown > Date.now(); }
@@ -3307,9 +3329,19 @@ function endGauntlet(retreated){
   }
   const rw = gauntletRewards(wavesCleared);
   const fullReward = wavesCleared >= GAUNTLET_MIN_WAVES_FOR_FULL_REWARD;
-  const gold = fullReward ? rw.gold : (wavesCleared>0 ? Math.round(rw.gold*0.4) : 0);
+  // ФІКС: gauntletRewards() масштабує лише за тиром фарм-зони
+  // (tierRewardScale) — на відміну від awardKill()/endBossFight(), де
+  // золото ЩЕ множиться на goldMultEff() (усі % золота з навичок/
+  // Переродження/Замку/комбо/дня-ночі), а досвід — на stats.farmXpMult.
+  // Через це Гаунтлет-нагорода взагалі не росла разом із рештою економіки
+  // гравця (на пізній грі, де goldMultEff() легко в сотні-тисячі разів
+  // більший за 1, різниця стає колосальною) — саме це й було справжньою
+  // причиною "малих нагород", а не просто заниженими базовими числами.
+  const goldRaw = fullReward ? rw.gold : (wavesCleared>0 ? Math.round(rw.gold*0.4) : 0);
+  const gold = Math.round(goldRaw * goldMultEff());
   const crystals = fullReward ? rw.crystals : 0;
-  const xp = fullReward ? rw.xp : (wavesCleared>0 ? Math.round(rw.xp*0.4) : 0);
+  const xpRaw = fullReward ? rw.xp : (wavesCleared>0 ? Math.round(rw.xp*0.4) : 0);
+  const xp = Math.round(xpRaw * stats.farmXpMult);
   if(gold>0){ state.gold += gold; state.lifetime.totalGoldEarned += gold; }
   if(crystals>0) state.crystals += crystals;
   if(xp>0) gainXp(xp);
@@ -3318,15 +3350,22 @@ function endGauntlet(retreated){
   // того, зачищено рівно 5 хвиль чи 51: довший забіг ніяк не підвищував шанс.
   // Тепер кожні 10 хвиль ПОНАД поріг дають ще один незалежний прокид (перший
   // успіх зупиняє цикл) — довша витримка реально покращує удачу, а не тільки
-  // грошову нагороду.
+  // грошову нагороду. І починаючи з GAUNTLET_GUARANTEED_RELIC_WAVES хвиль —
+  // реліквія (якщо лишилась ще не здобута) гарантована на 100%, без прокиду:
+  // гравець прямо попросив, щоб довгий, складний забіг завжди давав результат.
   let relicName = null;
   if(fullReward){
-    const relicRolls = 1 + Math.floor((wavesCleared - GAUNTLET_MIN_WAVES_FOR_FULL_REWARD) / 10);
-    for(let i=0; i<relicRolls; i++){
-      if(Math.random() < RELIC_DROP_CHANCE_GAUNTLET){
-        const relic = grantRelic();
-        if(relic){ relicName = L(relic,'name'); addLog('log.relicFound', 'item', {name:relicName}); }
-        break;
+    if(wavesCleared >= GAUNTLET_GUARANTEED_RELIC_WAVES){
+      const relic = grantRelic();
+      if(relic){ relicName = L(relic,'name'); addLog('log.relicFound', 'item', {name:relicName}); }
+    } else {
+      const relicRolls = 1 + Math.floor((wavesCleared - GAUNTLET_MIN_WAVES_FOR_FULL_REWARD) / 10);
+      for(let i=0; i<relicRolls; i++){
+        if(Math.random() < RELIC_DROP_CHANCE_GAUNTLET){
+          const relic = grantRelic();
+          if(relic){ relicName = L(relic,'name'); addLog('log.relicFound', 'item', {name:relicName}); }
+          break;
+        }
       }
     }
   }

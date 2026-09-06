@@ -5,6 +5,35 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.59] — Gauntlet reward bug, guaranteed relic at wave 80, quest-board click fix
+
+### Fixed
+- Gauntlet rewards weren't just low, they were actually missing a whole
+  multiplier: `awardKill()` and boss rewards both scale gold by the
+  player's full gold-multiplier stack (skills, Prestige, Castle, combo,
+  day/night) and XP by the farming XP bonus, but the Gauntlet's reward
+  function never applied either. On a very late-game character where
+  that multiplier stack is enormous, this made Gauntlet rewards fall
+  further and further behind the rest of the game's economy the longer
+  you played — reported directly after a 102-wave clear paid out a
+  trivial amount next to hundreds of billions of banked gold. Both
+  multipliers are now applied, matching every other reward source.
+- The Quest Board's "click gets eaten" bug (a button's DOM node getting
+  replaced out from under a held-down click) had a guard for one
+  specific trigger, but four other functions that also refresh the
+  board — accepting/turning in quests, including the ones the
+  Auto-Quests skill calls once a second — each had their own unguarded
+  refresh call that bypassed it entirely. All four now go through the
+  same shared guard, so a background refresh from automation can no
+  longer swap out a button while it's being clicked. Verified live with
+  a MutationObserver: zero DOM changes while a button is held down
+  through an automation tick, exactly one deferred refresh right after
+  release.
+
+### Changed
+- Long Gauntlet runs now guarantee a relic (if any remain unclaimed) from
+  wave 80 onward, instead of only ever rolling the percentage chance.
+
 ## [0.58] — Three small fixes: upgrade panel, skill tree text, relic odds
 
 ### Fixed
