@@ -5,6 +5,30 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.53] — Revert 0.52's spawn cap, fix the real cause of the lag
+
+### Fixed
+- Reported right after 0.52: monsters and items disappeared from view
+  entirely at very high levels — only pits remained visible. The spawn
+  cap added in 0.52 was based on a wrong assumption: at extreme attack
+  power, every monster within a single frame's movement is genuinely,
+  legitimately killed that same frame (not discarded unseen) — capping
+  spawns was directly cutting real kills and rewards. Reverted that cap
+  entirely.
+- The actual cause of the severe lag: the kill sound effect generated a
+  brand new noise buffer (a few thousand random samples) on every single
+  kill. At the kill rates extreme characters reach, that's millions of
+  random-number calls and megabytes of garbage every second — far
+  heavier than the number of on-screen entities itself. The noise buffer
+  is now generated once and reused, and the sound is throttled to at
+  most one play per ~30ms (well beyond what's audible as distinct hits
+  anyway).
+
+Verified with a live stress test ~37x more extreme than the reported
+character: monsters and pickups are visible again, and the game stayed
+essentially fully responsive (a 3-second wait measured at 3002ms, vs
+3523ms in the previous, far less extreme test before this fix).
+
 ## [0.52] — Optimization: severe lag with automation at extreme levels
 
 ### Fixed
