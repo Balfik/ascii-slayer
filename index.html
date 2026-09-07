@@ -328,19 +328,31 @@
   .forge-sort{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-bottom:10px;}
   .forge-sort-label{color:var(--dim);font-size:11px;margin-right:2px;}
 
-  /* Бібліотека — "розворот книжки": зображення зліва, текст справа;
-     на вузьких екранах переносяться одне під одне (flex-wrap). */
+  /* Бібліотека — "розворот книжки": картинка зліва, текст обтікає її
+     СПРАВА (як звичайний CSS float), а щойно текст стає довшим за
+     картинку — далі йде вже на всю ширину знизу, а не тримається у
+     вузькій колонці праворуч до самого кінця (той порожній прогалин
+     ліворуч під маленькою картинкою й був баг, показаний скріном).
+     display:flow-root замість display:flex — щоб контейнер сам
+     "охопив" висоту float-елемента (звичайна float-пастка: без цього
+     .library-book лишався б заввишки з один лише текст поряд, а
+     картинка вилазила б за межі рамки). На вузьких екранах float
+     скасовуємо — картинка й текст просто йдуть один під одним. */
   .library-book{
-    display:flex;gap:16px;align-items:flex-start;
+    display:flow-root;
     background:#0f1a10;border:1px solid var(--border);border-radius:8px;
-    padding:14px;margin-bottom:10px;flex-wrap:wrap;
+    padding:14px;margin-bottom:10px;
   }
   .library-portrait{
-    flex:0 0 140px;height:140px;border-radius:8px;
+    float:left;margin:0 16px 10px 0;
+    width:140px;height:140px;border-radius:8px;
     display:flex;align-items:center;justify-content:center;
     border:1px solid var(--border);overflow:hidden;
   }
-  .library-text{flex:1 1 240px;min-width:200px;}
+  .library-text{}
+  @media (max-width:760px){
+    .library-portrait{float:none;margin:0 auto 10px;}
+  }
   .library-entry-title{color:var(--gold);font-size:16px;letter-spacing:.5px;margin-bottom:8px;}
   .library-entry-body{color:var(--text);font-size:13px;line-height:1.6;}
   .library-pager{display:flex;align-items:center;justify-content:center;gap:14px;}
@@ -564,7 +576,7 @@
       <span id="termLabel" data-i18n="term.runLabel">світ безкінечно біжить праворуч →</span>
     </div>
     <canvas id="game"></canvas>
-    <button id="abilityBtn" class="ability-btn" data-i18n-title="ability.title">⚡</button>
+    <button id="abilityBtn" class="ability-btn">⚡</button>
     <div class="touch-controls" id="touchControls">
       <div class="dpad" id="dpadTown" hidden>
         <button class="dpad-up" id="btnUp" aria-label="Up" data-i18n-title="touch.up">▲</button>
@@ -645,7 +657,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.73';
+const GAME_VERSION = '0.74';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -1161,7 +1173,7 @@ function abilityReady(){ return abilityCooldownLeft<=0 && abilityTimeLeft<=0; }
 function effectiveAttack(){ return stats.attack * (abilityTimeLeft>0 ? ABILITY_ATTACK_MULT : 1); }
 function activateAbility(){
   if(mode!=='run' || !abilityReady()) return;
-  abilityTimeLeft = ABILITY_DURATION;
+  abilityTimeLeft = ABILITY_DURATION * stats.abilityDurationMult;
   addLog('log.abilityActivated', 'fight');
   sfxLevelUp();
 }
@@ -1170,7 +1182,7 @@ function activateAbility(){
 function updateTimedBuffs(dt){
   if(abilityTimeLeft>0){
     abilityTimeLeft -= dt;
-    if(abilityTimeLeft<=0){ abilityTimeLeft = 0; abilityCooldownLeft = ABILITY_COOLDOWN; }
+    if(abilityTimeLeft<=0){ abilityTimeLeft = 0; abilityCooldownLeft = ABILITY_COOLDOWN * stats.abilityCooldownMult; }
   } else if(abilityCooldownLeft>0){
     abilityCooldownLeft -= dt;
     if(abilityCooldownLeft<0) abilityCooldownLeft = 0;
@@ -1315,7 +1327,7 @@ const I18N = {
     'boss.reward':'Нагорода: {gold}$ · {souls}👹 · {xp} досвіду · {chance}% шанс демонічного предмета',
     'boss.hpLine':'HP: {hp}',
     'boss.timeLeft':'Час: {s}с',
-    'ability.title':'Бойова Лють — Q або клік: ×2 атака на 10с (кулдаун 60с)',
+    'ability.title':'Бойова Лють — Q або клік: ×2 атака на {dur}с (кулдаун {cd}с)',
     'ability.cooldownFmt':'{s}с',
     'log.bossAttempt':'👹 Бій з босом «{name}» почався!',
     'log.bossWin':'🏆 Боса «{name}» переможено! +{gold}$ +{souls}👹 +{xp} досвіду',
@@ -1331,6 +1343,7 @@ const I18N = {
     'term.gauntletLabel':'Гаунтлет — хвилі монстрів, крім відступу вийти не можна',
     'unit.atk':'атаки', 'unit.atkSpeed':'уд/с', 'unit.spd':'швидк.', 'unit.jump':'стрибка',
     'unit.drop':'дропу', 'unit.gold':'золота', 'unit.crit':'криту', 'unit.radius':'радіус', 'unit.crystal':'крист.', 'unit.xp':'досвіду',
+    'unit.abilityDuration':'тривалості Люті', 'unit.abilityCooldown':'кулдауну Люті',
     'unit.castleRes':'видобутку матеріалів Замку', 'unit.soulGain':'душ з босів',
     'skills.farmOnly':'лише під час фарму зони',
     'skills.together':'разом', 'confirm.reset':'Скинути весь прогрес? Дію не можна відмінити.',
@@ -1623,7 +1636,7 @@ const I18N = {
     'boss.reward':'Reward: {gold}$ · {souls}👹 · {xp} XP · {chance}% demonic item chance',
     'boss.hpLine':'HP: {hp}',
     'boss.timeLeft':'Time: {s}s',
-    'ability.title':'Battle Fury — Q or click: ×2 attack for 10s (60s cooldown)',
+    'ability.title':'Battle Fury — Q or click: ×2 attack for {dur}s ({cd}s cooldown)',
     'ability.cooldownFmt':'{s}s',
     'log.bossAttempt':'👹 Battle with boss «{name}» has begun!',
     'log.bossWin':'🏆 Boss «{name}» defeated! +{gold}$ +{souls}👹 +{xp} XP',
@@ -1639,6 +1652,7 @@ const I18N = {
     'term.gauntletLabel':'Gauntlet — waves of monsters, no early exit except retreat',
     'unit.atk':'attack', 'unit.atkSpeed':'atk/s', 'unit.spd':'speed', 'unit.jump':'jump',
     'unit.drop':'drop', 'unit.gold':'gold', 'unit.crit':'crit', 'unit.radius':'radius', 'unit.crystal':'crystals', 'unit.xp':'xp',
+    'unit.abilityDuration':'Fury duration', 'unit.abilityCooldown':'Fury cooldown',
     'unit.castleRes':'Castle material gain', 'unit.soulGain':'souls from bosses',
     'skills.farmOnly':'zone-farming only',
     'skills.together':'total', 'confirm.reset':'Reset all progress? This cannot be undone.',
@@ -1885,6 +1899,18 @@ function rarityColor(r){ return RARITY_COLOR[r] || RARITY_COLOR.common; }
 function formatNum(n){
   const sign = n<0 ? '-' : '';
   n = Math.abs(Math.round(n));
+  // Понад останню іменовану одиницю (1т=1e12) число росте вже
+  // ЕКСПОНЕНЦІЙНО без стелі (найпомітніше — ціна заточки, що росте як
+  // 1.35^рівень) — на екстремальних рівнях заточки (сотні+, особливо
+  // після "На всі"/автозаточки за багато годин) саме n/1e12 могло
+  // вилізти за 1e21. ECMAScript-специфікація Number.toFixed() для чисел
+  // ≥1e21 сама тихо повертає "сире" експоненційне представлення (усі ~17
+  // значущих цифр мантиси, БЕЗ округлення до 1 знака) — звідси й жах на
+  // кшталт "1.7914194590431863e+28т$" замість охайного числа. Фікс:
+  // власна, контрольована наукова нотація (2 знаки мантиси) для всього,
+  // що не влазить у "т" адекватно — задовго до того, як toFixed() сам
+  // зламався б.
+  if(n >= 1e15) return sign + n.toExponential(2).replace('e+', 'e');
   const units = [[1e12,'т'],[1e9,'млрд'],[1e6,'м'],[1e3,'к']];
   for(const [v,suf] of units){
     if(n >= v){
@@ -2535,7 +2561,8 @@ const SKILL_TREE = {
       {id:'c1', name:'Жага крові',      name_en:'Bloodlust',      desc:'+0.4% сили атаки за рівень',            desc_en:'+0.4% attack power per level',        baseCost:1, costStep:0.15, maxLevel:MAX_SKILL_LEVEL, effect:{atkPct:0.4}},
       {id:'c2', name:'Швидкі руки',     name_en:'Quick Hands',    desc:'+0.006 удар/с за рівень',               desc_en:'+0.006 attacks/s per level',           baseCost:1, costStep:0.15, maxLevel:MAX_SKILL_LEVEL, effect:{atkSpeedFlat:0.006}, requires:'c1'},
       {id:'c3', name:'Критичний удар',  name_en:'Critical Strike',desc:'+0.5% шанс завдати x2 шкоди за рівень', desc_en:'+0.5% chance to deal x2 damage per level', baseCost:2, costStep:0.25, maxLevel:MAX_SKILL_LEVEL, effect:{critChance:0.5}, requires:'c2'},
-      {id:'c4', name:'Берсерк',         name_en:'Berserk',        desc:'+0.8% сили атаки за рівень',            desc_en:'+0.8% attack power per level',         baseCost:3, costStep:0.35, maxLevel:MAX_SKILL_LEVEL, effect:{atkPct:0.8}, requires:'c3'}
+      {id:'c4', name:'Берсерк',         name_en:'Berserk',        desc:'+0.8% сили атаки за рівень',            desc_en:'+0.8% attack power per level',         baseCost:3, costStep:0.35, maxLevel:MAX_SKILL_LEVEL, effect:{atkPct:0.8}, requires:'c3'},
+      {id:'c5', name:'Довга Лють',      name_en:'Prolonged Fury', desc:'+1% тривалості Бойової Люті, -0.5% кулдауну Люті за рівень (кулдаун — до -70%)', desc_en:'+1% Battle Fury duration, -0.5% Fury cooldown per level (cooldown down to -70%)', baseCost:4, costStep:0.45, maxLevel:MAX_SKILL_LEVEL, effect:{abilityDurationPct:1, abilityCooldownPct:0.5}, requires:'c4'}
     ]
   },
   speed: {
@@ -2544,8 +2571,7 @@ const SKILL_TREE = {
       {id:'s1', name:'Легкі ноги',      name_en:'Light Feet',     desc:'+0.4% швидкості бігу за рівень',        desc_en:'+0.4% run speed per level',            baseCost:1, costStep:0.15, maxLevel:MAX_SKILL_LEVEL, effect:{spdPct:0.4}},
       {id:'s2', name:'Довгий стрибок',  name_en:'Long Jump',      desc:'+0.8% тривалості стрибка за рівень',    desc_en:'+0.8% jump duration per level',        baseCost:1, costStep:0.15, maxLevel:MAX_SKILL_LEVEL, effect:{jumpPct:0.8}, requires:'s1'},
       {id:'s3', name:'Магніт монет',    name_en:'Coin Magnet',    desc:'+0.3 клітини радіусу збору за рівень',  desc_en:'+0.3 tiles of pickup radius per level',baseCost:2, costStep:0.25, maxLevel:MAX_SKILL_LEVEL, effect:{magnetReach:0.3}, requires:'s2'},
-      {id:'s4', name:'Вітер у спину',   name_en:'Tailwind',       desc:'+0.6% швидкості бігу за рівень',        desc_en:'+0.6% run speed per level',            baseCost:3, costStep:0.35, maxLevel:MAX_SKILL_LEVEL, effect:{spdPct:0.6}, requires:'s3'},
-      {id:'s5', name:'Політ над прірвою', name_en:'Flight over the Abyss', desc:'Ігноруй ями — персонаж завжди пролітає їх, без стрибка', desc_en:'Ignore pits — the character always flies over them, no jump needed', baseCost:10, costStep:0, maxLevel:1, effect:{ignorePits:1}, requiresPrestige:true}
+      {id:'s4', name:'Вітер у спину',   name_en:'Tailwind',       desc:'+0.6% швидкості бігу за рівень',        desc_en:'+0.6% run speed per level',            baseCost:3, costStep:0.35, maxLevel:MAX_SKILL_LEVEL, effect:{spdPct:0.6}, requires:'s3'}
     ]
   },
   luck: {
@@ -2572,7 +2598,11 @@ const SKILL_TREE = {
       {id:'a2', name:'Без акробатики', name_en:'No More Acrobatics', desc:'Квести на стрибки більше не з\'являються на дошці оголошень (ефект зникає при Переродженні, як і всі звичайні навички)', desc_en:"Jump quests stop appearing on the board (effect ends on Prestige, like all regular skills)", baseCost:50, costStep:0, maxLevel:1, effect:{noJumpQuests:1}, requires:'a1'},
       {id:'a3', name:'Автоковаль', name_en:'Auto-Smith', desc:'Дозволяє увімкнути автозаточку предметів у Кузні — лише за золото (не за душі демонів), окремий перемикач у Кузні', desc_en:'Unlocks auto-enchanting items at the Forge — gold only (never demonic souls), separate on/off switch in the Forge', baseCost:50, costStep:0, maxLevel:1, effect:{autoEnchantGold:1}},
       {id:'a4', name:'Автотренер', name_en:'Auto-Trainer', desc:'Дозволяє увімкнути автопрокачку сили атаки/швидкості бігу/швидкості атаки — лише за золото (не за кристали, удача не автопрокачується), окремий перемикач у панелі "Прокачка"', desc_en:'Unlocks auto-upgrading attack/run speed/attack speed — gold only (never crystals, luck is not auto-upgraded), separate on/off switch in the Upgrades panel', baseCost:50, costStep:0, maxLevel:1, effect:{autoUpgradeGold:1}},
-      {id:'a5', name:'Автостратег', name_en:'Auto-Strategist', desc:'Дозволяє увімкнути автоматичний розподіл вільних очок навичок по всьому дереву (по порядку гілок, згори вниз) — окремий перемикач у Дереві навичок', desc_en:'Unlocks automatically spending free skill points across the whole tree (branch by branch, top to bottom) — separate on/off switch in the Skill Tree', baseCost:100, costStep:0, maxLevel:1, effect:{autoSkillSpend:1}}
+      {id:'a5', name:'Автостратег', name_en:'Auto-Strategist', desc:'Дозволяє увімкнути автоматичний розподіл вільних очок навичок по всьому дереву (по порядку гілок, згори вниз) — окремий перемикач у Дереві навичок', desc_en:'Unlocks automatically spending free skill points across the whole tree (branch by branch, top to bottom) — separate on/off switch in the Skill Tree', baseCost:100, costStep:0, maxLevel:1, effect:{autoSkillSpend:1}},
+      // id лишився 's5' (з часів, коли цей вузол жив у гілці бігуна) —
+      // НЕ перейменовувати: гравці, що вже купили його раніше, тримають
+      // прогрес у state.skills.s5, і зміна id "загубила" б їм цей вузол.
+      {id:'s5', name:'Політ над прірвою', name_en:'Flight over the Abyss', desc:'Ігноруй ями — персонаж завжди пролітає їх, без стрибка', desc_en:'Ignore pits — the character always flies over them, no jump needed', baseCost:10, costStep:0, maxLevel:1, effect:{ignorePits:1}, requiresPrestige:true}
     ]
   }
 };
@@ -4238,7 +4268,8 @@ const stats = {
   attack:BASE_ATTACK, speed:BASE_SPEED, atkSpeed:BASE_ATKSPEED, goldMult:1, dropChance:0.08,
   jumpDuration:JUMP_DURATION_BASE, critChance:0, pickupReach:0, crystalBonus:0, ignorePits:false,
   castleResourceMult:1, soulMult:1, bonusXpMult:1, autoQuest:false, noJumpQuests:false,
-  autoEnchantGold:false, autoUpgradeGold:false, autoSkillSpend:false
+  autoEnchantGold:false, autoUpgradeGold:false, autoSkillSpend:false,
+  abilityDurationMult:1, abilityCooldownMult:1
 };
 
 let distanceCols = 0; // "одометр" — скільки пройдено за все життя забігу, росте ЗАВЖДИ, ніщо його не заморожує й не переставляє
@@ -4336,7 +4367,7 @@ function goldMultEff(){ return stats.goldMult * (1+comboMultBonus()) * dayNightG
    СТАТИ
    ===================================================================== */
 function computeSkillBonuses(){
-  const b = {atkPct:0, atkSpeedFlat:0, spdPct:0, jumpPct:0, dropPct:0, goldPct:0, critChance:0, magnetReach:0, crystalBonus:0, ignorePits:0, farmGoldPct:0, farmXpPct:0, farmDropPct:0, autoQuest:0, noJumpQuests:0, autoEnchantGold:0, autoUpgradeGold:0, autoSkillSpend:0};
+  const b = {atkPct:0, atkSpeedFlat:0, spdPct:0, jumpPct:0, dropPct:0, goldPct:0, critChance:0, magnetReach:0, crystalBonus:0, ignorePits:0, farmGoldPct:0, farmXpPct:0, farmDropPct:0, autoQuest:0, noJumpQuests:0, autoEnchantGold:0, autoUpgradeGold:0, autoSkillSpend:0, abilityDurationPct:0, abilityCooldownPct:0};
   for(const branchKey in SKILL_TREE){
     for(const node of SKILL_TREE[branchKey].nodes){
       const lvl = state.skills[node.id] || 0;
@@ -4360,6 +4391,8 @@ function computeSkillBonuses(){
       if(e.autoEnchantGold) b.autoEnchantGold += e.autoEnchantGold*lvl;
       if(e.autoUpgradeGold) b.autoUpgradeGold += e.autoUpgradeGold*lvl;
       if(e.autoSkillSpend) b.autoSkillSpend += e.autoSkillSpend*lvl;
+      if(e.abilityDurationPct) b.abilityDurationPct += e.abilityDurationPct*lvl;
+      if(e.abilityCooldownPct) b.abilityCooldownPct += e.abilityCooldownPct*lvl;
     }
   }
   return b;
@@ -4464,6 +4497,12 @@ function recomputeStats(){
   stats.autoEnchantGold = skillB.autoEnchantGold > 0;
   stats.autoUpgradeGold = skillB.autoUpgradeGold > 0;
   stats.autoSkillSpend = skillB.autoSkillSpend > 0;
+  // Бойова Лють (v0.72) — тривалість росте без стелі (як і решта %-ефектів
+  // дерева), кулдаун натомість МАЄ стелю (та сама логіка, що й
+  // bossCooldownPct/prestigeB.bossCooldownPct вище) — інакше на дуже
+  // високих рівнях кулдаун міг би дійти до нуля чи від'ємного.
+  stats.abilityDurationMult = 1 + skillB.abilityDurationPct/100;
+  stats.abilityCooldownMult = 1 - Math.min(70, skillB.abilityCooldownPct)/100;
   stats.farmXpMult = farmXpMult;
   stats.bonusXpMult = (1 + prestigeB.xpPct/100) * (1 + castleB.xpPct/100) * (1 + companionXpPct/100);
   stats.castleResourceMult = 1 + castleB.resourceMult/100;
@@ -5938,6 +5977,11 @@ function skillTotalEffectText(node, lvl){
   if(e.farmGoldPct) parts.push(`+${(e.farmGoldPct*lvl).toFixed(1)}% ${t('unit.gold')} (${t('skills.farmOnly')})`);
   if(e.farmXpPct) parts.push(`+${(e.farmXpPct*lvl).toFixed(1)}% ${t('unit.xp')} (${t('skills.farmOnly')})`);
   if(e.farmDropPct) parts.push(`+${(e.farmDropPct*lvl).toFixed(1)}% ${t('unit.drop')} (${t('skills.farmOnly')})`);
+  if(e.abilityDurationPct) parts.push(`+${(e.abilityDurationPct*lvl).toFixed(1)}% ${t('unit.abilityDuration')}`);
+  if(e.abilityCooldownPct){
+    const capped = Math.min(70, e.abilityCooldownPct*lvl);
+    parts.push(`-${capped.toFixed(1)}% ${t('unit.abilityCooldown')}${capped>=70?` (${t('prestige.capped')})`:''}`);
+  }
   return parts.length ? ` · <span style="color:var(--accent)">${t('skills.together')} ${parts.join(', ')}</span>` : '';
 }
 function skillLockInfo(node){
@@ -7178,6 +7222,14 @@ function updateHud(){
   }
 
   const abilityBtn = document.getElementById('abilityBtn');
+  // Довга Лють (c5) міняє реальну тривалість/кулдаун — тултип рахуємо
+  // щокадру з поточних stats.abilityDurationMult/abilityCooldownMult,
+  // а не з тексту-заглушки: інакше після прокачки навички підказка
+  // брехала б про старі 10с/60с.
+  abilityBtn.title = t('ability.title', {
+    dur: (ABILITY_DURATION*stats.abilityDurationMult).toFixed(1),
+    cd: Math.round(ABILITY_COOLDOWN*stats.abilityCooldownMult)
+  });
   if(abilityTimeLeft>0){
     abilityBtn.textContent = t('ability.cooldownFmt', {s:Math.max(1,Math.ceil(abilityTimeLeft))});
     abilityBtn.classList.add('active');

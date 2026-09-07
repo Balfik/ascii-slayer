@@ -5,6 +5,27 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.74] — Battle Fury skill, moved skill, Library float layout, fixed Forge prices
+
+### Added
+- A new skill, "Prolonged Fury" (end of the Combat branch): increases
+  Battle Fury's duration and shortens its cooldown per level.
+
+### Changed
+- "Flight over the Abyss" (auto-ignore pits) moved from the Runner
+  branch to the Automation branch, where it fits by theme. Already
+  bought levels are unaffected.
+- The Library's image and text now behave like a normal floated
+  layout: text wraps beside the portrait and only drops to full width
+  once it runs past the image's height, instead of staying squeezed
+  into a narrow column the whole way down with empty space beside it.
+
+### Fixed
+- The Forge showed a wall of raw scientific notation for enchant
+  costs at extreme enchant levels (a side effect of `Number.toFixed()`
+  itself falling back to unrounded notation past a certain magnitude).
+  Costs now format cleanly at any scale.
+
 ## [0.73] — Companions: from one fixed bonus to a full system
 
 ### Added
