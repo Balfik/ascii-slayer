@@ -160,6 +160,25 @@
 
   .stage{max-width:980px;margin:0 auto 4px;position:relative;}
 
+  /* Кнопка активної здібності ("Бойова Лють") — НАВМИСНО не всередині
+     .touch-controls (те гейтиться @media (pointer:coarse) і призначене
+     лише для міського керування) — ця кнопка потрібна на БУДЬ-якому
+     пристрої, завжди видима поверх канвасу під час бігу. Текст всередині
+     міняється лише через textContent (⚡ / число секунд) в updateHud(),
+     сам елемент ніколи не перебудовується — той самий безпечний патерн,
+     що й #fightBar/#comboWrap. */
+  .ability-btn{
+    position:absolute; right:8px; bottom:8px; z-index:6;
+    width:44px; height:44px; border-radius:50%;
+    background:rgba(18,36,23,.88); border:2px solid var(--accent);
+    color:var(--accent); font-family:inherit; font-size:15px; font-weight:bold;
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+    line-height:1; padding:0;
+  }
+  .ability-btn:disabled{ opacity:.45; cursor:default; border-color:var(--dim); color:var(--dim); }
+  .ability-btn.active{ background:var(--accent); color:#0a0a0a; box-shadow:0 0 16px var(--accent); }
+  .ability-btn[hidden]{ display:none; }
+
   /* Тач-керування — тільки на пристроях з "грубим" (пальцевим) вводом,
      незалежно від ширини вікна (pointer:coarse — не media max-width, щоб
      тачскрін-ноутбук з мишкою його не бачив, а планшет у landscape бачив).
@@ -543,6 +562,7 @@
       <span id="termLabel" data-i18n="term.runLabel">світ безкінечно біжить праворуч →</span>
     </div>
     <canvas id="game"></canvas>
+    <button id="abilityBtn" class="ability-btn" data-i18n-title="ability.title">⚡</button>
     <div class="touch-controls" id="touchControls">
       <div class="dpad" id="dpadTown" hidden>
         <button class="dpad-up" id="btnUp" aria-label="Up" data-i18n-title="touch.up">▲</button>
@@ -623,7 +643,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.71';
+const GAME_VERSION = '0.72';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -1022,7 +1042,7 @@ function updateCompanion(dt){
   if(companionTimer < COMPANION_ATTACK_INTERVAL) return;
   companionTimer -= COMPANION_ATTACK_INTERVAL;
   if(isFighting && fightTarget && fightTarget.hp>0){
-    const dmg = Math.max(1, Math.round(stats.attack*COMPANION_ATTACK_PCT));
+    const dmg = Math.max(1, Math.round(effectiveAttack()*COMPANION_ATTACK_PCT));
     fightTarget.hp -= dmg;
     spawnFloatingText(PLAYER_COL-1, `-${dmg}`, COMPANION_COLOR);
     companionPulse = 0.35;
@@ -1033,6 +1053,74 @@ function updateCompanion(dt){
       fightTarget = null;
     }
   }
+}
+/* Бойова Лють — активна здібність гравця (v0.72). На відміну від решти
+   гри (все тіче саме), тут гравець САМ ловить момент — класичний ідл-
+   гачок "кнопка, яку тиснеш руками" (Cookie Clicker/AdVenture Capitalist).
+   Не чіпаємо stats.attack напряму (довелось би гонятись за кожним місцем,
+   де recomputeStats() міг би це перезаписати) — натомість effectiveAttack()
+   як єдина точка правди для БУДЬ-ЯКОГО розрахунку бойової шкоди гравця
+   (updateFight/processEntities-hitsNeeded/updateCompanion — компаньйон
+   рахує % ВІД сили гравця, тож теж підсилюється разом із нею). */
+const ABILITY_COOLDOWN = 60;   // сек між використаннями
+const ABILITY_DURATION = 10;   // сек дії
+const ABILITY_ATTACK_MULT = 2; // ×2 атака на час дії
+let abilityCooldownLeft = 0;   // >0 — на кулдауні
+let abilityTimeLeft = 0;       // >0 — активна зараз
+function abilityReady(){ return abilityCooldownLeft<=0 && abilityTimeLeft<=0; }
+function effectiveAttack(){ return stats.attack * (abilityTimeLeft>0 ? ABILITY_ATTACK_MULT : 1); }
+function activateAbility(){
+  if(mode!=='run' || !abilityReady()) return;
+  abilityTimeLeft = ABILITY_DURATION;
+  addLog('log.abilityActivated', 'fight');
+  sfxLevelUp();
+}
+// Тикає НЕЗАЛЕЖНО від режиму (update(), не updateRun()) — кулдаун не
+// "заморожується", якщо гравець зайшов у місто чи в бій з босом.
+function updateTimedBuffs(dt){
+  if(abilityTimeLeft>0){
+    abilityTimeLeft -= dt;
+    if(abilityTimeLeft<=0){ abilityTimeLeft = 0; abilityCooldownLeft = ABILITY_COOLDOWN; }
+  } else if(abilityCooldownLeft>0){
+    abilityCooldownLeft -= dt;
+    if(abilityCooldownLeft<0) abilityCooldownLeft = 0;
+  }
+  if(goldRushTimeLeft>0){
+    goldRushTimeLeft -= dt;
+    if(goldRushTimeLeft<0) goldRushTimeLeft = 0;
+  }
+}
+
+/* Золотий Гліф — рідкісна бонусна сутність на дорозі (v0.72), аналог
+   "золотого печива" Cookie Clicker: летить ПОВІТРЯМ (ROW_AIR, той самий
+   рядок, куди гравець підстрибує над мобом/ямою) — щоб забрати, треба
+   САМЕ підстрибнути в момент, коли вона порівняється з гравцем; якщо
+   пробігти повз не стрибаючи — зникає без жодного штрафу (на відміну
+   від ями). Нагорода: миттєвий вибух золота (і зрідка кристалів) +
+   часове вікно ×2 золота з УСІХ джерел (через goldMultEff() — коп,
+   вбивство, гаунтлет, бос, все одразу).
+   Спавниться за КОЛОНКОЮ (як інші сутності дороги, updateSpawns()), а не
+   за реальним часом — так її частота природно узгоджена з рештою
+   спавн-системи й не потребує окремого стеження за offline-прогресом. */
+const GOLDEN_GLYPH_MIN_GAP = 320, GOLDEN_GLYPH_MAX_GAP = 620; // колонок між появами
+const GOLDEN_GLYPH_BUFF_DURATION = 20; // сек ×2 золота після підбору
+const GOLDEN_GLYPH_GOLD_MULT = 2;
+const GOLDEN_GLYPH_COLOR = '#fff36b';
+let goldRushTimeLeft = 0; // >0 — активний баф ×2 золота
+function goldRushMult(){ return goldRushTimeLeft>0 ? GOLDEN_GLYPH_GOLD_MULT : 1; }
+function collectGoldenGlyph(){
+  goldRushTimeLeft = GOLDEN_GLYPH_BUFF_DURATION;
+  const burst = Math.round(150 * tierRewardScale(getTier()) * goldMultEff());
+  state.gold += burst;
+  state.lifetime.totalGoldEarned += burst;
+  spawnFloatingText(PLAYER_COL, `+${formatExact(burst)}$`, GOLDEN_GLYPH_COLOR);
+  if(Math.random() < 0.3){
+    const bonus = randInt(1,3);
+    state.crystals += bonus;
+    spawnFloatingText(PLAYER_COL-1, `+${bonus}◆`, '#4dd2ff');
+  }
+  addLog('log.goldenGlyph', 'item', {gold:burst});
+  sfxItem('legendary');
 }
 const BIOMES = ['Околиця села','Темний ліс','Стародавні руїни','Печери гоблінів','Прокляті болота','Вулканічні надра','Крижані вершини','Безодня','Серце Пітьми','Забутий Вимір','Царство Хаосу','Кінець Усього'];
 const BIOMES_EN = ['Village Outskirts','Dark Forest','Ancient Ruins','Goblin Caves','Cursed Swamps','Volcanic Depths','Frozen Peaks','The Abyss','Heart of Darkness','Forgotten Dimension','Realm of Chaos','The End of All'];
@@ -1061,6 +1149,7 @@ const I18N = {
     'modal.libraryTitle':'БІБЛІОТЕКА', 'btn.library':'📚 Бібліотека',
     'library.tab.world':'🌍 Світ', 'library.tab.castle':'🏰 Замок', 'library.tab.monsters':'👹 Монстри',
     'library.tab.bosses':'💀 Боси', 'library.tab.items':'⚔ Спорядження', 'library.tab.relics':'◆ Реліквії',
+    'library.tab.mechanics':'⚡ Механіки',
     'library.pageOf':'{cur} / {total}',
     'touch.up':'Вперед', 'touch.down':'Назад', 'touch.left':'Ліворуч', 'touch.right':'Праворуч',
     'touch.interact':'Взаємодія', 'touch.jump':'Стрибок',
@@ -1129,6 +1218,8 @@ const I18N = {
     'boss.reward':'Нагорода: {gold}$ · {souls}👹 · {xp} досвіду · {chance}% шанс демонічного предмета',
     'boss.hpLine':'HP: {hp}',
     'boss.timeLeft':'Час: {s}с',
+    'ability.title':'Бойова Лють — Q або клік: ×2 атака на 10с (кулдаун 60с)',
+    'ability.cooldownFmt':'{s}с',
     'log.bossAttempt':'👹 Бій з босом «{name}» почався!',
     'log.bossWin':'🏆 Боса «{name}» переможено! +{gold}$ +{souls}👹 +{xp} досвіду',
     'log.bossWinDemonic':'✨ Демонічний трофей: {name}! ✨',
@@ -1166,6 +1257,8 @@ const I18N = {
     'log.itemFound':'💎 Знайдено предмет: {name} ({rarity})',
     'log.legendaryFound':'✨ ЛЕГЕНДАРНА ЗНАХІДКА: {name}! ✨',
     'log.kill':'Вбито: {name} (+{gold} золота, +{xp} досвіду)',
+    'log.abilityActivated':'⚡ Бойова Лють! ×2 атака на 10с.',
+    'log.goldenGlyph':'✦ Золотий Гліф спіймано! +{gold} золота, ×2 золото на 20с.',
     'log.pitFall':'Ти провалився в яму і трохи забарився.',
     'log.encounter':'Зустрінуто {name}! Бій...',
     'log.enterTown':'Ти зайшов у місто.',
@@ -1357,6 +1450,7 @@ const I18N = {
     'modal.libraryTitle':'LIBRARY', 'btn.library':'📚 Library',
     'library.tab.world':'🌍 World', 'library.tab.castle':'🏰 Castle', 'library.tab.monsters':'👹 Monsters',
     'library.tab.bosses':'💀 Bosses', 'library.tab.items':'⚔ Gear', 'library.tab.relics':'◆ Relics',
+    'library.tab.mechanics':'⚡ Mechanics',
     'library.pageOf':'{cur} / {total}',
     'touch.up':'Up', 'touch.down':'Down', 'touch.left':'Left', 'touch.right':'Right',
     'touch.interact':'Interact', 'touch.jump':'Jump',
@@ -1425,6 +1519,8 @@ const I18N = {
     'boss.reward':'Reward: {gold}$ · {souls}👹 · {xp} XP · {chance}% demonic item chance',
     'boss.hpLine':'HP: {hp}',
     'boss.timeLeft':'Time: {s}s',
+    'ability.title':'Battle Fury — Q or click: ×2 attack for 10s (60s cooldown)',
+    'ability.cooldownFmt':'{s}s',
     'log.bossAttempt':'👹 Battle with boss «{name}» has begun!',
     'log.bossWin':'🏆 Boss «{name}» defeated! +{gold}$ +{souls}👹 +{xp} XP',
     'log.bossWinDemonic':'✨ Demonic trophy: {name}! ✨',
@@ -1462,6 +1558,8 @@ const I18N = {
     'log.itemFound':'💎 Item found: {name} ({rarity})',
     'log.legendaryFound':'✨ LEGENDARY FIND: {name}! ✨',
     'log.kill':'Killed: {name} (+{gold} gold, +{xp} XP)',
+    'log.abilityActivated':'⚡ Battle Fury! ×2 attack for 10s.',
+    'log.goldenGlyph':'✦ Golden Glyph caught! +{gold} gold, ×2 gold for 20s.',
     'log.pitFall':'You fell into a pit and lost some time.',
     'log.encounter':'Encountered {name}! Fighting...',
     'log.enterTown':'You entered the town.',
@@ -1975,6 +2073,20 @@ const LIBRARY_WORLD_PAGES = [
   {title:'Монстри, золото та інші незручності', title_en:'Monsters, gold, and other inconveniences',
     body:'Монстри трапляються дорогою здебільшого не тому, що тебе ненавидять, а тому, що стоять там, де й так є лише один шлях. Золото й кристали сиплються з їхніх кишень так охоче, ніби вони самі не проти позбутися тягаря. Час від часу трапляються ями — і тут доводиться визнати чесно: якщо в тебе колись і був план, стрибати через них точно в нього не входило.',
     body_en:"Monsters show up along the way — mostly not because they hate you, but because they're standing where the road happens to be, and there's only one road. Gold and crystals spill out of their pockets so readily it's like they weren't too attached to the weight anyway. Pits show up now and then too — and here's the honest truth: if you ever had a plan, jumping over them definitely wasn't part of it."}
+];
+// Механіки (v0.72) — кожна НОВА ігрова механіка (не предмет/моб/бос)
+// теж дістає власну сторінку в Бібліотеці з поясненням, що саме вона
+// робить, окрім самої лише атмосферної історії — гравець прямо просив
+// не лишати нічого нового недокументованим.
+const LIBRARY_MECHANICS = [
+  {id:'goldenGlyph', glyph:'✦', color:'#fff36b',
+    title:'Золотий Гліф', title_en:'Golden Glyph',
+    body:'Зрідка десь у повітрі над дорогою спалахує золотий вогник — ніхто не знає, звідки він береться і чому летить саме над головою, а не просто лежить на землі, як усе інше золото. Може, це крихта чужого багатства, що заблукала дорогою в інший вимір. Може, просто дражниться. Спіймати його можна лише одним способом: підстрибнути рівно в ту мить, коли він порівняється з тобою (як над мобом чи ямою) — пробігти повз не стрибаючи теж можна, просто нічого не отримаєш, і жодного штрафу за це немає. Нагорода — миттєвий вибух золота (і часом кілька кристалів на додачу), а ще на 20 секунд усе зароблене золото — з чого завгодно, коп, бій, Гаунтлет, бос — подвоюється.',
+    body_en:"Every so often a golden spark flares up somewhere in the air over the road — nobody knows where it comes from, or why it flies right above your head instead of just lying on the ground like every other coin. Maybe it's a stray crumb of someone else's fortune that lost its way into another dimension. Maybe it's just teasing you. There's exactly one way to catch it: jump at the exact moment it lines up with you (same as jumping over a monster or a pit) — running past without jumping is fine too, you simply get nothing, and there's no penalty either way. The reward is an instant burst of gold (sometimes a few crystals too), plus every bit of gold you earn from anything — running, fighting, the Gauntlet, a boss — is doubled for the next 20 seconds."},
+  {id:'battleFury', glyph:'⚡', color:'#ffb347',
+    title:'Бойова Лють', title_en:'Battle Fury',
+    body:'Десь у глибині навіть найіржавішої зброї ховається лють — та, що прокидається, лише коли її покликати самому (клавіша Q, або клік по блискавці внизу екрана). На 10 секунд кожен удар — твій і твого компаньйона — б\'є вдвічі сильніше, досить, щоб проламати навіть ту шкуру, яка інакше витримала б кілька ударів поспіль. Потім лють вгамовується — і навіть найзапальнішому характеру потрібно 60 секунд перепочинку, перш ніж покликати її знову.',
+    body_en:"Somewhere deep inside even the rustiest weapon, a fury sleeps — one that only wakes when called on purpose (press Q, or click the lightning bolt at the bottom of the screen). For 10 seconds, every hit — yours and your companion's — lands twice as hard, enough to crack open even the kind of hide that would otherwise shrug off several hits in a row. Then the fury settles back down — and even the hottest temper needs 60 seconds to catch its breath before being called again."}
 ];
 const LIBRARY_CASTLE_PAGES = [
   {title:'Руїни, що чекали', title_en:'Ruins that waited',
@@ -4007,6 +4119,7 @@ let distanceCols = 0; // "одометр" — скільки пройдено з
 let zoneTier = null;
 let entities = [];
 let nextMonsterSpawnCol = 0, nextCoinSpawnCol = 0, nextPitSpawnCol = 0, nextWoodSpawnCol = 0;
+let nextGoldenGlyphSpawnCol = randInt(GOLDEN_GLYPH_MIN_GAP, GOLDEN_GLYPH_MAX_GAP);
 let isJumping = false, jumpTimer = 0;
 let isFighting = false, fightTarget = null, fightAttackTimer = 0;
 let isStumbling = false, stumbleTimer = 0;
@@ -4087,7 +4200,7 @@ const NIGHT_GOLD_BONUS_PCT = 10;
 function dayPhase(){ return (bgTime % DAY_CYCLE_SEC) / DAY_CYCLE_SEC; }
 function nightAmount(){ return (1 - Math.cos(dayPhase()*Math.PI*2))/2; } // 0=день, 1=глибока ніч
 function dayNightGoldMult(){ return 1 + (nightAmount()*NIGHT_GOLD_BONUS_PCT)/100; }
-function goldMultEff(){ return stats.goldMult * (1+comboMultBonus()) * dayNightGoldMult(); }
+function goldMultEff(){ return stats.goldMult * (1+comboMultBonus()) * dayNightGoldMult() * goldRushMult(); }
 
 /* =====================================================================
    СТАТИ
@@ -4389,6 +4502,9 @@ function spawnPitAt(col){
 function spawnWoodAt(col){
   entities.push({type:'wood', worldCol:col, value:randInt(1,3), state:'pending'});
 }
+function spawnGoldenGlyphAt(col){
+  entities.push({type:'goldenGlyph', worldCol:col, state:'pending'});
+}
 // ВІДКОЧЕНО (v0.53): у v0.52 тут стояв MAX_SPAWN_PER_TICK-ліміт,
 // побудований на ХИБНОМУ припущенні, що більшість заспавнених сутностей
 // "однаково не встигали б вплинути на гру". Насправді processEntities()
@@ -4418,6 +4534,10 @@ function updateSpawns(){
   while(nextWoodSpawnCol < horizon){
     spawnWoodAt(nextWoodSpawnCol);
     nextWoodSpawnCol += randRange(16,28);
+  }
+  while(nextGoldenGlyphSpawnCol < horizon){
+    spawnGoldenGlyphAt(nextGoldenGlyphSpawnCol);
+    nextGoldenGlyphSpawnCol += randRange(GOLDEN_GLYPH_MIN_GAP, GOLDEN_GLYPH_MAX_GAP);
   }
 }
 function screenCol(e){ return e.worldCol - distanceCols + PLAYER_COL; }
@@ -4553,6 +4673,17 @@ function processEntities(){
       }
       continue;
     }
+    // Золотий Гліф летить ПОВІТРЯМ (на відміну від ям, тут навпаки: НЕ
+    // штраф за пропуск, а нагорода лише якщо СПЕЦІАЛЬНО підстрибнути
+    // рівно в потрібну мить) — символ "предмета, який треба підстрибнути
+    // забрати" гравець прямо просив.
+    if(e.type==='goldenGlyph'){
+      if(screenCol(e) <= PLAYER_COL){
+        if(isJumping) collectGoldenGlyph();
+        e.state = 'done';
+      }
+      continue;
+    }
     if(e.state==='fighting') continue;
     if(screenCol(e) <= PLAYER_COL){
       if(isJumping){
@@ -4573,7 +4704,7 @@ function processEntities(){
         // 'pending', спробуємо знову наступного кадру, коли поточний бій
         // завершиться (isFighting стане false).
       } else {
-        const hitsNeeded = Math.ceil(e.hp / Math.max(1,stats.attack));
+        const hitsNeeded = Math.ceil(e.hp / Math.max(1,effectiveAttack()));
         if(hitsNeeded <= 1){
           awardKill(e, false);
           e.state = 'done';
@@ -4597,7 +4728,8 @@ function updateFight(dt){
   if(fightAttackTimer >= interval){
     fightAttackTimer -= interval;
     const isCrit = Math.random() < stats.critChance;
-    const dmg = isCrit ? stats.attack*2 : stats.attack;
+    const atk = effectiveAttack();
+    const dmg = isCrit ? atk*2 : atk;
     fightTarget.hp -= dmg;
     spawnFloatingText(PLAYER_COL+1, isCrit?`-${dmg.toFixed(0)} ${t('combat.crit')}`:`-${dmg.toFixed(0)}`, isCrit?'#ffb347':'#ff8080');
     sfxHit();
@@ -4875,6 +5007,15 @@ function renderRun(){
     } else if(e.type==='wood'){
       ctx.fillStyle = COLORS.wood;
       ctx.fillText('%', xForCol(col), yForRow(ROW_GROUND));
+    } else if(e.type==='goldenGlyph'){
+      // Летить у ROW_AIR (той самий рядок, куди підстрибує гравець) —
+      // саме тому її можна забрати ЛИШЕ стрибком, не пробігом повз.
+      const pulse = 0.6 + 0.4*Math.sin(bgTime*8);
+      ctx.save();
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = GOLDEN_GLYPH_COLOR;
+      ctx.fillText('✦', xForCol(col), yForRow(ROW_AIR));
+      ctx.restore();
     } else {
       ctx.fillStyle = e.type==='crystal' ? COLORS.crystal : COLORS.coin;
       ctx.fillText(e.type==='crystal' ? '*' : '$', xForCol(col), yForRow(ROW_GROUND));
@@ -5158,6 +5299,9 @@ function updateModeUiText(){
   // й окремо ховається/показується в renderTown() за nearBuilding.
   document.getElementById('dpadTown').hidden = mode!=='town';
   if(mode!=='town') document.getElementById('btnInteract').hidden = true;
+  // Здібність активується лише на дорозі — у місті/бою з босом кнопка
+  // просто ховається (а не гасне) щоб не займати місце дарма.
+  document.getElementById('abilityBtn').hidden = mode!=='run';
 }
 function enterTown(){
   if(mode==='town') return;
@@ -6126,7 +6270,7 @@ function renderBestiary(){
    лору = одна "сторінка книжки" в межах категорії). Дані — LIBRARY_*
    вище, поряд з MONSTER_DESC/BOSS_DESC.
    ===================================================================== */
-const LIBRARY_TABS = ['world','castle','monsters','bosses','items','relics'];
+const LIBRARY_TABS = ['world','castle','monsters','bosses','items','relics','mechanics'];
 let libraryTab = 'world';
 let libraryPage = 0;
 function openLibrary(){
@@ -6233,6 +6377,13 @@ function libraryEntriesForTab(tab){
         imageHtml:libraryPortrait(libraryRelicIconSvg(r.id, '#c77dff'), '#c77dff')
       };
     });
+  }
+  if(tab==='mechanics'){
+    return LIBRARY_MECHANICS.map(m=>({
+      title:L(m,'title'),
+      body:L(m,'body'),
+      imageHtml:libraryPortrait(`<span style="color:${m.color};font-family:'Courier New',monospace;font-size:64px;font-weight:bold;text-shadow:0 0 18px ${m.color}99;">${m.glyph}</span>`, m.color)
+    }));
   }
   return [];
 }
@@ -6777,6 +6928,21 @@ function updateHud(){
     if(!fb.textContent) fb.textContent = ' '; // тримає рядок ненульової висоти з першого кадру
   }
 
+  const abilityBtn = document.getElementById('abilityBtn');
+  if(abilityTimeLeft>0){
+    abilityBtn.textContent = t('ability.cooldownFmt', {s:Math.max(1,Math.ceil(abilityTimeLeft))});
+    abilityBtn.classList.add('active');
+    abilityBtn.disabled = true;
+  } else if(abilityCooldownLeft>0){
+    abilityBtn.textContent = t('ability.cooldownFmt', {s:Math.max(1,Math.ceil(abilityCooldownLeft))});
+    abilityBtn.classList.remove('active');
+    abilityBtn.disabled = true;
+  } else {
+    abilityBtn.textContent = '⚡';
+    abilityBtn.classList.remove('active');
+    abilityBtn.disabled = mode!=='run';
+  }
+
   updateUpgradeAfford();
 }
 
@@ -6853,7 +7019,8 @@ let logEntries = [];
 // майбутньому просто не зламає фільтр, і додати його в правильну
 // категорію можна окремо, коли буде час.
 const LOG_CATEGORY = {
-  'log.kill':'combat', 'log.encounter':'combat', 'log.pitFall':'combat',
+  'log.kill':'combat', 'log.encounter':'combat', 'log.pitFall':'combat', 'log.abilityActivated':'combat',
+  'log.goldenGlyph':'loot',
   'log.itemFound':'loot', 'log.itemDuplicate':'loot', 'log.legendaryFound':'loot',
   'log.bossWinDemonic':'loot', 'log.relicFound':'loot',
   'log.achievement':'achievements', 'log.milestoneReached':'achievements',
@@ -7401,7 +7568,7 @@ sfxVolSlider.addEventListener('input', ()=>{
 /* =====================================================================
    ВВІД
    ===================================================================== */
-const HANDLED_CODES = new Set(['KeyW','KeyA','KeyS','KeyD','Space','KeyE','KeyT','ArrowUp','ArrowDown','ArrowLeft','ArrowRight']);
+const HANDLED_CODES = new Set(['KeyW','KeyA','KeyS','KeyD','Space','KeyE','KeyT','KeyQ','ArrowUp','ArrowDown','ArrowLeft','ArrowRight']);
 document.addEventListener('keydown', (e)=>{
   if(e.code==='Escape') closeModal(); // закриває модалку навіть під час друку в полі — не заважає вводу тексту
   // Гравець друкує в текстове поле (напр. логін/пароль у хмарних
@@ -7418,6 +7585,7 @@ document.addEventListener('keydown', (e)=>{
   if(e.code==='Space') tryJump();
   if(e.code==='KeyT') toggleTown();
   if(e.code==='KeyE' && mode==='town') interactBuilding();
+  if(e.code==='KeyQ') activateAbility();
 });
 document.addEventListener('keyup', (e)=>{ keysDown[e.code] = false; });
 document.addEventListener('pointerdown', ensureAudio, {once:true});
@@ -7444,6 +7612,7 @@ bindHoldButton(document.getElementById('btnLeft'), 'KeyA');
 bindHoldButton(document.getElementById('btnRight'), 'KeyD');
 document.getElementById('btnInteract').addEventListener('click', (e)=>{ e.preventDefault(); ensureAudio(); if(mode==='town') interactBuilding(); });
 document.getElementById('btnJump').addEventListener('click', (e)=>{ e.preventDefault(); ensureAudio(); tryJump(); });
+document.getElementById('abilityBtn').addEventListener('click', (e)=>{ e.preventDefault(); ensureAudio(); activateAbility(); });
 document.getElementById('townBtn').addEventListener('click', ()=>{ ensureAudio(); toggleTown(); });
 document.getElementById('skillsBtn').addEventListener('click', ()=>{ ensureAudio(); openSkills(); });
 document.getElementById('achievementsBtn').addEventListener('click', ()=>{ ensureAudio(); openAchievements(); });
@@ -7509,6 +7678,7 @@ function update(dt){
   const __t4 = performance.now();
   autoManageSkillSpend(dt);
   const __t5 = performance.now();
+  updateTimedBuffs(dt);
   if(mode==='town'){
     updateTown(dt);
   } else if(mode==='boss'){

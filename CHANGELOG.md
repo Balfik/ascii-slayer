@@ -5,6 +5,19 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.72] — Golden Glyph and Battle Fury
+
+### Added
+- **Golden Glyph**: a rare glowing star occasionally flies above the road.
+  Jump at just the right moment to grab it (running past without jumping
+  is fine too, no penalty) for an instant burst of gold, sometimes a few
+  crystals, and 20 seconds of double gold from every source.
+- **Battle Fury**: the first ability you trigger yourself — a button
+  (or the Q key) doubles your attack for 10 seconds, then a 60-second
+  cooldown. Always visible during a run, on both desktop and mobile.
+- Both are now documented in the Library, under a new "Mechanics" tab,
+  with their own icon and a full explanation of what they do.
+
 ## [0.71] — Run window 50% taller; fixed the overflowing fight-status line
 
 ### Changed
