@@ -130,6 +130,7 @@
   #prestigeBtn, #characterBtn{color:var(--crystal);}
   #bestiaryBtn{color:var(--text);}
   #libraryBtn{color:var(--legendary);}
+  #companionsBtn{color:#7dffb8;}
   #bossPortalBtn{color:#ff6b6b;}
   #worldMapHudBtn{color:var(--accent);}
   #leaderboardBtn{color:var(--crystal);}
@@ -549,6 +550,7 @@
     <button id="characterBtn" data-i18n="btn.character">📋 Персонаж</button>
     <button id="bestiaryBtn" data-i18n="btn.bestiary">📖 Бестіарій</button>
     <button id="libraryBtn" data-i18n="btn.library">📚 Бібліотека</button>
+    <button id="companionsBtn" data-i18n="btn.companions">🐾 Компаньйони</button>
     <button id="bossPortalBtn" data-i18n="btn.bossPortal">👹 Портал Босів</button>
     <button id="worldMapHudBtn" data-i18n="btn.worldMap">🗺 Карта Світу</button>
     <button id="leaderboardBtn" data-i18n="btn.leaderboard">🌍 Лідерборд</button>
@@ -643,7 +645,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.72';
+const GAME_VERSION = '0.73';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -1024,27 +1026,115 @@ function playerAuraTier(){
   return null;
 }
 
-/* Компаньйон — розблоковується першою перемогою над босом (boss_1),
-   суто QoL-улюбленець: трохи розширює радіус збору монет і час від часу
-   сам б'є моба, з яким гравець зараз б'ється (тільки на дорозі, не в
-   боях з босами — щоб не зачіпати баланс isBossFightHopeless()). */
-const COMPANION_UNLOCK_ACH = 'boss_1';
-const COMPANION_ATTACK_INTERVAL = 5; // сек
-const COMPANION_ATTACK_PCT = 0.25;   // 25% від сили атаки гравця
-const COMPANION_MAGNET_BONUS = 2;
-const COMPANION_COLOR = '#7dffb8';
-function hasCompanion(){ return !!state.achievements[COMPANION_UNLOCK_ACH]; }
+/* Компаньйони (v0.73) — до v0.72 це був ОДИН фіксований бонус, назавжди
+   ввімкнений першою перемогою над босом (boss_1). Гравець прямо попросив
+   зробити з цього повноцінну систему: кілька компаньйонів із РІЗНИМИ
+   ролями, кожен левелиться окремо за золото, і в кожен момент супроводжує
+   рівно ОДИН обраний — справжній вибір білда, а не просто "увімкнено/
+   вимкнено". Розблокування — далі за перемогами над босами (ті самі
+   ачівки boss_1/boss_5/boss_20, що вже існували), СТАРІ збереження з уже
+   здобутим boss_1 нічого не втрачають: companionLevel() гарантує Lv.1
+   одразу за розблокування (та сама сила, що й до v0.73), а
+   activeCompanion() сама підставляє перший розблокований, якщо гравець
+   ще жодного явно не обирав (state.companions.active===null) — без
+   потреби в окремій міграції збереження.
+   Ролі:
+   - blade (Дух Клинка)    — бойовий: періодично сам б'є ціль гравця
+                             (як єдиний компаньйон до v0.73).
+   - hoarder (Дух Скарбника) — пасивний: +% золота, +% шанс дропу.
+   - hunter (Дух Мисливця)   — пасивний: +% досвіду, +радіус збору лута.
+   Лише АКТИВНИЙ компаньйон дає свій ефект — тримати кількох одночасно
+   свідомо не можна, це і є вибір. */
+const COMPANION_TYPES = [
+  {id:'blade',   name:'Дух Клинка',     name_en:'Blade Spirit',   unlockAch:'boss_1',  glyph:'c', color:'#7dffb8', role:'dps'},
+  {id:'hoarder', name:'Дух Скарбника',  name_en:'Hoarder Spirit', unlockAch:'boss_5',  glyph:'g', color:'#ffd94d', role:'support'},
+  {id:'hunter',  name:'Дух Мисливця',   name_en:'Hunter Spirit',  unlockAch:'boss_20', glyph:'h', color:'#4dd2ff', role:'utility'}
+];
+const MAX_COMPANION_LEVEL = 100;
+const COMPANION_BASE_COST = 300, COMPANION_COST_STEP = 200; // золото, лінійно — та сама філософія, що й дерево навичок
+const COMPANION_ATTACK_INTERVAL = 5;      // сек між ударами Духа Клинка
+const COMPANION_BLADE_PCT_BASE = 0.25;    // Lv.1 — та сама сила, що й фіксований бонус до v0.73
+const COMPANION_BLADE_PCT_STEP = 0.015;   // +1.5% за кожен рівень понад Lv.1
+const COMPANION_HOARDER_GOLD_PCT_PER_LVL = 1;
+const COMPANION_HOARDER_DROP_PCT_PER_LVL = 0.3;
+const COMPANION_HUNTER_XP_PCT_PER_LVL = 1;
+const COMPANION_MAGNET_BONUS = 2; // база "просто є компаньйон" — та сама, що й до v0.73, тримає стару поведінку для старих збережень
+const COMPANION_HUNTER_MAGNET_PER_LVL = 0.3;
+function companionUnlocked(id){
+  const c = COMPANION_TYPES.find(x=>x.id===id);
+  return !!(c && state.achievements[c.unlockAch]);
+}
+// Ефективний рівень: 0, поки не розблоковано; інакше МІНІМУМ 1 (розблокування
+// саме по собі вже дає Lv.1 безкоштовно) плюс усе, куплене за золото зверху.
+function companionLevel(id){
+  if(!companionUnlocked(id)) return 0;
+  return Math.max(1, state.companions.level[id]||0);
+}
+function companionCost(id){
+  const lvl = companionLevel(id);
+  if(lvl >= MAX_COMPANION_LEVEL) return Infinity;
+  return Math.round(COMPANION_BASE_COST + lvl*COMPANION_COST_STEP);
+}
+// Активний — той, кого гравець явно обрав; якщо ще не обирав (null) —
+// перший розблокований за порядком COMPANION_TYPES (тримає стару
+// поведінку "компаньйон завжди поруч" для тих, у кого вже був boss_1).
+function activeCompanion(){
+  let id = state.companions.active;
+  if(!id || !companionUnlocked(id)){
+    const fallback = COMPANION_TYPES.find(c=>companionUnlocked(c.id));
+    id = fallback ? fallback.id : null;
+  }
+  return id ? COMPANION_TYPES.find(c=>c.id===id) : null;
+}
+function hasCompanion(){ return COMPANION_TYPES.some(c=>companionUnlocked(c.id)); }
+function selectCompanion(id){
+  if(!companionUnlocked(id) || state.companions.active===id) return;
+  state.companions.active = id;
+  recomputeStats();
+  addLog('log.companionSelected', 'upgrade', {name:L(COMPANION_TYPES.find(c=>c.id===id),'name')});
+  renderCompanionsIfOpen();
+  save();
+}
+function buyCompanionLevel(id){
+  if(!companionUnlocked(id)) return;
+  const cost = companionCost(id);
+  if(!isFinite(cost)) return;
+  if(state.gold < cost){ addLog('log.notEnoughCurrency', 'warn', {currency:t('currency.gold'), label:L(COMPANION_TYPES.find(c=>c.id===id),'name')}); return; }
+  state.gold -= cost;
+  state.companions.level[id] = companionLevel(id)+1;
+  recomputeStats();
+  renderCompanionsIfOpen();
+  save();
+}
+function buyCompanionLevelMax(id){
+  if(!companionUnlocked(id)) return;
+  let count = 0;
+  const cap = 100000; // той самий запобіжник, що й buyUpgradeMax/buySkillMax
+  while(count < cap){
+    const cost = companionCost(id);
+    if(!isFinite(cost) || state.gold < cost) break;
+    state.gold -= cost;
+    state.companions.level[id] = companionLevel(id)+1;
+    count++;
+  }
+  if(count===0) return;
+  recomputeStats();
+  renderCompanionsIfOpen();
+  save();
+}
 let companionTimer = 0, companionPulse = 0;
 function updateCompanion(dt){
   if(companionPulse>0) companionPulse -= dt;
-  if(!hasCompanion()) return;
+  const active = activeCompanion();
+  if(!active || active.role!=='dps') return; // лише Дух Клинка б'ється сам — Скарбник/Мисливець суто пасивні
   companionTimer += dt;
   if(companionTimer < COMPANION_ATTACK_INTERVAL) return;
   companionTimer -= COMPANION_ATTACK_INTERVAL;
   if(isFighting && fightTarget && fightTarget.hp>0){
-    const dmg = Math.max(1, Math.round(effectiveAttack()*COMPANION_ATTACK_PCT));
+    const pct = COMPANION_BLADE_PCT_BASE + (companionLevel('blade')-1)*COMPANION_BLADE_PCT_STEP;
+    const dmg = Math.max(1, Math.round(effectiveAttack()*pct));
     fightTarget.hp -= dmg;
-    spawnFloatingText(PLAYER_COL-1, `-${dmg}`, COMPANION_COLOR);
+    spawnFloatingText(PLAYER_COL-1, `-${dmg}`, active.color);
     companionPulse = 0.35;
     if(fightTarget.hp <= 0){
       awardKill(fightTarget, true);
@@ -1147,9 +1237,16 @@ const I18N = {
     'town.library':'[E] Бібліотека',
     'modal.worldmapTitle':'КАРТА СВІТУ',
     'modal.libraryTitle':'БІБЛІОТЕКА', 'btn.library':'📚 Бібліотека',
+    'modal.companionsTitle':'КОМПАНЬЙОНИ', 'btn.companions':'🐾 Компаньйони',
+    'companion.locked':'Розблокується: {desc}',
+    'companion.selectBtn':'Обрати', 'companion.activeBtn':'Активний', 'companion.maxLevel':'Максимальний рівень',
+    'companion.effectBlade':'+{pct}% сили атаки кожні {sec}с (лише в бою на дорозі)',
+    'companion.effectHoarder':'+{gold}% золота, +{drop}% шанс дропу',
+    'companion.effectHunter':'+{xp}% досвіду, +{magnet} радіус збору лута',
+    'log.companionSelected':'🐾 Тепер із тобою: {name}.',
     'library.tab.world':'🌍 Світ', 'library.tab.castle':'🏰 Замок', 'library.tab.monsters':'👹 Монстри',
     'library.tab.bosses':'💀 Боси', 'library.tab.items':'⚔ Спорядження', 'library.tab.relics':'◆ Реліквії',
-    'library.tab.mechanics':'⚡ Механіки',
+    'library.tab.mechanics':'⚡ Механіки', 'library.tab.companions':'🐾 Компаньйони',
     'library.pageOf':'{cur} / {total}',
     'touch.up':'Вперед', 'touch.down':'Назад', 'touch.left':'Ліворуч', 'touch.right':'Праворуч',
     'touch.interact':'Взаємодія', 'touch.jump':'Стрибок',
@@ -1448,9 +1545,16 @@ const I18N = {
     'town.library':'[E] Library',
     'modal.worldmapTitle':'WORLD MAP',
     'modal.libraryTitle':'LIBRARY', 'btn.library':'📚 Library',
+    'modal.companionsTitle':'COMPANIONS', 'btn.companions':'🐾 Companions',
+    'companion.locked':'Unlocks: {desc}',
+    'companion.selectBtn':'Select', 'companion.activeBtn':'Active', 'companion.maxLevel':'Max level',
+    'companion.effectBlade':'+{pct}% attack power every {sec}s (road combat only)',
+    'companion.effectHoarder':'+{gold}% gold, +{drop}% drop chance',
+    'companion.effectHunter':'+{xp}% XP, +{magnet} pickup radius',
+    'log.companionSelected':'🐾 Now with you: {name}.',
     'library.tab.world':'🌍 World', 'library.tab.castle':'🏰 Castle', 'library.tab.monsters':'👹 Monsters',
     'library.tab.bosses':'💀 Bosses', 'library.tab.items':'⚔ Gear', 'library.tab.relics':'◆ Relics',
-    'library.tab.mechanics':'⚡ Mechanics',
+    'library.tab.mechanics':'⚡ Mechanics', 'library.tab.companions':'🐾 Companions',
     'library.pageOf':'{cur} / {total}',
     'touch.up':'Up', 'touch.down':'Down', 'touch.left':'Left', 'touch.right':'Right',
     'touch.interact':'Interact', 'touch.jump':'Jump',
@@ -2088,6 +2192,25 @@ const LIBRARY_MECHANICS = [
     body:'Десь у глибині навіть найіржавішої зброї ховається лють — та, що прокидається, лише коли її покликати самому (клавіша Q, або клік по блискавці внизу екрана). На 10 секунд кожен удар — твій і твого компаньйона — б\'є вдвічі сильніше, досить, щоб проламати навіть ту шкуру, яка інакше витримала б кілька ударів поспіль. Потім лють вгамовується — і навіть найзапальнішому характеру потрібно 60 секунд перепочинку, перш ніж покликати її знову.',
     body_en:"Somewhere deep inside even the rustiest weapon, a fury sleeps — one that only wakes when called on purpose (press Q, or click the lightning bolt at the bottom of the screen). For 10 seconds, every hit — yours and your companion's — lands twice as hard, enough to crack open even the kind of hide that would otherwise shrug off several hits in a row. Then the fury settles back down — and even the hottest temper needs 60 seconds to catch its breath before being called again."}
 ];
+// Компаньйони (v0.73) — теж своя вкладка Бібліотеки: гравець прямо
+// попросив документувати кожного новоствореного компаньйона так само,
+// як предмети/реліквії — з унікальним "портретом" (тут — просто
+// кольоровий гліф самого компаньйона, той же символ, що біжить поруч
+// із гравцем) і історією ПЛЮС чітким поясненням механіки.
+const LIBRARY_COMPANION_LORE = {
+  blade: {
+    body:'Дух Клинка не пам\'ятає, кому цей клинок належав до того, як лишитись саме духом — надто вже стрімко закінчилось те, попереднє життя. Тепер він просто йде поруч, крок у крок, і час від часу сам встромляє щось гостре в те, з чим ти й так уже б\'єшся — не з ввічливості, а тому, що звичка нікуди не поділась. Поки він твій активний компаньйон: раз на 5 секунд б\'є ціль твого бою на додаткові 25% сили атаки на Lv.1, і ще +1.5% за кожен рівень понад це — можеш прокачувати його золотом хоч довіку.',
+    body_en:"The Blade Spirit doesn't remember whose blade it used to be before becoming just a spirit — that previous life ended a little too abruptly for details to stick. Now it just walks alongside you, step for step, occasionally sinking something sharp into whatever you're already fighting anyway — not out of courtesy, just old habit that never quite left. While it's your active companion: once every 5 seconds it hits your current target for an extra 25% of your attack power at Lv.1, plus 1.5% more per level beyond that — level it up with gold for as long as you like."
+  },
+  hoarder: {
+    body:'Дух Скарбника був колись, судячи з усього, або дуже жадібним торговцем, або дуже нещасливим злодієм — тепер уже не з\'ясувати, яка саме версія правдива, бо сам він на цю тему мовчить і лише дзвенить монетами в кишенях, яких у нього фізично немає. Іде поруч не для бою, а для того, щоб золото саме лягало в руку трохи охочіше, а удача трохи частіше посміхалась. Поки він твій активний компаньйон: +1% золота і +0.3% шансу дропу за кожен його рівень.',
+    body_en:"The Hoarder Spirit was, by all appearances, once either a very greedy merchant or a very unlucky thief — which version is true is anyone's guess by now, since it stays quiet on the subject and just jingles coins in pockets it doesn't actually have. It walks beside you not to fight, but so that gold lands in your hand just a little more willingly, and luck smiles just a little more often. While it's your active companion: +1% gold and +0.3% drop chance per level."
+  },
+  hunter: {
+    body:'Дух Мисливця бачить дорогу так, як не бачить ніхто інший — не як пряму лінію, а як довгий список того, що варто підняти, перш ніж воно зникне позаду. Тягнеться до кожної монети трохи далі, ніж тягнешся ти сам, і якимось чином встигає навчити й тебе трохи більшого з кожного вбитого моба. Поки він твій активний компаньйон: +1% досвіду і додатковий радіус збору лута (+0.3 за рівень, понад базові +2, які просто дає наявність будь-якого компаньйона) за кожен його рівень.',
+    body_en:"The Hunter Spirit sees the road like nobody else does — not as a straight line, but as a long list of things worth picking up before they scroll off the back edge. It reaches for every coin a little further than you would yourself, and somehow teaches you to squeeze a bit more experience out of every kill along the way. While it's your active companion: +1% XP and extra pickup radius (+0.3 per level, on top of the base +2 that simply having any companion already grants) per level."
+  }
+};
 const LIBRARY_CASTLE_PAGES = [
   {title:'Руїни, що чекали', title_en:'Ruins that waited',
     body:'Замок на околиці лежав у руїнах ще до того, як ти взагалі прийшов у ці краї — жодного каменя на камені, тільки порожня ділянка й напис на брамі, який давно вицвів. Хто його зруйнував — демони, час, чи власна необережність колишніх господарів — тепер уже й не з\'ясувати; лишились тільки чутки, і в кожній чутці винен хтось інший. Ти відбудовуєш його не тому, що хтось попросив, а тому, що золото й дерево все одно треба кудись діти, а порожня ділянка муляла око. Кожен новий камінь — це трохи більше причин вважати, що цього разу він встоїть.',
@@ -4082,6 +4205,13 @@ const state = {
   quests:{ offers:[], active:[], history:[], refreshesLeft:3, refreshDate:null, daily:null },
   bossCooldowns:{}, // bossId -> timestamp (мс), коли знову можна атакувати
   gauntletCooldown:0, // timestamp (мс), коли знову можна почати Гаунтлет
+  // Компаньйони (v0.73): level — companionId->рівень ПОНАД гарантований
+  // Lv.1 за розблокування (companionLevel() рахує реальний ефективний
+  // рівень, тут лежить лише те, що куплено за золото); active — який
+  // ОДИН з розблокованих зараз супроводжує гравця (null — ще не обирав
+  // явно, activeCompanion() сама підбере перший розблокований, щоб
+  // старі збереження з уже здобутим boss_1 не "втратили" компаньйона).
+  companions:{level:{}, active:null},
   // налаштування QoL, не lifetime-статистика. logFilters — дефолт для
   // ЗОВСІМ нового гравця (ще до першого loadLocal()) — applyLoadedData()
   // перезбирає це ж поле безпечно при реальному завантаженні, але цей
@@ -4293,6 +4423,22 @@ function recomputeStats(){
   dropBonus += castleB.dropPct/100;
   atkSpeed += castleB.atkSpeedFlat;
 
+  // Компаньйони (v0.73) — лише АКТИВНИЙ дає ефект своєї ролі; сам факт
+  // "хоч один розблокований" і далі тримає стару базову магнітну надбавку
+  // (COMPANION_MAGNET_BONUS), щоб старі збереження з уже здобутим boss_1
+  // нічого не втратили, навіть якщо активним зараз обрано не Мисливця.
+  const companion = activeCompanion();
+  let companionXpPct = 0, companionMagnet = hasCompanion() ? COMPANION_MAGNET_BONUS : 0;
+  if(companion && companion.role==='support'){
+    const lvl = companionLevel('hoarder');
+    goldMult += (lvl*COMPANION_HOARDER_GOLD_PCT_PER_LVL)/100;
+    dropBonus += (lvl*COMPANION_HOARDER_DROP_PCT_PER_LVL)/100;
+  } else if(companion && companion.role==='utility'){
+    const lvl = companionLevel('hunter');
+    companionXpPct = lvl*COMPANION_HUNTER_XP_PCT_PER_LVL;
+    companionMagnet += lvl*COMPANION_HUNTER_MAGNET_PER_LVL;
+  }
+
   stats.attack = atk;
   // ТИМЧАСОВЕ обмеження швидкості (v0.57), поки триває пошук справжньої
   // причини лагів/зависань на екстремальних рівнях: чим вища stats.speed,
@@ -4310,7 +4456,7 @@ function recomputeStats(){
   stats.dropChance = Math.min(0.5, 0.08 + dropBonus);
   stats.jumpDuration = JUMP_DURATION_BASE * (1 + skillB.jumpPct/100);
   stats.critChance = skillB.critChance/100 + prestigeB.critChance/100 + castleB.critChance/100;
-  stats.pickupReach = skillB.magnetReach + castleB.magnetReach + (hasCompanion() ? COMPANION_MAGNET_BONUS : 0);
+  stats.pickupReach = skillB.magnetReach + castleB.magnetReach + companionMagnet;
   stats.crystalBonus = skillB.crystalBonus;
   stats.ignorePits = skillB.ignorePits > 0;
   stats.autoQuest = skillB.autoQuest > 0;
@@ -4319,7 +4465,7 @@ function recomputeStats(){
   stats.autoUpgradeGold = skillB.autoUpgradeGold > 0;
   stats.autoSkillSpend = skillB.autoSkillSpend > 0;
   stats.farmXpMult = farmXpMult;
-  stats.bonusXpMult = (1 + prestigeB.xpPct/100) * (1 + castleB.xpPct/100);
+  stats.bonusXpMult = (1 + prestigeB.xpPct/100) * (1 + castleB.xpPct/100) * (1 + companionXpPct/100);
   stats.castleResourceMult = 1 + castleB.resourceMult/100;
   stats.soulMult = 1 + castleB.soulMult/100;
 }
@@ -5041,11 +5187,12 @@ function renderRun(){
     ctx.fillStyle = '#ffd94d';
     ctx.fillText('*', xForCol(PLAYER_COL)+6, yForRow(prow)-14);
   }
-  if(hasCompanion()){
+  const runCompanion = activeCompanion();
+  if(runCompanion){
     const bob = Math.sin(bgTime*3)*2;
     ctx.font = `bold ${runFontPx(14)}px 'Courier New', monospace`;
-    ctx.fillStyle = companionPulse>0 ? '#ffffff' : COMPANION_COLOR;
-    ctx.fillText('c', xForCol(PLAYER_COL-2), yForRow(ROW_GROUND)+bob);
+    ctx.fillStyle = companionPulse>0 ? '#ffffff' : runCompanion.color;
+    ctx.fillText(runCompanion.glyph, xForCol(PLAYER_COL-2), yForRow(ROW_GROUND)+bob);
     ctx.font = `bold ${runFontPx(20)}px 'Courier New', monospace`;
   }
 
@@ -5262,10 +5409,11 @@ function renderTown(){
   }
   ctx.fillStyle = townAura ? townAura.color : COLORS.player;
   ctx.fillText('@', townXForCol(townPos.x)-4, townYForRow(townPos.y));
-  if(hasCompanion()){
+  const townCompanion = activeCompanion();
+  if(townCompanion){
     ctx.font = "bold 14px 'Courier New', monospace";
-    ctx.fillStyle = COMPANION_COLOR;
-    ctx.fillText('c', townXForCol(townPos.x)-24, townYForRow(townPos.y));
+    ctx.fillStyle = townCompanion.color;
+    ctx.fillText(townCompanion.glyph, townXForCol(townPos.x)-24, townYForRow(townPos.y));
     ctx.font = "bold 20px 'Courier New', monospace";
   }
 
@@ -5456,6 +5604,10 @@ document.addEventListener('pointerup', ()=>{
   if(pendingForgeRender && modalKind==='forge'){
     pendingForgeRender = false;
     setTimeout(()=>{ if(modalKind==='forge') renderModalBody(); }, 0);
+  }
+  if(pendingCompanionsRender && modalKind==='companions'){
+    pendingCompanionsRender = false;
+    setTimeout(()=>{ if(modalKind==='companions') renderCompanions(); }, 0);
   }
 }, true);
 // Той самий гард ще раз — для Кузні (автоматизація "Автоковаль",
@@ -5657,6 +5809,7 @@ function renderModalBody(){
   if(modalKind==='worldmap'){ renderWorldMap(); return; }
   if(modalKind==='bestiary'){ renderBestiary(); return; }
   if(modalKind==='library'){ renderLibrary(); return; }
+  if(modalKind==='companions'){ renderCompanions(); return; }
   if(modalKind==='castle'){ renderCastle(); return; }
   if(modalKind==='shop'){ renderShop(); return; }
   if(modalKind==='cloud'){ renderCloudModal(); return; }
@@ -6270,9 +6423,86 @@ function renderBestiary(){
    лору = одна "сторінка книжки" в межах категорії). Дані — LIBRARY_*
    вище, поряд з MONSTER_DESC/BOSS_DESC.
    ===================================================================== */
-const LIBRARY_TABS = ['world','castle','monsters','bosses','items','relics','mechanics'];
+const LIBRARY_TABS = ['world','castle','monsters','bosses','items','relics','mechanics','companions'];
 let libraryTab = 'world';
 let libraryPage = 0;
+/* =====================================================================
+   КОМПАНЬЙОНИ (v0.73) — модалка: список із 3, кожен або "заблокований"
+   (текст умови розблокування замість кнопок), або з рівнем/ефектом/
+   кнопками "Обрати"/"Купити"/"На всі". Той самий безпечний патерн, що
+   й Дерево навичок: renderCompanionsIfOpen() (повний перебуд, лише як
+   ПРЯМИЙ наслідок кліку гравця) + updateCompanionAffordability()
+   (точкове перемикання disabled щокадру, БЕЗ перебудови кнопок) —
+   золото змінюється щосекунди під час бігу, навіть коли ця модалка
+   відкрита, тож без точкового патчу кнопки "тікали" б під курсором
+   так само, як колись Дошка оголошень/Дерево навичок (v0.59-61).
+   ===================================================================== */
+function openCompanions(){
+  modalKind = 'companions';
+  modalTitle.textContent = t('modal.companionsTitle');
+  renderCompanions();
+  modalBackdrop.hidden = false;
+}
+function companionEffectText(c, lvl){
+  if(c.role==='dps'){
+    const pct = Math.round((COMPANION_BLADE_PCT_BASE + (lvl-1)*COMPANION_BLADE_PCT_STEP)*100);
+    return t('companion.effectBlade', {pct, sec:COMPANION_ATTACK_INTERVAL});
+  }
+  if(c.role==='support'){
+    return t('companion.effectHoarder', {gold:(lvl*COMPANION_HOARDER_GOLD_PCT_PER_LVL).toFixed(1), drop:(lvl*COMPANION_HOARDER_DROP_PCT_PER_LVL).toFixed(1)});
+  }
+  return t('companion.effectHunter', {xp:(lvl*COMPANION_HUNTER_XP_PCT_PER_LVL).toFixed(1), magnet:(COMPANION_MAGNET_BONUS+lvl*COMPANION_HUNTER_MAGNET_PER_LVL).toFixed(1)});
+}
+function renderCompanions(){
+  const active = activeCompanion();
+  let html = '';
+  for(const c of COMPANION_TYPES){
+    const unlocked = companionUnlocked(c.id);
+    if(!unlocked){
+      const ach = ACHIEVEMENTS.find(a=>a.id===c.unlockAch);
+      html += `<div class="mrow stack">
+        <div class="up-name" style="color:var(--dim);">${L(c,'name')}
+          <small>${t('companion.locked', {desc: ach?L(ach,'desc'):''})}</small>
+        </div>
+      </div>`;
+      continue;
+    }
+    const lvl = companionLevel(c.id);
+    const maxed = lvl >= MAX_COMPANION_LEVEL;
+    const cost = companionCost(c.id);
+    const isActive = active && active.id===c.id;
+    const canBuy = !maxed && state.gold >= cost;
+    html += `<div class="mrow stack">
+      <div class="up-name" style="color:${c.color};">${L(c,'name')} <span class="lvl">Lv.${lvl}</span>
+        <small style="color:var(--dim);">${companionEffectText(c, lvl)}</small>
+      </div>
+      <span class="buy-group">
+        <button class="buy-max${isActive?' active':''}" data-action="companionSelect" data-id="${c.id}" ${isActive?'disabled':''}>${isActive?t('companion.activeBtn'):t('companion.selectBtn')}</button>
+        ${maxed ? `<span class="empty-msg">${t('companion.maxLevel')}</span>` : `<button class="buy" data-action="companionBuy" data-id="${c.id}" ${canBuy?'':'disabled'} title="${formatExact(cost)}"><span class="cost-g">${formatNum(cost)}$</span></button>
+        <button class="buy-max" data-action="companionBuyMax" data-id="${c.id}" ${canBuy?'':'disabled'}>${t('btn.buyMax')}</button>`}
+      </span>
+    </div>`;
+  }
+  modalBody.innerHTML = html;
+}
+let pendingCompanionsRender = false;
+function renderCompanionsIfOpen(){
+  if(modalKind!=='companions') return;
+  if(modalPointerDown){ pendingCompanionsRender = true; return; }
+  renderCompanions();
+}
+// Точковий патч (щокадру, з updateHud() — те саме місце, що й
+// updateUpgradeAfford()) — лише disabled на вже ІСНУЮЧИХ кнопках,
+// жоден рядок не перестворюється.
+function updateCompanionAffordability(){
+  if(modalKind!=='companions') return;
+  modalBody.querySelectorAll('button[data-action="companionBuy"], button[data-action="companionBuyMax"]').forEach(btn=>{
+    const id = btn.dataset.id;
+    const lvl = companionLevel(id);
+    const maxed = lvl >= MAX_COMPANION_LEVEL;
+    btn.disabled = maxed || state.gold < companionCost(id);
+  });
+}
 function openLibrary(){
   modalKind = 'library';
   modalTitle.textContent = t('modal.libraryTitle');
@@ -6384,6 +6614,22 @@ function libraryEntriesForTab(tab){
       body:L(m,'body'),
       imageHtml:libraryPortrait(`<span style="color:${m.color};font-family:'Courier New',monospace;font-size:64px;font-weight:bold;text-shadow:0 0 18px ${m.color}99;">${m.glyph}</span>`, m.color)
     }));
+  }
+  if(tab==='companions'){
+    // Показуємо всіх трьох незалежно від розблокування (як і решта
+    // вкладок Бібліотеки — вона не прив'язана до прогресу, на відміну
+    // від Бестіарія) — назва лишається, лише позначаємо ще не
+    // розблокованих окремим кольором/приміткою.
+    return COMPANION_TYPES.map(c=>{
+      const lore = LIBRARY_COMPANION_LORE[c.id];
+      const unlocked = companionUnlocked(c.id);
+      const ach = ACHIEVEMENTS.find(a=>a.id===c.unlockAch);
+      return {
+        title: unlocked ? L(c,'name') : `${L(c,'name')} <span class="lvl" style="color:var(--dim);">🔒</span>`,
+        body: (lore ? L(lore,'body') : '') + (unlocked ? '' : `<br><br><i style="color:var(--dim);">${t('companion.locked',{desc:ach?L(ach,'desc'):''})}</i>`),
+        imageHtml:libraryPortrait(`<span style="color:${c.color};font-family:'Courier New',monospace;font-size:64px;font-weight:bold;text-shadow:0 0 18px ${c.color}99;">${c.glyph}</span>`, c.color)
+      };
+    });
   }
   return [];
 }
@@ -6636,6 +6882,9 @@ modalBody.addEventListener('click', (e)=>{
   else if(btn.dataset.action==='libraryTab'){ libraryTab = btn.dataset.tab; libraryPage = 0; renderLibrary(); }
   else if(btn.dataset.action==='libraryPrevPage') changeLibraryPage(-1);
   else if(btn.dataset.action==='libraryNextPage') changeLibraryPage(1);
+  else if(btn.dataset.action==='companionSelect') selectCompanion(btn.dataset.id);
+  else if(btn.dataset.action==='companionBuy') buyCompanionLevel(btn.dataset.id);
+  else if(btn.dataset.action==='companionBuyMax') buyCompanionLevelMax(btn.dataset.id);
   else if(btn.dataset.action==='prestigeModalTab'){ prestigeModalTab = btn.dataset.tab; renderPrestigeModal(); }
   else if(btn.dataset.action==='prestigeSkill') buyPrestigeSkill(btn.dataset.id);
   else if(btn.dataset.action==='prestigeSkillMax') buyPrestigeSkillMax(btn.dataset.id);
@@ -6944,6 +7193,7 @@ function updateHud(){
   }
 
   updateUpgradeAfford();
+  updateCompanionAffordability();
 }
 
 function renderUpgrades(){
@@ -7090,6 +7340,7 @@ function buildSaveObject(){
     achievements:state.achievements, lifetime:state.lifetime, quests:state.quests,
     bossCooldowns:state.bossCooldowns, gauntletCooldown:state.gauntletCooldown, settings:state.settings,
     relics:state.relics, prestigeSkills:state.prestigeSkills, milestonesClaimed:state.milestonesClaimed,
+    companions:state.companions,
     castleLevel:state.castleLevel, castleResources:state.castleResources,
     distanceCols, zoneTier, upgrades:state.upgrades, inventory:state.inventory,
     musicVolume, musicMuted, sfxVolume, sfxMuted, musicTrackIndex, lang,
@@ -7215,6 +7466,11 @@ function applyLoadedData(d){
     autoSkillSpendEnabled: !!ds.autoSkillSpendEnabled
   };
   state.relics = (d.relics && typeof d.relics==='object') ? d.relics : {};
+  const dcomp = (d.companions && typeof d.companions==='object') ? d.companions : {};
+  state.companions = {
+    level: (dcomp.level && typeof dcomp.level==='object') ? dcomp.level : {},
+    active: (typeof dcomp.active==='string') ? dcomp.active : null
+  };
   state.prestigeSkills = (d.prestigeSkills && typeof d.prestigeSkills==='object') ? d.prestigeSkills : {};
   state.milestonesClaimed = (d.milestonesClaimed && typeof d.milestonesClaimed==='object') ? d.milestonesClaimed : {};
   if(d.lang==='uk' || d.lang==='en') lang = d.lang;
@@ -7621,6 +7877,7 @@ document.getElementById('questsBtn').addEventListener('click', ()=>{ ensureAudio
 document.getElementById('characterBtn').addEventListener('click', ()=>{ ensureAudio(); openCharacterSheet(); });
 document.getElementById('bestiaryBtn').addEventListener('click', ()=>{ ensureAudio(); openBestiary(); });
 document.getElementById('libraryBtn').addEventListener('click', ()=>{ ensureAudio(); openLibrary(); });
+document.getElementById('companionsBtn').addEventListener('click', ()=>{ ensureAudio(); openCompanions(); });
 document.getElementById('bossPortalBtn').addEventListener('click', ()=>{ ensureAudio(); openBossPortal(); });
 document.getElementById('worldMapHudBtn').addEventListener('click', ()=>{ ensureAudio(); openWorldMap(); });
 document.getElementById('leaderboardBtn').addEventListener('click', ()=>{ ensureAudio(); openLeaderboard(); });

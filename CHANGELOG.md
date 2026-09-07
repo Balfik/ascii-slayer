@@ -5,6 +5,25 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.73] — Companions: from one fixed bonus to a full system
+
+### Added
+- Companions are now a real choice instead of a single always-on
+  perk: three spirits, each with a role, each leveled separately with
+  gold, only one accompanying you at a time.
+  - **Blade Spirit** (defeat your first boss) — fights alongside you,
+    striking your target every 5 seconds.
+  - **Hoarder Spirit** (defeat 5 bosses, new) — passive: bonus gold
+    and drop chance.
+  - **Hunter Spirit** (defeat 20 bosses, new) — passive: bonus XP and
+    pickup radius.
+- A new Companions screen to pick your active companion and spend
+  gold leveling any of them up.
+- All three documented in the Library under a new Companions tab,
+  with their own icon and lore — locked ones show what unlocks them.
+- Existing saves keep their companion exactly as before (nothing
+  lost, nothing to redo).
+
 ## [0.72] — Golden Glyph and Battle Fury
 
 ### Added
