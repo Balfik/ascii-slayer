@@ -5,6 +5,22 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.76] — Fixed a visual glitch, relic color, companions up to Lv.200
+
+### Fixed
+- Critical: the boss/Gauntlet result screen could visually blend with
+  the previous frame (fight text and result text overlapping into a
+  mess). The new decorative background painted with a semi-transparent
+  gradient instead of clearing the canvas first, so old pixels bled
+  through frame after frame. Fixed by clearing before drawing it.
+- Relic names in the leaderboard feed now show in their proper purple,
+  matching how relics are colored everywhere else.
+
+### Changed
+- Companions can now be leveled up to 200 (was 100). Levels 101-200
+  cost both gold and crystals, with a steeper price increase than the
+  first 100 levels.
+
 ## [0.75] — Companions join boss fights, mobile controls repositioned, and more
 
 ### Added

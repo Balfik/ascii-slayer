@@ -703,7 +703,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.75';
+const GAME_VERSION = '0.76';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -1118,8 +1118,17 @@ const COMPANION_TYPES = [
   {id:'hoarder', name:'Дух Скарбника',  name_en:'Hoarder Spirit', unlockAch:'boss_5',  glyph:'g', color:'#ffd94d', role:'support'},
   {id:'hunter',  name:'Дух Мисливця',   name_en:'Hunter Spirit',  unlockAch:'boss_20', glyph:'h', color:'#4dd2ff', role:'utility'}
 ];
-const MAX_COMPANION_LEVEL = 100;
-const COMPANION_BASE_COST = 300, COMPANION_COST_STEP = 200; // золото, лінійно — та сама філософія, що й дерево навичок
+// v0.76: стелю підняли зі 100 до 200 — гравець прямо попросив. Рівні
+// 1..100 і далі лише за золото (як було); з 101-го — рівень коштує
+// ЩЕ й кристали (не самі кристали, ОБИДВІ валюти водночас), і сам
+// приріст ціни за золото після 100 теж крутіший (COMPANION_COST_STEP_LATE
+// > COMPANION_COST_STEP) — гравець прямо попросив "збільшити ціну на
+// кожен рівень після 100".
+const MAX_COMPANION_LEVEL = 200;
+const COMPANION_LATE_LEVEL = 100; // з цього рівня — кристали + крутіший приріст
+const COMPANION_BASE_COST = 300, COMPANION_COST_STEP = 200; // золото, лінійно, рівні 1..100
+const COMPANION_COST_STEP_LATE = 500; // золото, лінійно, рівні 101..200 (крутіше)
+const COMPANION_CRYSTAL_BASE = 10, COMPANION_CRYSTAL_STEP = 5; // кристали, лише рівні 101..200
 const COMPANION_ATTACK_INTERVAL = 5;      // сек між ударами Духа Клинка
 const COMPANION_BLADE_PCT_BASE = 0.25;    // Lv.1 — та сама сила, що й фіксований бонус до v0.73
 const COMPANION_BLADE_PCT_STEP = 0.015;   // +1.5% за кожен рівень понад Lv.1
@@ -1138,11 +1147,22 @@ function companionLevel(id){
   if(!companionUnlocked(id)) return 0;
   return Math.max(1, state.companions.level[id]||0);
 }
+// Повертає {gold, crystals} — ціну НАСТУПНОГО рівня понад поточний
+// companionLevel(id); null, якщо вже на стелі (MAX_COMPANION_LEVEL).
 function companionCost(id){
   const lvl = companionLevel(id);
-  if(lvl >= MAX_COMPANION_LEVEL) return Infinity;
-  return Math.round(COMPANION_BASE_COST + lvl*COMPANION_COST_STEP);
+  if(lvl >= MAX_COMPANION_LEVEL) return null;
+  if(lvl < COMPANION_LATE_LEVEL){
+    return {gold: Math.round(COMPANION_BASE_COST + lvl*COMPANION_COST_STEP), crystals:0};
+  }
+  const over = lvl - COMPANION_LATE_LEVEL;
+  const goldAtLate = COMPANION_BASE_COST + COMPANION_LATE_LEVEL*COMPANION_COST_STEP;
+  return {
+    gold: Math.round(goldAtLate + over*COMPANION_COST_STEP_LATE),
+    crystals: Math.round(COMPANION_CRYSTAL_BASE + over*COMPANION_CRYSTAL_STEP)
+  };
 }
+function companionCanAfford(cost){ return !!cost && state.gold>=cost.gold && state.crystals>=cost.crystals; }
 // Активний — той, кого гравець явно обрав; якщо ще не обирав (null) —
 // перший розблокований за порядком COMPANION_TYPES (тримає стару
 // поведінку "компаньйон завжди поруч" для тих, у кого вже був boss_1).
@@ -1166,9 +1186,12 @@ function selectCompanion(id){
 function buyCompanionLevel(id){
   if(!companionUnlocked(id)) return;
   const cost = companionCost(id);
-  if(!isFinite(cost)) return;
-  if(state.gold < cost){ addLog('log.notEnoughCurrency', 'warn', {currency:t('currency.gold'), label:L(COMPANION_TYPES.find(c=>c.id===id),'name')}); return; }
-  state.gold -= cost;
+  if(!companionCanAfford(cost)){
+    if(cost) addLog('log.notEnoughCurrency', 'warn', {currency:t('currency.gold'), label:L(COMPANION_TYPES.find(c=>c.id===id),'name')});
+    return;
+  }
+  state.gold -= cost.gold;
+  state.crystals -= cost.crystals;
   state.companions.level[id] = companionLevel(id)+1;
   recomputeStats();
   renderCompanionsIfOpen();
@@ -1180,8 +1203,9 @@ function buyCompanionLevelMax(id){
   const cap = 100000; // той самий запобіжник, що й buyUpgradeMax/buySkillMax
   while(count < cap){
     const cost = companionCost(id);
-    if(!isFinite(cost) || state.gold < cost) break;
-    state.gold -= cost;
+    if(!companionCanAfford(cost)) break;
+    state.gold -= cost.gold;
+    state.crystals -= cost.crystals;
     state.companions.level[id] = companionLevel(id)+1;
     count++;
   }
@@ -1949,7 +1973,15 @@ function L(obj, field){
   return obj[field];
 }
 function rarityLabel(r){ return t('rarity.'+r); }
-const RARITY_COLOR = {common:'#c9ffd4', uncommon:'#4bd66c', rare:'#4dd2ff', epic:'#c77dff', legendary:'#ff9d1f', demonic:'#ff2d4d'};
+const RARITY_COLOR = {common:'#c9ffd4', uncommon:'#4bd66c', rare:'#4dd2ff', epic:'#c77dff', legendary:'#ff9d1f', demonic:'#ff2d4d',
+  // Реліквії — не частина звичайної шкали рідкості (лише 5 у грі,
+  // кожна унікальна), але renderEventLine() у стрічці подій лідерборду
+  // фарбує ім'я цілі через ЦЕЙ САМИЙ словник за target_rarity — без
+  // власного ключа тут relic_found показував ім'я реліквії звичайним
+  // білим текстом замість фіолетового, яким вона позначена всюди
+  // деінде (Бібліотека, екран перемоги над босом). Той самий відтінок,
+  // що вже використовується для реліквій в іншому UI.
+  relic:'#c77dff'};
 function rarityColor(r){ return RARITY_COLOR[r] || RARITY_COLOR.common; }
 /* Числа на кнопках прокачки з часом стають величезними (мільйони) і не
    вміщаються — скорочуємо до "3.2к / 255.5к / 1м / 2.4млрд". Для HUD
@@ -2214,7 +2246,7 @@ function grantRelic(){
   // Стрічка подій лідерборду — гравець прямо попросив більше активу там:
   // реліквія рідкісна й видовищна подія (лише 5 у грі, кожна раз назавжди),
   // ідеально пасує для публічної стрічки.
-  reportEvent('relic_found', {targetName:L(relic,'name')});
+  reportEvent('relic_found', {targetName:L(relic,'name'), targetRarity:'relic'});
   return relic;
 }
 let relicQuestTimer = 0;
@@ -3875,6 +3907,15 @@ function drawBossArenaBackground(accentColor){
   // а не лише знижуємо альфу — інакше при яскравих акцентних кольорах
   // (демони/дракони) навіть невелика прозорість все одно "світилась"
   // надто гаряче.
+  // КРИТИЧНО: clearRect ПЕРШИМ — grd нижче на центрі напівпрозорий
+  // (альфа 0x20), тож звичайний fillRect без попереднього clearRect
+  // лише ЗМІШУЄТЬСЯ зі старими пікселями замість замінити їх. Це й був
+  // справжній баг "перемога налазить на фон Гаунтлета/попередньої
+  // хвилі" — текст минулого кадру (чи взагалі минулого екрана: бій →
+  // результат) просвічував крізь новий, кадр за кадром накопичуючись у
+  // суцільну кашу. Стара версія на clearRect(); тепер лишається
+  // clearRect() + непрозорий фон поверх.
+  ctx.clearRect(0, 0, BOSS_W, BOSS_H);
   const darkAccent = shadeColor(accentColor, -50);
   const grd = ctx.createRadialGradient(BOSS_W/2, BOSS_H*0.42, 10, BOSS_W/2, BOSS_H*0.42, BOSS_W*0.55);
   grd.addColorStop(0, darkAccent+'20');
@@ -6728,14 +6769,18 @@ function renderCompanions(){
     const maxed = lvl >= MAX_COMPANION_LEVEL;
     const cost = companionCost(c.id);
     const isActive = active && active.id===c.id;
-    const canBuy = !maxed && state.gold >= cost;
+    const canBuy = companionCanAfford(cost);
+    // Понад COMPANION_LATE_LEVEL ціна — золото Й кристали водночас, не
+    // просто одна з двох валют — показуємо обидві поруч у кнопці.
+    const costLabel = cost ? `<span class="cost-g">${formatNum(cost.gold)}$</span>${cost.crystals>0?` <span class="cost-c">${formatNum(cost.crystals)}◆</span>`:''}` : '';
+    const costTitle = cost ? `${formatExact(cost.gold)}$${cost.crystals>0?` + ${formatExact(cost.crystals)}◆`:''}` : '';
     html += `<div class="mrow stack">
       <div class="up-name" style="color:${c.color};">${L(c,'name')} <span class="lvl">Lv.${lvl}</span>
         <small style="color:var(--dim);">${companionEffectText(c, lvl)}</small>
       </div>
       <span class="buy-group">
         <button class="buy-max${isActive?' active':''}" data-action="companionSelect" data-id="${c.id}" ${isActive?'disabled':''}>${isActive?t('companion.activeBtn'):t('companion.selectBtn')}</button>
-        ${maxed ? `<span class="empty-msg">${t('companion.maxLevel')}</span>` : `<button class="buy" data-action="companionBuy" data-id="${c.id}" ${canBuy?'':'disabled'} title="${formatExact(cost)}"><span class="cost-g">${formatNum(cost)}$</span></button>
+        ${maxed ? `<span class="empty-msg">${t('companion.maxLevel')}</span>` : `<button class="buy" data-action="companionBuy" data-id="${c.id}" ${canBuy?'':'disabled'} title="${costTitle}">${costLabel}</button>
         <button class="buy-max" data-action="companionBuyMax" data-id="${c.id}" ${canBuy?'':'disabled'}>${t('btn.buyMax')}</button>`}
       </span>
     </div>`;
@@ -6754,10 +6799,7 @@ function renderCompanionsIfOpen(){
 function updateCompanionAffordability(){
   if(modalKind!=='companions') return;
   modalBody.querySelectorAll('button[data-action="companionBuy"], button[data-action="companionBuyMax"]').forEach(btn=>{
-    const id = btn.dataset.id;
-    const lvl = companionLevel(id);
-    const maxed = lvl >= MAX_COMPANION_LEVEL;
-    btn.disabled = maxed || state.gold < companionCost(id);
+    btn.disabled = !companionCanAfford(companionCost(btn.dataset.id));
   });
 }
 function openLibrary(){
