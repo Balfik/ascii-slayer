@@ -5,6 +5,32 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.75] — Companions join boss fights, mobile controls repositioned, and more
+
+### Added
+- Battle Fury now works during boss fights and the Gauntlet too, not just
+  on the road — and while it's active, a glowing border pulses around
+  the whole game window so it's obvious it's running, not just a number
+  on the button.
+- In boss fights and the Gauntlet, all of your unlocked companions show
+  up together (not just the one active on the road) and fire colorful
+  beams at the target — a fun payoff for having them, on top of the
+  usual road behavior.
+- Boss/Gauntlet screens got an actual background: a soft themed glow
+  plus drifting embers, instead of solid black.
+- Wake Lock: the screen no longer dims/sleeps while playing on mobile,
+  the same way a video player keeps it awake.
+- A new Library tab, "Quests", telling the story behind each of the
+  5 quest types on the board.
+
+### Changed
+- On mobile, the jump button no longer sits on top of the character —
+  it moved below the game window, jump on the left and Battle Fury on
+  the right. The keyboard-oriented hint text is hidden there too, since
+  the buttons speak for themselves.
+- The jump button is hidden entirely during boss fights and the
+  Gauntlet on mobile, since there's nothing to jump over there.
+
 ## [0.74] — Battle Fury skill, moved skill, Library float layout, fixed Forge prices
 
 ### Added

@@ -160,13 +160,29 @@
   #comboWrap{ visibility:hidden; }
 
   .stage{max-width:980px;margin:0 auto 4px;position:relative;}
+  /* Візуальне підтвердження активної Бойової Люті (v0.75) — гравець
+     попросив щось помітніше за самий лічильник на кнопці: легка
+     вогняна рамка навколо всього вікна гри (термбар+канвас), поки скіл
+     діє. rgba-тінь, а не суцільний border — щоб не зсувала розмір/
+     верстку жодного елемента всередині (border додав би товщину). */
+  .stage.fury-active{
+    box-shadow: 0 0 0 2px rgba(255,140,40,.55), 0 0 22px 4px rgba(255,140,40,.45);
+    border-radius:8px;
+    animation: furyPulse 0.6s ease-in-out infinite alternate;
+  }
+  @keyframes furyPulse{
+    from{ box-shadow: 0 0 0 2px rgba(255,140,40,.4), 0 0 16px 2px rgba(255,140,40,.3); }
+    to{ box-shadow: 0 0 0 3px rgba(255,170,60,.75), 0 0 28px 6px rgba(255,140,40,.6); }
+  }
 
-  /* Кнопка активної здібності ("Бойова Лють") — НАВМИСНО не всередині
-     .touch-controls (те гейтиться @media (pointer:coarse) і призначене
-     лише для міського керування) — ця кнопка потрібна на БУДЬ-якому
-     пристрої, завжди видима поверх канвасу під час бігу. Текст всередині
-     міняється лише через textContent (⚡ / число секунд) в updateHud(),
-     сам елемент ніколи не перебудовується — той самий безпечний патерн,
+  /* Кнопка активної здібності ("Бойова Лють") — на десктопі лишається
+     position:absolute поверх канвасу (правий нижній кут), як і завжди;
+     на мобільному (@media pointer:coarse нижче) переходить у звичайний
+     потік — стає елементом .run-controls-row ПІД вікном гри, а не
+     поверх персонажа (гравець показав скрін, де стара нижня-ліва
+     кнопка стрибка закривала саме персонажа). Текст всередині міняється
+     лише через textContent (⚡ / число секунд) в updateHud(), сам
+     елемент ніколи не перебудовується — той самий безпечний патерн,
      що й #fightBar/#comboWrap. */
   .ability-btn{
     position:absolute; right:8px; bottom:8px; z-index:6;
@@ -180,11 +196,31 @@
   .ability-btn.active{ background:var(--accent); color:#0a0a0a; box-shadow:0 0 16px var(--accent); }
   .ability-btn[hidden]{ display:none; }
 
-  /* Тач-керування — тільки на пристроях з "грубим" (пальцевим) вводом,
-     незалежно від ширини вікна (pointer:coarse — не media max-width, щоб
-     тачскрін-ноутбук з мишкою його не бачив, а планшет у landscape бачив).
-     WASD-хрестик і кнопка E потрібні лише в місті (toggleTouchControls()
-     ховає їх поза містом) — під час бігу керувати нічим, окрім стрибка. */
+  /* Рядок стрибка/Люті ПІД канвасом (не поверх) — на десктопі порожній
+     на вигляд: #btnJump тут завжди прихований (десктоп стрибає
+     Пробілом, видима кнопка не потрібна), а #abilityBtn — position:
+     absolute й "виходить" із цього рядка до .stage (найближчого
+     позиційованого предка вище), тож порожній рядок не займає місця й
+     нічого не зсуває на десктопі. */
+  .run-controls-row #btnJump{ display:none; }
+  @media (pointer:coarse){
+    .run-controls-row{
+      display:flex; align-items:center; gap:10px; padding:8px 4px 0;
+    }
+    .run-controls-row #btnJump{ display:flex; }
+    /* [hidden] МАЄ перебити .display:flex вище (JS ставить hidden поза
+       run-режимом, наприклад у бою з босом/Гаунтлеті — гравець прямо
+       попросив прибрати стрибок саме там) — без цього рядка властивість
+       hidden атрибута тихо програвала б специфічність ID-селектора. */
+    .run-controls-row #btnJump[hidden]{ display:none; }
+    .run-controls-row .ability-btn{ position:static; margin-left:auto; }
+  }
+  /* Тач-керування (хрестик WASD + E) — тільки на пристроях з "грубим"
+     (пальцевим) вводом, незалежно від ширини вікна (pointer:coarse —
+     не media max-width, щоб тачскрін-ноутбук з мишкою його не бачив, а
+     планшет у landscape бачив). Потрібні лише в місті — під час бігу/
+     бою з босом/Гаунтлета керувати тут нічим (стрибок — окремо, у
+     .run-controls-row вище, поза цим абсолютним оверлеєм). */
   .touch-controls{
     display:none;position:absolute;left:0;right:0;bottom:8px;
     padding:0 10px;pointer-events:none;z-index:5;
@@ -192,7 +228,7 @@
   }
   @media (pointer:coarse){ .touch-controls{display:flex;} }
   .touch-controls > *{pointer-events:auto;}
-  .touch-controls button{
+  .touch-controls button, .run-controls-row #btnJump{
     font-family:inherit;color:var(--accent);background:rgba(18,36,23,.82);
     border:1px solid var(--border);border-radius:8px;
     -webkit-user-select:none;user-select:none;touch-action:none;
@@ -569,14 +605,13 @@
   </div>
   <div id="fightBar"></div>
 
-  <div class="stage">
+  <div class="stage" id="stage">
     <div class="termbar">
       <span class="left"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
       <span style="margin-left:4px;">run.exe</span></span>
       <span id="termLabel" data-i18n="term.runLabel">світ безкінечно біжить праворуч →</span>
     </div>
     <canvas id="game"></canvas>
-    <button id="abilityBtn" class="ability-btn">⚡</button>
     <div class="touch-controls" id="touchControls">
       <div class="dpad" id="dpadTown" hidden>
         <button class="dpad-up" id="btnUp" aria-label="Up" data-i18n-title="touch.up">▲</button>
@@ -586,8 +621,19 @@
       </div>
       <div class="touch-actions">
         <button class="touch-action-btn" id="btnInteract" hidden data-i18n-title="touch.interact">E</button>
-        <button class="touch-action-btn" id="btnJump" data-i18n-title="touch.jump">⤴</button>
       </div>
+    </div>
+    <!-- Стрибок і Лють НАВМИСНО поза .touch-controls (той — абсолютний
+         оверлей поверх канвасу, потрібен лише в місті для хрестика/E).
+         Цей рядок — звичайний блок ПІД канвасом: на мобільному раніше
+         кнопка стрибка лежала поверх персонажа знизу-зліва, гравець
+         показав скрін. #abilityBtn лишається position:absolute й на
+         десктопі "виходить" із цього порожнього на вигляд рядка до
+         .stage (найближчого позиційованого предка) — тут порожній div
+         нічого не важить і нічого не зсуває. -->
+    <div class="run-controls-row" id="runControlsRow">
+      <button class="touch-action-btn" id="btnJump" data-i18n-title="touch.jump">⤴</button>
+      <button id="abilityBtn" class="ability-btn">⚡</button>
     </div>
   </div>
   <div class="hint" id="hintText"></div>
@@ -657,7 +703,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.74';
+const GAME_VERSION = '0.75';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -954,6 +1000,16 @@ let INTERNAL_H = TOP_PAD + 3*ROW_GAP + BOTTOM_PAD;
 let RUN_FONT_SCALE = 1;
 function runFontPx(basePx){ return Math.round(basePx * RUN_FONT_SCALE); }
 function isMobileViewport(){ return window.innerWidth <= 760; } // той самий поріг, що й .panels вище
+// Той самий сигнал, що й CSS @media(pointer:coarse) — керує показом
+// стрибка/Люті ПІД канвасом (.run-controls-row) замість тексту-підказки.
+// НАВМИСНО не isMobileViewport() (та — просто вузька ширина, могла б
+// бути звичайна звужена вкладка з мишкою й клавіатурою) — інакше на
+// вузькому ДЕСКТОПНОМУ вікні підказка зникла б, а кнопки під канвасом
+// (ті самі, що й підказку замінюють) не з'явились би — гравець лишився
+// б взагалі без жодного пояснення керування.
+function isTouchDevice(){
+  try{ return window.matchMedia('(pointer: coarse)').matches; }catch(err){ return false; }
+}
 function updateRunGeometryForViewport(){
   const mobile = isMobileViewport();
   // heightScale 3.6→6.5: гравець прямо попросив "розмір вікна збільшити
@@ -1172,9 +1228,11 @@ let abilityTimeLeft = 0;       // >0 — активна зараз
 function abilityReady(){ return abilityCooldownLeft<=0 && abilityTimeLeft<=0; }
 function effectiveAttack(){ return stats.attack * (abilityTimeLeft>0 ? ABILITY_ATTACK_MULT : 1); }
 function activateAbility(){
-  if(mode!=='run' || !abilityReady()) return;
+  // Працює на дорозі, у бою з босом і в Гаунтлеті — лише в місті
+  // активувати нічого (там немає бою взагалі).
+  if(mode==='town' || !abilityReady()) return;
   abilityTimeLeft = ABILITY_DURATION * stats.abilityDurationMult;
-  addLog('log.abilityActivated', 'fight');
+  addLog('log.abilityActivated', 'fight', {dur:abilityTimeLeft.toFixed(1)});
   sfxLevelUp();
 }
 // Тикає НЕЗАЛЕЖНО від режиму (update(), не updateRun()) — кулдаун не
@@ -1258,7 +1316,7 @@ const I18N = {
     'log.companionSelected':'🐾 Тепер із тобою: {name}.',
     'library.tab.world':'🌍 Світ', 'library.tab.castle':'🏰 Замок', 'library.tab.monsters':'👹 Монстри',
     'library.tab.bosses':'💀 Боси', 'library.tab.items':'⚔ Спорядження', 'library.tab.relics':'◆ Реліквії',
-    'library.tab.mechanics':'⚡ Механіки', 'library.tab.companions':'🐾 Компаньйони',
+    'library.tab.mechanics':'⚡ Механіки', 'library.tab.companions':'🐾 Компаньйони', 'library.tab.quests':'📜 Квести',
     'library.pageOf':'{cur} / {total}',
     'touch.up':'Вперед', 'touch.down':'Назад', 'touch.left':'Ліворуч', 'touch.right':'Праворуч',
     'touch.interact':'Взаємодія', 'touch.jump':'Стрибок',
@@ -1367,7 +1425,7 @@ const I18N = {
     'log.itemFound':'💎 Знайдено предмет: {name} ({rarity})',
     'log.legendaryFound':'✨ ЛЕГЕНДАРНА ЗНАХІДКА: {name}! ✨',
     'log.kill':'Вбито: {name} (+{gold} золота, +{xp} досвіду)',
-    'log.abilityActivated':'⚡ Бойова Лють! ×2 атака на 10с.',
+    'log.abilityActivated':'⚡ Бойова Лють! ×2 атака на {dur}с.',
     'log.goldenGlyph':'✦ Золотий Гліф спіймано! +{gold} золота, ×2 золото на 20с.',
     'log.pitFall':'Ти провалився в яму і трохи забарився.',
     'log.encounter':'Зустрінуто {name}! Бій...',
@@ -1567,7 +1625,7 @@ const I18N = {
     'log.companionSelected':'🐾 Now with you: {name}.',
     'library.tab.world':'🌍 World', 'library.tab.castle':'🏰 Castle', 'library.tab.monsters':'👹 Monsters',
     'library.tab.bosses':'💀 Bosses', 'library.tab.items':'⚔ Gear', 'library.tab.relics':'◆ Relics',
-    'library.tab.mechanics':'⚡ Mechanics', 'library.tab.companions':'🐾 Companions',
+    'library.tab.mechanics':'⚡ Mechanics', 'library.tab.companions':'🐾 Companions', 'library.tab.quests':'📜 Quests',
     'library.pageOf':'{cur} / {total}',
     'touch.up':'Up', 'touch.down':'Down', 'touch.left':'Left', 'touch.right':'Right',
     'touch.interact':'Interact', 'touch.jump':'Jump',
@@ -1676,7 +1734,7 @@ const I18N = {
     'log.itemFound':'💎 Item found: {name} ({rarity})',
     'log.legendaryFound':'✨ LEGENDARY FIND: {name}! ✨',
     'log.kill':'Killed: {name} (+{gold} gold, +{xp} XP)',
-    'log.abilityActivated':'⚡ Battle Fury! ×2 attack for 10s.',
+    'log.abilityActivated':'⚡ Battle Fury! ×2 attack for {dur}s.',
     'log.goldenGlyph':'✦ Golden Glyph caught! +{gold} gold, ×2 gold for 20s.',
     'log.pitFall':'You fell into a pit and lost some time.',
     'log.encounter':'Encountered {name}! Fighting...',
@@ -2235,6 +2293,32 @@ const LIBRARY_COMPANION_LORE = {
   hunter: {
     body:'Дух Мисливця бачить дорогу так, як не бачить ніхто інший — не як пряму лінію, а як довгий список того, що варто підняти, перш ніж воно зникне позаду. Тягнеться до кожної монети трохи далі, ніж тягнешся ти сам, і якимось чином встигає навчити й тебе трохи більшого з кожного вбитого моба. Поки він твій активний компаньйон: +1% досвіду і додатковий радіус збору лута (+0.3 за рівень, понад базові +2, які просто дає наявність будь-якого компаньйона) за кожен його рівень.',
     body_en:"The Hunter Spirit sees the road like nobody else does — not as a straight line, but as a long list of things worth picking up before they scroll off the back edge. It reaches for every coin a little further than you would yourself, and somehow teaches you to squeeze a bit more experience out of every kill along the way. While it's your active companion: +1% XP and extra pickup radius (+0.3 per level, on top of the base +2 that simply having any companion already grants) per level."
+  }
+};
+// Квести (v0.75) — теж своя вкладка: за кожним типом контракту з Дошки
+// оголошень своя маленька історія ПЛЮС чітке пояснення, що саме він
+// вимагає — гравець прямо попросив розписати "в нашому стилі" кожен
+// наявний квест.
+const LIBRARY_QUEST_LORE = {
+  kill: {
+    body:'Хтось повісив об\'яву "Убити N монстрів" і зник — підпису на ній ніколи немає, а обличчя того, хто її лишив, не пам\'ятає навіть сам стенд оголошень. Односельці підозрюють, що дошка сама собі пише контракти вночі, коли ніхто не дивиться, просто щоб не нудьгувати. Тобі, чесно кажучи, байдуже, звідки замовлення — ти й так б\'єш усе на дорозі, а тут ще й платять.',
+    body_en:'Someone pinned up a "Kill N monsters" notice and vanished — it\'s never signed, and even the board itself doesn\'t seem to remember whose face left it there. The villagers suspect the board writes its own contracts at night, out of boredom, when nobody\'s looking. Honestly, you don\'t care where the order came from — you were killing everything on the road anyway, and now it pays.'
+  },
+  gold: {
+    body:'Формально це контракт "заробити N золота", але насправді хтось у місті просто хоче знати, скільки грошей крутиться в обігу цього тижня — статистика, не благодійність. Здати цей квест простіше за всі інші: не треба нічого спеціального робити, досить бігти дорогою, як завжди, і рахувати монети, що й так падають у кишеню.',
+    body_en:'Officially it\'s a "earn N gold" contract, but really someone in town just wants to know how much money is circulating this week — bookkeeping, not charity. This one\'s the easiest to turn in: no special effort required, just keep running the road like always and let the coins that were already falling into your pocket do the counting.'
+  },
+  distance: {
+    body:'Контракт "пробігти N метрів" з\'явився на дошці ще до того, як хтось узагалі почав вимірювати цю дорогу в метрах — тож ніхто насправді не знає, звідки взялось саме це число. Тобі й не треба знати: дорога однаково нескінченна, а ти й так по ній біжиш, отже рано чи пізно ця цифра сама набіжить.',
+    body_en:'The "run N meters" contract showed up on the board before anyone had actually started measuring this road in meters — so nobody really knows where that specific number came from. You don\'t need to know either: the road is endless anyway, and you\'re already running down it, so the number racks itself up sooner or later.'
+  },
+  items: {
+    body:'Контракт "знайти N предметів" писав явно хтось, хто сам ніколи нічого не знаходив — інакше знав би, що це найлегший з усіх п\'яти. Дропи трапляються самі, без жодного зусилля з твого боку, тож цей квест по суті просто чекає, поки твоя удача (і трохи навички "Гострий зір") зробить свою справу.',
+    body_en:'The "find N items" contract was clearly written by someone who never actually found anything themselves — otherwise they\'d know it\'s the easiest of the five. Drops just happen on their own, no extra effort required, so this quest basically just waits for your luck (and a bit of the "Sharp Eye" skill) to do the work.'
+  },
+  jump: {
+    body:'Контракт "стрибнути N разів" — той самий, якого щиро ненавидить кожен, хто хоч раз намагався вибити його на високій швидкості бігу, коли ями й моби пролітають повз за частки секунди. Саме тому навичка "Без акробатики" в гілці автоматизації існує окремим пунктом: не тому, що хтось не любить стрибати, а тому, що всі, абсолютно всі, стомились рахувати стрибки вручну.',
+    body_en:'The "jump N times" contract is the one everyone secretly hates the moment they try clearing it at high run speed, when pits and monsters fly past in fractions of a second. That\'s exactly why the "No More Acrobatics" skill exists as its own line in the Automation branch — not because anyone dislikes jumping, but because absolutely everyone got tired of counting jumps by hand.'
   }
 };
 const LIBRARY_CASTLE_PAGES = [
@@ -3585,6 +3669,7 @@ function attemptBoss(bossId){
   bossResult = null;
   const hp = bossEffectiveHp(boss);
   bossFight = {boss, hp, maxHp:hp, timeLeft:BOSS_FIGHT_TIME, attackTimer:0, attackFlash:0};
+  resetBossCompanionTimers();
   mode = 'boss';
   setupCanvas();
   updateModeUiText();
@@ -3626,11 +3711,13 @@ function updateBossFight(dt){
   if(bf.attackTimer >= interval && bf.hp>0){
     bf.attackTimer -= interval;
     const isCrit = Math.random() < stats.critChance;
-    const dmg = isCrit ? stats.attack*2 : stats.attack;
+    const atk = effectiveAttack();
+    const dmg = isCrit ? atk*2 : atk;
     bf.hp = Math.max(0, bf.hp-dmg);
     bf.attackFlash = 0.15;
     sfxHit();
   }
+  if(bf.hp>0) updateBossCompanions(dt, dmg=>{ bf.hp = Math.max(0, bf.hp-dmg); });
   if(bf.hp<=0){ endBossFight(true, false); return; }
   if(bf.timeLeft<=0){ endBossFight(false, false); return; }
   if(state.settings.autoRetreatBoss && isBossFightHopeless(bf)){ endBossFight(false, true); return; }
@@ -3767,11 +3854,124 @@ function closeEndingScreen(){
   closeModal();
 }
 
+/* =====================================================================
+   БІЙ З БОСОМ/ГАУНТЛЕТ — декоративний фон + компаньйони (v0.75).
+   Гравець прямо попросив: (а) не суцільний чорний фон на цих екранах,
+   (б) усі РОЗБЛОКОВАНІ компаньйони видимі й "стріляють" кольоровими
+   променями в ціль. На відміну від дороги (де діє лише ОДИН активний
+   компаньйон — свідомий вибір білда), тут показуємо/анімуємо ВСІХ
+   розблокованих одразу — це разовий видовищний момент великого бою,
+   а не заміна вибору активного на дорозі. РЕАЛЬНУ шкоду завдає лише
+   Дух Клинка (role:'dps', та сама формула, що на дорозі й у
+   updateCompanion()) — Скарбник/Мисливець стріляють суто для картинки,
+   без додаткової шкоди: інакше розблокувати всіх трьох тихо потроїло б
+   бойовий внесок компаньйонів саме в найважливіших боях гри.
+   ===================================================================== */
+const ARENA_EMBER_COUNT = 14;
+function drawBossArenaBackground(accentColor){
+  // v0.75: перша версія (accentColor+'22' напряму) гравець назвав "занадто
+  // червоний яскравий фон" — приглушуємо саму барву (-50%, той самий
+  // shadeColor(), що й фон дороги) ПЕРЕД тим, як додавати ще й прозорість,
+  // а не лише знижуємо альфу — інакше при яскравих акцентних кольорах
+  // (демони/дракони) навіть невелика прозорість все одно "світилась"
+  // надто гаряче.
+  const darkAccent = shadeColor(accentColor, -50);
+  const grd = ctx.createRadialGradient(BOSS_W/2, BOSS_H*0.42, 10, BOSS_W/2, BOSS_H*0.42, BOSS_W*0.55);
+  grd.addColorStop(0, darkAccent+'20');
+  grd.addColorStop(1, '#080808');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, BOSS_W, BOSS_H);
+  ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+  ctx.beginPath();
+  ctx.moveTo(0, BOSS_H-28);
+  ctx.lineTo(BOSS_W, BOSS_H-28);
+  ctx.stroke();
+  // Жаринки, що повільно спливають знизу вгору й тихо гаснуть — суто
+  // атмосферно, той самий pseudoRand(), що й у фоні дороги, лише без
+  // паралаксу (цей канвас нікуди не скролиться).
+  ctx.save();
+  for(let i=0;i<ARENA_EMBER_COUNT;i++){
+    const seed = i*37.19;
+    const cycle = 5 + pseudoRand(seed+3)*4;
+    const prog = ((bgTime + pseudoRand(seed+4)*cycle*10) / cycle) % 1;
+    const x = pseudoRand(seed+1)*BOSS_W;
+    const y = (BOSS_H-28) - prog*(BOSS_H-40);
+    const alpha = Math.sin(prog*Math.PI) * 0.35;
+    ctx.globalAlpha = Math.max(0, alpha);
+    ctx.fillStyle = accentColor;
+    ctx.beginPath();
+    ctx.arc(x, y, 1.3+pseudoRand(seed+5)*1.4, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+// bossCompanionTimers: companionId -> {timer, flash} — окремо від
+// companionTimer/companionPulse дороги (ті лишаються для run-режиму).
+let bossCompanionTimers = {};
+function resetBossCompanionTimers(){
+  bossCompanionTimers = {};
+  // Невеликий випадковий зсув старту, щоб промені не спалахували всі
+  // одночасно, першим же кадром бою — виглядає живіше.
+  for(const c of COMPANION_TYPES) bossCompanionTimers[c.id] = {timer: randRange(0, 2), flash:0};
+}
+// dealDamage(dmg) — колбек, що зменшує HP поточної цілі (боса чи моба
+// хвилі Гаунтлета) — виклик лишається на боці updateBossFight()/
+// updateGauntlet(), ця функція сама нічого про ціль не знає.
+function updateBossCompanions(dt, dealDamage){
+  for(const c of COMPANION_TYPES){
+    if(!companionUnlocked(c.id)) continue;
+    const bc = bossCompanionTimers[c.id] || (bossCompanionTimers[c.id] = {timer:0, flash:0});
+    if(bc.flash>0) bc.flash -= dt;
+    bc.timer += dt;
+    const interval = c.role==='dps' ? COMPANION_ATTACK_INTERVAL : (3.5 + (c.id.charCodeAt(0)%3));
+    if(bc.timer >= interval){
+      bc.timer -= interval;
+      bc.flash = 0.25;
+      if(c.role==='dps'){
+        const pct = COMPANION_BLADE_PCT_BASE + (companionLevel('blade')-1)*COMPANION_BLADE_PCT_STEP;
+        dealDamage(Math.max(1, Math.round(effectiveAttack()*pct)));
+      }
+    }
+  }
+}
+function drawCompanionBeam(fromX, fromY, toX, toY, color, alpha){
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 9;
+  ctx.beginPath();
+  ctx.moveTo(fromX, fromY);
+  ctx.lineTo(toX, toY);
+  ctx.stroke();
+  ctx.restore();
+}
+// Малює всіх РОЗБЛОКОВАНИХ компаньйонів у ряд біля гравця (лівий низ
+// екрана) + промінь до цілі (targetX/targetY), поки bc.flash>0.
+function renderBossCompanionsRow(targetX, targetY){
+  let slot = 0;
+  for(const c of COMPANION_TYPES){
+    if(!companionUnlocked(c.id)) continue;
+    slot++;
+    const cx = 40 + slot*26, cy = 302;
+    const bc = bossCompanionTimers[c.id];
+    const firing = bc && bc.flash>0;
+    ctx.font = "bold 18px 'Courier New', monospace";
+    ctx.fillStyle = firing ? '#ffffff' : c.color;
+    ctx.fillText(c.glyph, cx, cy);
+    if(firing){
+      drawCompanionBeam(cx+4, cy-10, targetX, targetY, c.color, Math.min(1, bc.flash/0.25));
+    }
+  }
+}
+
 function renderBossResult(){
   const r = bossResult;
   if(!r) return;
   const shape = BOSS_SHAPES[r.boss.shape];
-  ctx.clearRect(0,0,BOSS_W,BOSS_H);
+  drawBossArenaBackground(shape.color);
   ctx.textAlign = 'center';
 
   const titleKey = r.won ? 'boss.resultWin' : (r.retreated ? 'boss.resultRetreat' : 'boss.resultLose');
@@ -3817,7 +4017,7 @@ function renderBossFight(){
   const bf = bossFight;
   const boss = bf.boss;
   const shape = BOSS_SHAPES[boss.shape];
-  ctx.clearRect(0,0,BOSS_W,BOSS_H);
+  drawBossArenaBackground(shape.color);
 
   ctx.textAlign = 'center';
   ctx.font = "bold 20px 'Courier New', monospace";
@@ -3852,6 +4052,7 @@ function renderBossFight(){
     ctx.fillStyle = '#ffd94d';
     ctx.fillText('*', 66, BOSS_H-32);
   }
+  renderBossCompanionsRow(BOSS_W/2, 170);
 }
 
 /* =====================================================================
@@ -3879,6 +4080,7 @@ function attemptGauntlet(){
   closeModal();
   gauntletResult = null;
   gauntletFight = {wave:1, mtype:null, hp:0, maxHp:0, timeLeft:GAUNTLET_TIME, attackTimer:0, attackFlash:0};
+  resetBossCompanionTimers();
   spawnGauntletWave(gauntletFight);
   mode = 'gauntlet';
   setupCanvas();
@@ -3913,11 +4115,13 @@ function updateGauntlet(dt){
   if(gf.attackTimer >= interval && gf.hp>0){
     gf.attackTimer -= interval;
     const isCrit = Math.random() < stats.critChance;
-    const dmg = isCrit ? stats.attack*2 : stats.attack;
+    const atk = effectiveAttack();
+    const dmg = isCrit ? atk*2 : atk;
     gf.hp = Math.max(0, gf.hp-dmg);
     gf.attackFlash = 0.15;
     sfxHit();
   }
+  if(gf.hp>0) updateBossCompanions(dt, dmg=>{ gf.hp = Math.max(0, gf.hp-dmg); });
   if(gf.hp<=0){
     gf.wave++;
     spawnGauntletWave(gf);
@@ -4006,10 +4210,11 @@ function returnFromGauntlet(){
 function renderGauntletResult(){
   const r = gauntletResult;
   if(!r) return;
-  ctx.clearRect(0,0,BOSS_W,BOSS_H);
+  const goodRun = r.wavesCleared>=GAUNTLET_MIN_WAVES_FOR_FULL_REWARD;
+  drawBossArenaBackground(goodRun ? '#4dff88' : '#ffd94d');
   ctx.textAlign = 'center';
   ctx.font = "bold 24px 'Courier New', monospace";
-  ctx.fillStyle = r.wavesCleared>=GAUNTLET_MIN_WAVES_FOR_FULL_REWARD ? '#4dff88' : '#ffd94d';
+  ctx.fillStyle = goodRun ? '#4dff88' : '#ffd94d';
   ctx.fillText(t('gauntlet.resultTitle',{waves:r.wavesCleared}), BOSS_W/2, 50);
   ctx.font = "14px 'Courier New', monospace";
   ctx.fillStyle = '#c9ffd4';
@@ -4034,7 +4239,7 @@ function renderGauntletFight(){
   if(!gauntletFight) return;
   const gf = gauntletFight;
   const mtype = gf.mtype;
-  ctx.clearRect(0,0,BOSS_W,BOSS_H);
+  drawBossArenaBackground(mtype.color);
   ctx.textAlign = 'center';
   ctx.font = "bold 18px 'Courier New', monospace";
   ctx.fillStyle = '#ffd94d';
@@ -4070,6 +4275,7 @@ function renderGauntletFight(){
     ctx.fillStyle = '#ffd94d';
     ctx.fillText('*', 66, BOSS_H-32);
   }
+  renderBossCompanionsRow(BOSS_W/2, 170);
 }
 
 /* =====================================================================
@@ -5473,7 +5679,10 @@ function updateModeUiText(){
   document.getElementById('townBtn').textContent = mode==='town' ? t('btn.leaveTown') : t('btn.town');
   document.getElementById('townBtn').disabled = (mode==='boss' || mode==='gauntlet');
   document.getElementById('termLabel').textContent = mode==='town' ? t('term.townLabel') : (mode==='boss' ? t('term.bossLabel') : (mode==='gauntlet' ? t('term.gauntletLabel') : t('term.runLabel')));
-  document.getElementById('hintText').innerHTML = mode==='town' ? t('hint.town') : ((mode==='boss'||mode==='gauntlet') ? '' : t('hint.run'));
+  // Підказку про Пробіл/T на дорозі на мобільному прибираємо (гравець
+  // попросив) — там її роль тепер виконують самі кнопки під вікном гри
+  // (стрибок/Лють), клавіатурні підказки на тач-пристрої однаково зайві.
+  document.getElementById('hintText').innerHTML = mode==='town' ? t('hint.town') : ((mode==='boss'||mode==='gauntlet') ? '' : (isTouchDevice() ? '' : t('hint.run')));
   const retreatBtn = document.getElementById('bossRetreatBtn');
   const continueBossBtn = document.getElementById('bossContinueBtn');
   retreatBtn.hidden = !((mode==='boss' && bossFight && !bossResult) || (mode==='gauntlet' && gauntletFight && !gauntletResult));
@@ -5481,14 +5690,18 @@ function updateModeUiText(){
   continueBossBtn.hidden = !((mode==='boss' && bossResult) || (mode==='gauntlet' && gauntletResult));
   continueBossBtn.textContent = mode==='gauntlet' ? t('gauntlet.continueBtn') : t('boss.continueBtn');
   // WASD-хрестик потрібен лише в місті (на дорозі/у боях керувати нічим,
-  // окрім стрибка — той на мобільних уже покриває тап по канвасу, кнопка
-  // #btnJump лишається видимою завжди для явности). #btnInteract сам ще
-  // й окремо ховається/показується в renderTown() за nearBuilding.
+  // окрім стрибка). #btnInteract сам ще й окремо ховається/показується
+  // в renderTown() за nearBuilding.
   document.getElementById('dpadTown').hidden = mode!=='town';
   if(mode!=='town') document.getElementById('btnInteract').hidden = true;
-  // Здібність активується лише на дорозі — у місті/бою з босом кнопка
-  // просто ховається (а не гасне) щоб не займати місце дарма.
-  document.getElementById('abilityBtn').hidden = mode!=='run';
+  // Стрибок потрібен ЛИШЕ на самій дорозі (у місті нічим стрибати
+  // нема, у бою з босом/Гаунтлеті — теж, там немає ям/мобів на шляху) —
+  // гравець прямо попросив прибрати кнопку стрибка з екрана боса/
+  // Гаунтлета на мобільному, вона там просто зайва.
+  document.getElementById('btnJump').hidden = mode!=='run';
+  // Бойова Лють тепер працює і в бою з босом, і в Гаунтлеті (не лише
+  // на дорозі) — кнопка ховається лише в місті, де активувати нічого.
+  document.getElementById('abilityBtn').hidden = mode==='town';
 }
 function enterTown(){
   if(mode==='town') return;
@@ -6467,7 +6680,7 @@ function renderBestiary(){
    лору = одна "сторінка книжки" в межах категорії). Дані — LIBRARY_*
    вище, поряд з MONSTER_DESC/BOSS_DESC.
    ===================================================================== */
-const LIBRARY_TABS = ['world','castle','monsters','bosses','items','relics','mechanics','companions'];
+const LIBRARY_TABS = ['world','castle','monsters','bosses','items','relics','mechanics','companions','quests'];
 let libraryTab = 'world';
 let libraryPage = 0;
 /* =====================================================================
@@ -6672,6 +6885,18 @@ function libraryEntriesForTab(tab){
         title: unlocked ? L(c,'name') : `${L(c,'name')} <span class="lvl" style="color:var(--dim);">🔒</span>`,
         body: (lore ? L(lore,'body') : '') + (unlocked ? '' : `<br><br><i style="color:var(--dim);">${t('companion.locked',{desc:ach?L(ach,'desc'):''})}</i>`),
         imageHtml:libraryPortrait(`<span style="color:${c.color};font-family:'Courier New',monospace;font-size:64px;font-weight:bold;text-shadow:0 0 18px ${c.color}99;">${c.glyph}</span>`, c.color)
+      };
+    });
+  }
+  if(tab==='quests'){
+    const QUEST_COLOR = {kill:'#ff5252', gold:'#ffd94d', distance:'#4dffb8', items:'#c77dff', jump:'#4dd2ff'};
+    return QUEST_TYPES.map(qt=>{
+      const lore = LIBRARY_QUEST_LORE[qt.id];
+      const color = QUEST_COLOR[qt.id] || '#c9ffd4';
+      return {
+        title:L(qt,'name'),
+        body: lore ? L(lore,'body') : '',
+        imageHtml:libraryPortrait(`<span style="font-size:60px;filter:drop-shadow(0 0 10px ${color}99);">${qt.icon}</span>`, color)
       };
     });
   }
@@ -6978,7 +7203,25 @@ let audioCtx = null, sfxGain = null;
 let musicVolume = 0.35, musicMuted = false;
 let sfxVolume = 0.5, sfxMuted = false;
 
+/* Wake Lock (v0.75) — не даємо екрану мобільного гаснути під час гри,
+   як у відеоплеєра. Best-effort: якщо API немає (старий браузер/Safari
+   до недавніх версій) чи дозвіл відмовлено — просто мовчки нічого не
+   робимо, гра як і раніше працює без цього. Сам лок браузер сам
+   "відпускає", коли вкладка ховається (перемкнув застосунок/заблокував
+   екран) — на visibilitychange назад у 'visible' перезапитуємо. */
+let wakeLock = null;
+async function requestWakeLock(){
+  if(!('wakeLock' in navigator) || wakeLock) return;
+  try{
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', ()=>{ wakeLock = null; });
+  }catch(err){ /* дозвіл відмовлено або API недоступне — ігноруємо */ }
+}
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState==='visible') requestWakeLock();
+});
 function ensureAudio(){
+  requestWakeLock();
   if(!audioCtx){
     try{
       audioCtx = new (window.AudioContext||window.webkitAudioContext)();
@@ -7221,6 +7464,11 @@ function updateHud(){
     if(!fb.textContent) fb.textContent = ' '; // тримає рядок ненульової висоти з першого кадру
   }
 
+  // Вогняна рамка навколо вікна гри — єдина, добре помітна ознака "Лють
+  // діє", крім самого таймера на кнопці (гравець прямо попросив: "не
+  // тільки таймер"). classList.toggle сам no-op'ає, якщо стан не
+  // змінився — жодних зайвих reflow щокадру.
+  document.getElementById('stage').classList.toggle('fury-active', abilityTimeLeft>0);
   const abilityBtn = document.getElementById('abilityBtn');
   // Довга Лють (c5) міняє реальну тривалість/кулдаун — тултип рахуємо
   // щокадру з поточних stats.abilityDurationMult/abilityCooldownMult,
@@ -7241,7 +7489,7 @@ function updateHud(){
   } else {
     abilityBtn.textContent = '⚡';
     abilityBtn.classList.remove('active');
-    abilityBtn.disabled = mode!=='run';
+    abilityBtn.disabled = mode==='town';
   }
 
   updateUpgradeAfford();
