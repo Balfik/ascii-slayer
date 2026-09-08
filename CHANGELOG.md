@@ -5,6 +5,21 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.79] — Castle rebuilt to match the original design exactly
+
+### Fixed
+- The login streak calendar could show your current streak count
+  correctly while leaving every day unmarked with a flame — accounts
+  that already had a streak going before the calendar existed now
+  backfill their history correctly on next login.
+- The Castle has been rebuilt from scratch to precisely match its
+  intended design — twin towers, banners, gate, and full brickwork —
+  instead of the earlier approximation. The Castle plot in town is
+  wider to fit the full silhouette, and every alignment issue found
+  along the way (towers looking crooked, the level label drifting off
+  to one side) has been fixed so it now renders cleanly and
+  symmetrically at every level, from the first stone to full Lv.20.
+
 ## [0.78] — Login streak calendar, redesigned Castle, fixed Forge overflow
 
 ### Added
