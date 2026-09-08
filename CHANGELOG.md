@@ -5,6 +5,32 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.78] — Login streak calendar, redesigned Castle, fixed Forge overflow
+
+### Added
+- A calendar for your login streak: a new "🔥 Streak" button opens a
+  month view with every day you logged in marked, current streak
+  count, and month navigation.
+- The streak now grants a standing bonus (not just a one-time daily
+  gift) — attack, gold, and drop chance all scale up the longer your
+  current streak runs, up to a cap. Miss a day and it resets.
+- Weekends: Saturdays and Sundays always give ×2 gold, XP, and boss
+  souls, marked right on the calendar — independent of your streak.
+
+### Fixed
+- The Forge could show "Infinity$" as an enchant cost at extreme
+  enchant levels — the exponential cost formula genuinely overflowed
+  JavaScript's number range. Costs now stay finite at any level.
+
+### Changed
+- The Castle model got a full redesign: a symmetric structure with
+  twin towers, crenellations, a gate, and banners that genuinely
+  builds up floor by floor as you invest in it, instead of the old
+  shape that didn't read clearly as a castle.
+- Fireworks over town now play permanently once you've completed the
+  game, instead of only for a short burst right after.
+- The Castle plot's ground tile is darker, less bright.
+
 ## [0.76] — Fixed a visual glitch, relic color, companions up to Lv.200
 
 ### Fixed

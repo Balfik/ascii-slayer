@@ -131,6 +131,7 @@
   #bestiaryBtn{color:var(--text);}
   #libraryBtn{color:var(--legendary);}
   #companionsBtn{color:#7dffb8;}
+  #streakBtn{color:#ff9d4d;}
   #bossPortalBtn{color:#ff6b6b;}
   #worldMapHudBtn{color:var(--accent);}
   #leaderboardBtn{color:var(--crystal);}
@@ -393,6 +394,29 @@
   .library-entry-body{color:var(--text);font-size:13px;line-height:1.6;}
   .library-pager{display:flex;align-items:center;justify-content:center;gap:14px;}
 
+  /* Календар стріку входів (v0.78) — сітка 7 колонок (Пн..Нд), кожен
+     день або "порожній" (до 1-го числа місяця), або "заповнений" з
+     номером дня. Клітина логіну — легкий теплий фон + 🔥; сьогодні —
+     рамка акцентом; майбутні дні — притлумлені (ще не могли настати). */
+  .streak-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:10px 0;}
+  .cal-weekday{text-align:center;font-size:10.5px;color:var(--dim);padding-bottom:2px;}
+  .cal-day{
+    position:relative;
+    aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    border-radius:5px;border:1px solid var(--border);font-size:11px;color:var(--dim);
+    background:#0f1a10;
+  }
+  .cal-day.empty{border-color:transparent;background:transparent;}
+  .cal-day.logged{background:#3a2410;border-color:#ff9d4d;color:#ffd9a8;}
+  .cal-day.today{border-color:var(--accent);border-width:2px;color:var(--accent);}
+  .cal-day.future{color:#3a4a3a;}
+  .cal-day.weekend{border-color:#7a6a2a;}
+  .cal-day .flame{font-size:12px;line-height:1;}
+  /* Позначка вихідного (субота/неділя) — завжди подвійні рейти на
+     золото/досвід/душі босів, гравець прямо попросив показати це тут. */
+  .cal-day .x2tag{position:absolute;top:1px;right:2px;font-size:7px;color:#ffd94d;line-height:1;}
+  .streak-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:6px;}
+
   .inv-item, .log-row{
     padding:5px 0 5px 8px;border-left:3px solid var(--border);margin-bottom:5px;font-size:12px;
   }
@@ -596,6 +620,7 @@
     <button id="prestigeBtn"><span data-i18n="btn.prestige">♻️ Переродження</span> (<span id="prestigeBadge">0</span>)</button>
     <button id="questsBtn" data-i18n="btn.quests">📜 Квести</button>
     <button id="characterBtn" data-i18n="btn.character">📋 Персонаж</button>
+    <button id="streakBtn"><span data-i18n="btn.streak">🔥 Стрик</span> (<span id="streakBadge">0</span>)</button>
     <button id="bestiaryBtn" data-i18n="btn.bestiary">📖 Бестіарій</button>
     <button id="libraryBtn" data-i18n="btn.library">📚 Бібліотека</button>
     <button id="companionsBtn" data-i18n="btn.companions">🐾 Компаньйони</button>
@@ -703,7 +728,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.76';
+const GAME_VERSION = '0.78';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -1338,6 +1363,15 @@ const I18N = {
     'companion.effectHoarder':'+{gold}% золота, +{drop}% шанс дропу',
     'companion.effectHunter':'+{xp}% досвіду, +{magnet} радіус збору лута',
     'log.companionSelected':'🐾 Тепер із тобою: {name}.',
+    'btn.streak':'🔥 Стрик', 'modal.streakTitle':'СТРИК ВХОДІВ',
+    'streak.currentLabel':'поточний стрик (днів поспіль)',
+    'streak.bonusHeader':'Постійний бонус, поки стрик діє:',
+    'streak.bonusAtk':'+{pct}% сили атаки', 'streak.bonusGold':'+{pct}% золота', 'streak.bonusDrop':'+{pct}% шансу дропу',
+    'streak.noBonusYet':'Зайди в гру завтра, щоб почати стрик і здобути перший бонус.',
+    'streak.atCap':'Стеля бонусу досягнута — довший стрик уже не підсилює його далі.',
+    'streak.weekendActiveNow':'🎉 Вихідний! ×{mult} на золото, досвід і душі босів діє прямо зараз.',
+    'streak.weekendInfo':'По суботах і неділях завжди діє ×{mult} на золото, досвід і душі босів (позначено ×{mult} на клітинках нижче) — незалежно від стріку.',
+    'streak.explain':'Заходь у гру щодня, щоб не перервати стрик. За кожен новий день — разова нагорода золотом/кристалами (цикл на 7 днів, далі повторюється), а сам стрик увесь час дає постійний бонус до атаки/золота/шансу дропу, поки триває. Пропустив хоч один день — стрик скидається до 1.',
     'library.tab.world':'🌍 Світ', 'library.tab.castle':'🏰 Замок', 'library.tab.monsters':'👹 Монстри',
     'library.tab.bosses':'💀 Боси', 'library.tab.items':'⚔ Спорядження', 'library.tab.relics':'◆ Реліквії',
     'library.tab.mechanics':'⚡ Механіки', 'library.tab.companions':'🐾 Компаньйони', 'library.tab.quests':'📜 Квести',
@@ -1647,6 +1681,15 @@ const I18N = {
     'companion.effectHoarder':'+{gold}% gold, +{drop}% drop chance',
     'companion.effectHunter':'+{xp}% XP, +{magnet} pickup radius',
     'log.companionSelected':'🐾 Now with you: {name}.',
+    'btn.streak':'🔥 Streak', 'modal.streakTitle':'LOGIN STREAK',
+    'streak.currentLabel':'current streak (days in a row)',
+    'streak.bonusHeader':'Standing bonus while the streak lasts:',
+    'streak.bonusAtk':'+{pct}% attack power', 'streak.bonusGold':'+{pct}% gold', 'streak.bonusDrop':'+{pct}% drop chance',
+    'streak.noBonusYet':'Come back tomorrow to start a streak and earn your first bonus.',
+    'streak.atCap':'Bonus cap reached — a longer streak no longer boosts it further.',
+    'streak.weekendActiveNow':'🎉 Weekend! ×{mult} gold, XP and boss souls is active right now.',
+    'streak.weekendInfo':'Saturdays and Sundays always get ×{mult} gold, XP and boss souls (marked ×{mult} on the cells below) — regardless of your streak.',
+    'streak.explain':"Log in every day to keep the streak alive. Each new day gives a one-time gold/crystal reward (a 7-day cycle that then repeats), while the streak itself grants a standing bonus to attack, gold, and drop chance for as long as it lasts. Miss even one day and the streak resets to 1.",
     'library.tab.world':'🌍 World', 'library.tab.castle':'🏰 Castle', 'library.tab.monsters':'👹 Monsters',
     'library.tab.bosses':'💀 Bosses', 'library.tab.items':'⚔ Gear', 'library.tab.relics':'◆ Relics',
     'library.tab.mechanics':'⚡ Mechanics', 'library.tab.companions':'🐾 Companions', 'library.tab.quests':'📜 Quests',
@@ -3117,6 +3160,33 @@ function loginStreakReward(streak){
   const idx = Math.max(0, Math.min(LOGIN_STREAK_REWARDS.length, streak) - 1);
   return LOGIN_STREAK_REWARDS[idx];
 }
+// Стрик до v0.78 давав ЛИШЕ разовий подарунок за день — гравець прямо
+// попросив ще й ПОСТІЙНИЙ бонус до статів, що росте з довжиною
+// поточного стріку (діє, поки стрик не перервався) — та сама
+// "довгий хвіст зі стелею" філософія, що й компаньйони/навички:
+// STREAK_BONUS_MAX_DAYS — стеля, понад яку бонус більше не росте
+// (інакше місяцями непереривний стрик почав би домінувати над рештою
+// прогресії). Дні ПОНАД стелю все одно рахуються (ачівки/показ у
+// календарі), просто не додають більше сили.
+const STREAK_BONUS_MAX_DAYS = 60;
+const STREAK_BONUS_ATK_PCT_PER_DAY = 0.5;
+const STREAK_BONUS_GOLD_PCT_PER_DAY = 0.3;
+const STREAK_BONUS_DROP_PCT_PER_DAY = 0.15;
+function streakBonusDays(){ return Math.min(STREAK_BONUS_MAX_DAYS, state.lifetime.loginStreak||0); }
+// Скільки дат історії тримаємо для календаря — довше не потрібно (сам
+// UI показує максимум кілька місяців), і не роздуває save-файл
+// назавжди для дуже старих акаунтів.
+const LOGIN_DATES_KEEP_DAYS = 120;
+function pruneLoginDates(lt){
+  const keys = Object.keys(lt.loginDates||{});
+  if(keys.length <= LOGIN_DATES_KEEP_DAYS) return;
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-LOGIN_DATES_KEEP_DAYS);
+  for(const k of keys){
+    const parts = k.split('-').map(Number);
+    const d = new Date(parts[0], (parts[1]||1)-1, parts[2]||1);
+    if(d < cutoff) delete lt.loginDates[k];
+  }
+}
 function checkLoginStreak(){
   const key = todayKey();
   const lt = state.lifetime;
@@ -3126,6 +3196,9 @@ function checkLoginStreak(){
   const yKey = dateKey(y);
   lt.loginStreak = (prevDate === yKey) ? (lt.loginStreak||0)+1 : 1;
   lt.lastLoginDate = key;
+  if(!lt.loginDates) lt.loginDates = {};
+  lt.loginDates[key] = true;
+  pruneLoginDates(lt);
   const reward = loginStreakReward(lt.loginStreak);
   state.gold += reward.gold; lt.totalGoldEarned += reward.gold;
   state.crystals += reward.crystals;
@@ -3133,7 +3206,112 @@ function checkLoginStreak(){
   addLog('log.loginStreak', 'levelup', {streak:lt.loginStreak, gold:reward.gold, crystals:reward.crystals});
   spawnFloatingText(PLAYER_COL, `🔥 ${lt.loginStreak}`, '#ffd94d');
   sfxLevelUp();
+  // Стрик міняє реальні статy (атака/золото/дроп) — перерахувати одразу,
+  // а не покладатись, що виклик init() десь після цього сам це зробить.
+  recomputeStats();
   save();
+}
+
+/* =====================================================================
+   КАЛЕНДАР СТРІКУ (v0.78) — гравець прямо попросив: видно, які дні
+   зараховані, який стрик зараз, і які саме бонуси він дає. Місяць, що
+   переглядається — суто сесійний UI-стан (як libraryPage), завжди
+   стартує з поточного місяця при відкритті.
+   ===================================================================== */
+let calendarViewYear = null, calendarViewMonth = null; // null → підставляємо поточні при відкритті
+function openStreakCalendar(){
+  modalKind = 'streak';
+  modalTitle.textContent = t('modal.streakTitle');
+  const now = new Date();
+  calendarViewYear = now.getFullYear();
+  calendarViewMonth = now.getMonth();
+  renderStreakCalendar();
+  modalBackdrop.hidden = false;
+}
+function changeCalendarMonth(delta){
+  calendarViewMonth += delta;
+  if(calendarViewMonth < 0){ calendarViewMonth = 11; calendarViewYear--; }
+  else if(calendarViewMonth > 11){ calendarViewMonth = 0; calendarViewYear++; }
+  renderStreakCalendar();
+}
+function streakBonusLines(days){
+  const parts = [];
+  if(days<=0) return parts;
+  parts.push(t('streak.bonusAtk', {pct:(days*STREAK_BONUS_ATK_PCT_PER_DAY).toFixed(1)}));
+  parts.push(t('streak.bonusGold', {pct:(days*STREAK_BONUS_GOLD_PCT_PER_DAY).toFixed(1)}));
+  parts.push(t('streak.bonusDrop', {pct:(days*STREAK_BONUS_DROP_PCT_PER_DAY).toFixed(1)}));
+  return parts;
+}
+function renderStreakCalendar(){
+  const lt = state.lifetime;
+  const streak = lt.loginStreak||0;
+  const days = streakBonusDays();
+  const locale = lang==='en' ? 'en-US' : 'uk-UA';
+  const viewDate = new Date(calendarViewYear, calendarViewMonth, 1);
+  const monthLabel = viewDate.toLocaleDateString(locale, {month:'long', year:'numeric'});
+
+  let html = `<div style="text-align:center;margin-bottom:12px;">
+    <div style="font-size:26px;color:#ff9d4d;">🔥 ${streak}</div>
+    <div style="color:var(--dim);font-size:12px;">${t('streak.currentLabel')}</div>
+  </div>`;
+
+  const bonusLines = streakBonusLines(days);
+  html += `<div style="margin-bottom:12px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:#0f1a10;">
+    <div style="color:var(--purple);font-size:11.5px;letter-spacing:.5px;margin-bottom:4px;">${t('streak.bonusHeader')}</div>
+    ${bonusLines.length
+      ? `<div style="color:var(--accent);font-size:12.5px;line-height:1.6;">${bonusLines.join('<br>')}</div>`
+      : `<div style="color:var(--dim);font-size:12px;">${t('streak.noBonusYet')}</div>`}
+    ${days>=STREAK_BONUS_MAX_DAYS ? `<div style="color:var(--gold);font-size:11px;margin-top:4px;">${t('streak.atCap')}</div>` : ''}
+  </div>`;
+
+  // Вихідні (v0.78) — окремий, самостійний бонус: щосуботи й щонеділі
+  // ×2 на золото/досвід/душі босів, увесь день, незалежно від активного
+  // стріку. Показуємо і "діє просто зараз", і саму позначку на кожній
+  // суботньо-недільній клітинці нижче.
+  html += `<div style="margin-bottom:12px;padding:8px 10px;border:1px solid ${isWeekendBonus()?'#ffd94d':'var(--border)'};border-radius:6px;background:${isWeekendBonus()?'#2a230f':'#0f1a10'};">
+    <div style="color:${isWeekendBonus()?'var(--gold)':'var(--purple)'};font-size:11.5px;letter-spacing:.5px;">
+      ${isWeekendBonus() ? t('streak.weekendActiveNow', {mult:WEEKEND_MULT}) : t('streak.weekendInfo', {mult:WEEKEND_MULT})}
+    </div>
+  </div>`;
+
+  html += `<div class="streak-nav">
+    <button class="buy-max" data-action="streakPrevMonth">◀</button>
+    <span style="color:var(--text);font-size:13px;text-transform:capitalize;">${monthLabel}</span>
+    <button class="buy-max" data-action="streakNextMonth">▶</button>
+  </div>`;
+
+  // Пн..Нд — getDay() (0=Нд) зсунуто так, щоб тиждень починався з Пн.
+  const weekdayFmt = new Intl.DateTimeFormat(locale, {weekday:'short'});
+  const mondayBase = new Date(2024, 0, 1); // понеділок, зручна опорна дата
+  html += `<div class="streak-cal">`;
+  for(let i=0;i<7;i++){
+    const wd = new Date(mondayBase); wd.setDate(mondayBase.getDate()+i);
+    html += `<div class="cal-weekday">${weekdayFmt.format(wd)}</div>`;
+  }
+  const daysInMonth = new Date(calendarViewYear, calendarViewMonth+1, 0).getDate();
+  const firstWeekday = (new Date(calendarViewYear, calendarViewMonth, 1).getDay() + 6) % 7; // 0=Пн
+  const todayStr = todayKey();
+  for(let i=0;i<firstWeekday;i++) html += `<div class="cal-day empty"></div>`;
+  for(let d=1; d<=daysInMonth; d++){
+    const cellDate = new Date(calendarViewYear, calendarViewMonth, d);
+    const key = dateKey(cellDate);
+    const logged = !!lt.loginDates[key];
+    const isToday = key===todayStr;
+    const isFuture = cellDate > new Date(new Date().setHours(23,59,59,999));
+    const dow = cellDate.getDay();
+    const isWeekendCell = dow===0 || dow===6;
+    const cls = ['cal-day'];
+    if(logged) cls.push('logged');
+    if(isToday) cls.push('today');
+    if(isFuture && !logged) cls.push('future');
+    if(isWeekendCell) cls.push('weekend');
+    html += `<div class="${cls.join(' ')}">${isWeekendCell?`<span class="x2tag">×${WEEKEND_MULT}</span>`:''}${logged?'<span class="flame">🔥</span>':''}<span>${d}</span></div>`;
+  }
+  html += `</div>`;
+
+  html += `<p style="color:var(--dim);font-size:11.5px;line-height:1.5;margin-top:10px;">${t('streak.explain')}</p>`;
+
+  modalBody.innerHTML = html;
 }
 // Скільки лишилось до півночі (локальний час) — саме тоді todayKey()
 // зміниться і ensureQuestRefreshDaily() поверне повні MAX_QUEST_REFRESHES.
@@ -3855,17 +4033,14 @@ function returnFromBoss(){
 
 /* Фінальний екран — відкривається ОДИН РАЗ (returnFromBoss(), коли
    bossResult.isEnding) поверх щойно намальованого міста. Салют у самому
-   місті — окремий канвас-шар (renderTownFireworks(), викликається з
-   renderTown() увесь час, поки Date.now() < fireworksUntil), лишається
-   видимим і ПІСЛЯ закриття цієї модалки, поки не згасне сам. */
-let fireworksUntil = 0;
-const FIREWORKS_DURATION_MS = 25000;
+   місті — окремий канвас-шар (renderTownFireworks(), нижче), тепер
+   ЗАВЖДИ увімкнений, поки state.lifetime.gameCompleted — не лише
+   короткий спалах одразу після цього екрана. */
 function openEndingScreen(){
   modalKind = 'ending';
   modalTitle.textContent = t('modal.endingTitle');
   renderEndingScreen();
   modalBackdrop.hidden = false;
-  fireworksUntil = Date.now() + FIREWORKS_DURATION_MS;
   sfxLevelUp();
 }
 function endingArt(){
@@ -4507,7 +4682,7 @@ const state = {
              bestDistance:0, bestLevel:1, prestigePoints:0, prestigeCount:0, prestigeSkillPoints:0,
              questsCompleted:0, legendaryFound:0, maxTierAnnounced:0, bossesDefeated:0,
              skillLevelsBought:0, itemsEnchanted:0, demonicFound:0,
-             monsterKills:{}, bossKills:{}, loginStreak:0, lastLoginDate:null,
+             monsterKills:{}, bossKills:{}, loginStreak:0, lastLoginDate:null, loginDates:{},
              totalWoodCollected:0, totalStoneCollected:0, totalIronCollected:0,
              bestGauntletWaves:0, setsCompleted:{} }
 };
@@ -4608,7 +4783,16 @@ const NIGHT_GOLD_BONUS_PCT = 10;
 function dayPhase(){ return (bgTime % DAY_CYCLE_SEC) / DAY_CYCLE_SEC; }
 function nightAmount(){ return (1 - Math.cos(dayPhase()*Math.PI*2))/2; } // 0=день, 1=глибока ніч
 function dayNightGoldMult(){ return 1 + (nightAmount()*NIGHT_GOLD_BONUS_PCT)/100; }
-function goldMultEff(){ return stats.goldMult * (1+comboMultBonus()) * dayNightGoldMult() * goldRushMult(); }
+// Вихідні (v0.78) — субота й неділя за РЕАЛЬНИМ календарем (не ігровим
+// bgTime-циклом дня/ночі вище — це геть інша, довша шкала) — гравець
+// прямо попросив: ×2 на золото/досвід/душі босів увесь вихідний,
+// показано в тому самому календарі, що й стрик. WEEKEND_MULT — єдине
+// число, яке й malює ×2-бейджик у календарі, і реально застосовується
+// тут.
+const WEEKEND_MULT = 2;
+function isWeekendBonus(){ const d = new Date().getDay(); return d===0 || d===6; } // 0=нд, 6=сб
+function weekendMult(){ return isWeekendBonus() ? WEEKEND_MULT : 1; }
+function goldMultEff(){ return stats.goldMult * (1+comboMultBonus()) * dayNightGoldMult() * goldRushMult() * weekendMult(); }
 
 /* =====================================================================
    СТАТИ
@@ -4719,6 +4903,13 @@ function recomputeStats(){
     companionMagnet += lvl*COMPANION_HUNTER_MAGNET_PER_LVL;
   }
 
+  // Стрик входів (v0.78) — постійний бонус, поки стрик не перервався,
+  // росте з довжиною поточного стріку до стелі STREAK_BONUS_MAX_DAYS.
+  const streakDays = streakBonusDays();
+  atk *= (1 + streakDays*STREAK_BONUS_ATK_PCT_PER_DAY/100);
+  goldMult += streakDays*STREAK_BONUS_GOLD_PCT_PER_DAY/100;
+  dropBonus += streakDays*STREAK_BONUS_DROP_PCT_PER_DAY/100;
+
   stats.attack = atk;
   // ТИМЧАСОВЕ обмеження швидкості (v0.57), поки триває пошук справжньої
   // причини лагів/зависань на екстремальних рівнях: чим вища stats.speed,
@@ -4751,9 +4942,9 @@ function recomputeStats(){
   stats.abilityDurationMult = 1 + skillB.abilityDurationPct/100;
   stats.abilityCooldownMult = 1 - Math.min(70, skillB.abilityCooldownPct)/100;
   stats.farmXpMult = farmXpMult;
-  stats.bonusXpMult = (1 + prestigeB.xpPct/100) * (1 + castleB.xpPct/100) * (1 + companionXpPct/100);
+  stats.bonusXpMult = (1 + prestigeB.xpPct/100) * (1 + castleB.xpPct/100) * (1 + companionXpPct/100) * weekendMult();
   stats.castleResourceMult = 1 + castleB.resourceMult/100;
-  stats.soulMult = 1 + castleB.soulMult/100;
+  stats.soulMult = (1 + castleB.soulMult/100) * weekendMult();
 }
 
 function upgradeCost(key){
@@ -5559,13 +5750,15 @@ function renderTownTorches(){
   ctx.globalAlpha = 1;
 }
 
-// Салют над містом — увімкнений на FIREWORKS_DURATION_MS після ПЕРШОЇ
-// перемоги над фінальним босом (fireworksUntil виставляється в
-// openEndingScreen()). Кожен "вибух" — короткий цикл (0..1.2с з паузою
+// Салют над містом — гравець прямо попросив: ЗАВЖДИ, поки гру пройдено
+// (state.lifetime.gameCompleted), а не лише коротким спалахом одразу
+// після цього. Прапорець ніколи не скидається (як і сам факт
+// проходження), тож це просто назавжди ввімкнена декорація для тих,
+// хто дійшов до кінця. Кожен "вибух" — короткий цикл (0..1.2с з паузою
 // до 3с), окрема фаза на індекс i, як TOWN_TORCHES/torch.x — щоб не
 // спалахували всі одночасно. Суто декоративно, ніяких ігрових ефектів.
 function renderTownFireworks(){
-  if(Date.now() > fireworksUntil) return;
+  if(!state.lifetime.gameCompleted) return;
   const now = Date.now()/1000;
   const colors = ['#ffd94d','#ff6b8a','#7ad4ff','#7dffb0','#c77dff','#ffb84d'];
   ctx.save();
@@ -5589,36 +5782,43 @@ function renderTownFireworks(){
 }
 
 /* Фізична споруда Замку на Ділянці (тайли '~', колонки 13-18, рядки 2-8
-   в TOWN_MAP) — росте разом зі state.castleLevel. Раніше тут було лише
-   7 УКРУПНЕНИХ візуальних стадій (діапазони рівнів) — тепер ОКРЕМА
-   картинка на КОЖЕН з 20 рівнів (CASTLE_TOWN_STAGES[level] — індекс
-   масиву == рівень замку, без пошуку діапазону), кожна є попередньою
-   +1 видима зміна (нова вежа, дим над кузнею, зубці на стінах, герб...),
-   узгоджено за порядком з CASTLE_CONSTRUCTIONS. Той самий масив
-   використовує і модалка Замку (renderCastle() -> castleTownArtFor()). */
+   в TOWN_MAP) — росте разом зі state.castleLevel, окрема картинка на
+   КОЖЕН з 20 рівнів. v0.77: гравець прямо назвав попередню версію
+   "кашею незрозумілою" й показав референс — симетричний замок із
+   двома баштами, зубцями й прапорами. Перероблено з нуля: КОЖЕН новий
+   рівень або додає НОВИЙ поверх/елемент ЗВЕРХУ на вже наявну основу
+   (справжнє "будується знизу вверх", а не довільна заміна форми), або
+   додає дрібну деталь до вже наявної форми — фундамент і брама, щойно
+   з'явившись, більше не зникають і не перекроюються. Порядок: фундамент
+   → брама → стіни ростуть → башти-близнючки (симетрія!) → вікна →
+   зубці на стіні → дахи башт → друга брама (посилена) → прапори →
+   з'єднувальна стіна між баштами росте → зубці на ній → флюгери на
+   дахах → герб над брамою → центральна вежа-донжон визирає над усім —
+   фінальний вигляд на Lv.20. Той самий масив використовує і модалка
+   Замку (renderCastle() -> castleTownArtFor()). */
 const CASTLE_GROUNDS = {x0:13, x1:18, y0:2, y1:8};
 const CASTLE_TOWN_STAGES = [
-  {level:0, color:'#5a5240', art:['   .    .','  .   ?   .','   .    .']},
-  {level:1, color:'#8a7550', art:['==========']},
-  {level:2, color:'#8a7550', art:[' ______','|______|','==========']},
-  {level:3, color:'#8a7550', art:[' ______','|[==]  |','==========']},
-  {level:4, color:'#c9a876', art:[' _','|_|','    ______','   |[==]  |','==========']},
-  {level:5, color:'#c9a876', art:[' _              _','|_|            |_|','    ______','   |[==]  |','==========']},
-  {level:6, color:'#c9a876', art:[' _         _','|_|  ____ |_|','    |[==]  |','    |______|','  =========']},
-  {level:7, color:'#d4b483', art:['   /\\','  |##|',' _         _','|_|  ____ |_|','    |[==]  |','    |______|','  =========']},
-  {level:8, color:'#d4b483', art:['   /\\','  |##|',' _         _','|_|  ____ |_|','    |[==]  |','    |______|',' . ========= .']},
-  {level:9, color:'#d4b483', art:['   /\\','  |##|',' _ [X][X][X] _','|_|  ____  |_|','    |[==]  |','    |______|',' . ========= .']},
-  {level:10, color:'#e0c080', art:['  ~ ~','   /\\','  |##|',' _ [X][X][X] _','|_|  ____  |_|','    |[==]  |','    |______|',' . ========= .']},
-  {level:11, color:'#e0c080', art:['  ~ ~','   /\\','  |##|',' _ [X][X][X] _','|_|  ____  |_|','   |>K==K<|','    |______|',' . ========= .']},
-  {level:12, color:'#e0c080', art:['  ~ ~','   /\\','  |##|',' _[X][X][X][] _','|_|  ____   |_|','   |>K==K<|','    |______|',' . ========= .']},
-  {level:13, color:'#e0c080', art:['  ~ ~','   /\\','  |##|',' _[X][X][X][] _','|_|  ____   |_|','  $|>K==K<|$','    |______|',' . ========= .']},
-  {level:14, color:'#e8cf90', art:['   *','  ~ ~','   /\\','  |##|',' _[X][X][X][] _','|_|  ____   |_|','  $|>K==K<|$','    |______|',' . ========= .']},
-  {level:15, color:'#e8cf90', art:['   *','  ~ ~','   /\\','  |##|',' _[X][X][X][] _','|_|  ____   |_|','  $|>K==K<|$','    |______|','.+ ========= +.']},
-  {level:16, color:'#e8cf90', art:['   *','  ~ ~','   /\\','  |##|',' _[X][X][X][] _','|_|  ____   |_|','  $|>K==K<|$','    |______|','.+ ========= +.','  vvvvvvvvv']},
-  {level:17, color:'#ffd27a', art:['   *','  ~ ~','   /\\','  |##|',' _[X][X][X][] _','|_|  ____   |_|','  $|>K==K<|$','    |______|','##=============##','   vvvvvvvvv']},
-  {level:18, color:'#ffd27a', art:[' ^^^^^^^^^^^^^^^^^','   *','  ~ ~','   /\\','  |##|',' _[X][X][X][] _','|_|  ____   |_|','  $|>K==K<|$','    |______|','##=============##','   vvvvvvvvv']},
-  {level:19, color:'#ffd27a', art:['      [K]',' ^^^^^^^^^^^^^^^^^','   *','  ~ ~','   /\\','  |##|',' _[X][X][X][] _','|_|  ____   |_|','  $|>K==K<|$','    |______|','##=============##','   vvvvvvvvv']},
-  {level:20, color:'#ffe9a8', art:['      [K]',' ^^^^^^^^^^^^^^^^^','  *P       P*','  ~ ~','   /\\','  |##|',' _[X][X][X][] _','|_|  ____   |_|','  $|>K==K<|$','    |______|','##=============##','   vvvvvvvvv']},
+  {level:0,  color:'#5a5240', art:['   .    .','  .   ?   .','   .    .']},
+  {level:1,  color:'#8a7550', art:['=========']},
+  {level:2,  color:'#8a7550', art:['|_______|','=========']},
+  {level:3,  color:'#8a7550', art:['|_[==]_|','=========']},
+  {level:4,  color:'#c9a876', art:['|       |','|_[==]_|','=========']},
+  {level:5,  color:'#c9a876', art:[' _     _','|_|   |_|','|_[==]_|','=========']},
+  {level:6,  color:'#c9a876', art:['| |   | |','|_|   |_|','|_[==]_|','=========']},
+  {level:7,  color:'#d4b483', art:['|o|   |o|','| |   | |','|_|   |_|','|_[==]_|','=========']},
+  {level:8,  color:'#d4b483', art:['|o|   |o|','| |   | |','|_|^^^|_|','|_[==]_|','=========']},
+  {level:9,  color:'#d4b483', art:['/^\\   /^\\','|o|   |o|','| |   | |','|_|^^^|_|','|_[==]_|','=========']},
+  {level:10, color:'#e0c080', art:['/^\\   /^\\','|o|   |o|','| |   | |','|_|^^^|_|','|[XX]|','==========']},
+  {level:11, color:'#e0c080', art:[' !     !','/^\\   /^\\','|o|   |o|','| |   | |','|_|^^^|_|','|[XX]|','==========']},
+  {level:12, color:'#e0c080', art:[' !     !','/^\\   /^\\','|o|   |o|','|_|___|_|','|_|^^^|_|','|[XX]|','===========']},
+  {level:13, color:'#e0c080', art:[' !     !','/^\\   /^\\','|o|**|o|','|_|___|_|','|_|^^^|_|','|[XX]|','===========']},
+  {level:14, color:'#e8cf90', art:[' !     !','/^\\   /^\\','|o|**|o|','| |___| |','|_|___|_|','|_|^^^|_|','|[XX]|','===========']},
+  {level:15, color:'#e8cf90', art:[' !     !','/^\\   /^\\','|o|**|o|','| |^^^| |','|_|___|_|','|_|^^^|_|','|[XX]|','===========']},
+  {level:16, color:'#e8cf90', art:['  !   !',' !     !','/^\\   /^\\','|o|**|o|','| |^^^| |','|_|___|_|','|_|^^^|_|','|[XX]|','============']},
+  {level:17, color:'#ffd27a', art:['  !   !',' !     !','/^\\   /^\\','|o|**|o|','| |^^^| |','|_|___|_|','|_|^^^|_|','#[XX]#','#============#']},
+  {level:18, color:'#ffd27a', art:['  !   !',' !     !','/^!\\ /^!\\','|o|**|o|','| |^^^| |','|_|___|_|','|_|^^^|_|','#[XX]#','#============#']},
+  {level:19, color:'#ffd27a', art:['  !   !',' !     !','/^!\\ /^!\\','|o|**|o|','| |[K]| |','|_|___|_|','|_|^^^|_|','#[XX]#','#============#']},
+  {level:20, color:'#ffe9a8', art:['   /\\','  |##|','  !   !',' !     !','/^!\\ /^!\\','|o|**|o|','| |[K]| |','|_|___|_|','|_|^^^|_|','$[XX]$','$============$']},
 ];
 function castleTownArtFor(level){
   return CASTLE_TOWN_STAGES[Math.max(0, Math.min(CASTLE_MAX_LEVEL, level))];
@@ -5667,7 +5867,7 @@ function renderTown(){
       if(ch==='#') color = '#2a4a2a';
       else if(ch==='.') color = '#173318';
       else if(ch===':') color = '#4a4230'; // бруківка дороги до брами
-      else if(ch==='~') color = '#3a3018'; // Ділянка Замку — теплий приглушений ґрунт
+      else if(ch==='~') color = '#241e10'; // Ділянка Замку — теплий приглушений ґрунт (гравець попросив темніше)
       else if(ch==='G') color = '#ffd94d';
       else if(ch==='K') color = '#ff9d4d';
       else if(ch==='M') color = '#4dd2ff';
@@ -6103,6 +6303,7 @@ function renderModalBody(){
   if(modalKind==='bestiary'){ renderBestiary(); return; }
   if(modalKind==='library'){ renderLibrary(); return; }
   if(modalKind==='companions'){ renderCompanions(); return; }
+  if(modalKind==='streak'){ renderStreakCalendar(); return; }
   if(modalKind==='castle'){ renderCastle(); return; }
   if(modalKind==='shop'){ renderShop(); return; }
   if(modalKind==='cloud'){ renderCloudModal(); return; }
@@ -7077,9 +7278,26 @@ function showOfflineModal(summary){
   modalBackdrop.hidden = false;
 }
 
+// Понад ENCHANT_COST_EXP_CAP рівнів заточки чиста експонента (1.35^рівень
+// чи 1.4^рівень демонічних) переповнює Number (>1.8e308) і перетворюється
+// на Infinity — гравець на дуже високих рівнях (+5000 і більше, вже
+// бачив на своєму акаунті) отримував кнопку "Infinity$", яку фізично
+// неможливо натиснути. Той самий принцип, що вже застосований до
+// дерева навичок/компаньйонів (довгий хвіст без переповнення): до межі
+// — формула БЕЗ ЗМІН (весь баланс нижче 400 заточки лишається таким,
+// яким і був), а ПОНАД неї — набагато повільніша "довга" експонента
+// (1.01×/рівень замість 1.35×/1.4×), що продовжує рости, але не
+// переповнює Number ще десятки тисяч рівнів далі.
+const ENCHANT_COST_EXP_CAP = 400;
+const ENCHANT_COST_LATE_MULT = 1.01;
+function enchantCostGeneric(base, mult, enchant){
+  if(enchant <= ENCHANT_COST_EXP_CAP) return Math.round(base*Math.pow(mult, enchant));
+  const atCap = base*Math.pow(mult, ENCHANT_COST_EXP_CAP);
+  return Math.round(atCap*Math.pow(ENCHANT_COST_LATE_MULT, enchant-ENCHANT_COST_EXP_CAP));
+}
 function enchantCostOf(it){
-  if(it.rarity==='demonic') return Math.round(DEMONIC_ENCHANT_BASE*Math.pow(DEMONIC_ENCHANT_MULT, it.enchant||0));
-  return Math.round(ENCHANT_BASE_COST[it.rarity]*Math.pow(1.35, it.enchant||0));
+  if(it.rarity==='demonic') return enchantCostGeneric(DEMONIC_ENCHANT_BASE, DEMONIC_ENCHANT_MULT, it.enchant||0);
+  return enchantCostGeneric(ENCHANT_BASE_COST[it.rarity], 1.35, it.enchant||0);
 }
 function enchantCurrencyOf(it){ return it.rarity==='demonic' ? 'souls' : 'gold'; }
 function updateModalAfford(){
@@ -7196,6 +7414,8 @@ modalBody.addEventListener('click', (e)=>{
   else if(btn.dataset.action==='companionSelect') selectCompanion(btn.dataset.id);
   else if(btn.dataset.action==='companionBuy') buyCompanionLevel(btn.dataset.id);
   else if(btn.dataset.action==='companionBuyMax') buyCompanionLevelMax(btn.dataset.id);
+  else if(btn.dataset.action==='streakPrevMonth') changeCalendarMonth(-1);
+  else if(btn.dataset.action==='streakNextMonth') changeCalendarMonth(1);
   else if(btn.dataset.action==='prestigeModalTab'){ prestigeModalTab = btn.dataset.tab; renderPrestigeModal(); }
   else if(btn.dataset.action==='prestigeSkill') buyPrestigeSkill(btn.dataset.id);
   else if(btn.dataset.action==='prestigeSkillMax') buyPrestigeSkillMax(btn.dataset.id);
@@ -7484,6 +7704,7 @@ function updateHud(){
   const achClaimed = ACHIEVEMENTS.filter(a=>state.achievements[a.id]).length;
   document.getElementById('achBadge').textContent = `${achClaimed}/${ACHIEVEMENTS.length}`;
   document.getElementById('prestigeBadge').textContent = state.lifetime.prestigePoints;
+  document.getElementById('streakBadge').textContent = state.lifetime.loginStreak||0;
 
   // Комбо й панель бою НЕ ховаємо через display:none (hidden), а лише через
   // visibility — інакше вони зникають/з'являються з макета і все під ними
@@ -7750,6 +7971,7 @@ function applyLoadedData(d){
     prestigeSkillPoints: dl.prestigeSkillPoints||0,
     loginStreak: dl.loginStreak||0,
     lastLoginDate: typeof dl.lastLoginDate==='string' ? dl.lastLoginDate : null,
+    loginDates: (dl.loginDates && typeof dl.loginDates==='object') ? dl.loginDates : {},
     questsCompleted: dl.questsCompleted||0,
     legendaryFound: dl.legendaryFound||0,
     // Math.max(0,...) — старі збереження могли мати -1 (ще з часів, коли
@@ -8088,7 +8310,7 @@ function resetProgress(){
                      bestDistance:0, bestLevel:1, prestigePoints:0, prestigeCount:0, prestigeSkillPoints:0,
                      questsCompleted:0, legendaryFound:0, maxTierAnnounced:0, bossesDefeated:0,
                      skillLevelsBought:0, itemsEnchanted:0, demonicFound:0,
-                     monsterKills:{}, bossKills:{}, loginStreak:0, lastLoginDate:null,
+                     monsterKills:{}, bossKills:{}, loginStreak:0, lastLoginDate:null, loginDates:{},
                      totalWoodCollected:0, totalStoneCollected:0, totalIronCollected:0,
                      bestGauntletWaves:0, setsCompleted:{}, gameCompleted:false};
   distanceCols = 0;
@@ -8220,6 +8442,7 @@ document.getElementById('characterBtn').addEventListener('click', ()=>{ ensureAu
 document.getElementById('bestiaryBtn').addEventListener('click', ()=>{ ensureAudio(); openBestiary(); });
 document.getElementById('libraryBtn').addEventListener('click', ()=>{ ensureAudio(); openLibrary(); });
 document.getElementById('companionsBtn').addEventListener('click', ()=>{ ensureAudio(); openCompanions(); });
+document.getElementById('streakBtn').addEventListener('click', ()=>{ ensureAudio(); openStreakCalendar(); });
 document.getElementById('bossPortalBtn').addEventListener('click', ()=>{ ensureAudio(); openBossPortal(); });
 document.getElementById('worldMapHudBtn').addEventListener('click', ()=>{ ensureAudio(); openWorldMap(); });
 document.getElementById('leaderboardBtn').addEventListener('click', ()=>{ ensureAudio(); openLeaderboard(); });
@@ -8584,12 +8807,19 @@ function showTitleScreen(){
   if(!state.nickname) state.nickname = generateNickname();
   document.getElementById('titleNickname').textContent = state.nickname;
   titleScreen.hidden = false;
+  // #titleScreen — position:fixed поверх усього, але фіксовані елементи
+  // САМІ ПО СОБІ не блокують скрол сторінки під ними — на мобільному це
+  // відчувалось як зайвий "гумовий" скрол фону, що нікуди не веде (весь
+  // реальний контент однаково захований під цим екраном). Гравець прямо
+  // попросив заблокувати скрол body, поки цей екран видимий.
+  document.body.style.overflow = 'hidden';
   sizeTitleCanvas();
   titleLastTs = 0;
   titleRafId = requestAnimationFrame(titleLoop);
 }
 function hideTitleScreen(){
   titleScreen.hidden = true;
+  document.body.style.overflow = '';
   if(titleRafId) cancelAnimationFrame(titleRafId);
   titleRafId = null;
 }
