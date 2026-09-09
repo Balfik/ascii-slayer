@@ -647,7 +647,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = '0.84';
+const GAME_VERSION = '0.85';
 
 const SUPABASE_URL = 'https://vfaveuenkublhxgatbcn.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_PkeJBe1KSw0ZWUSgcAIZFA_SuG8Ilyo';
@@ -802,22 +802,13 @@ const LEADERBOARD_NICK_COLOR = 'var(--accent)';
 function nickSpan(nick){ return `<span style="color:${LEADERBOARD_NICK_COLOR}">${escapeHtml(nick)}</span>`; }
 function renderEventLine(e){
   const nick = nickSpan(e.nickname);
-  // v0.80/81 БАГ, підтверджений живим тестом напряму на Supabase: колонка
-  // target_rarity в events має server-side перевірку, що приймає ЛИШЕ
-  // справжні рідкості предметів (common..demonic) — 'relic' НЕ серед
-  // них, тож будь-який relic_found із targetRarity:'relic' незмінно
-  // відхилявся ("target_rarity invalid"), НАЗАВЖДИ, незалежно від черги/
-  // троттлінгу (звідси й 0 relic_found за 1000+ записів навіть ПІСЛЯ
-  // фіксу черги). Фікс: relic_found більше не шле target_rarity в БД
-  // взагалі (grantRelic() нижче) — фіолетовий колір реліквії тепер суто
-  // клієнтський, вибирається тут за event_type, а не за (недопустимим)
-  // значенням із бази.
+
   const rarityColor = e.event_type==='relic_found' ? RARITY_COLOR.relic : (e.target_rarity ? RARITY_COLOR[e.target_rarity] : null);
   const target = e.target_name!=null ? `«<span style="color:${rarityColor||'var(--text)'}">${escapeHtml(e.target_name)}</span>»` : '';
   const uk = {
     level_milestone: `${nick} досяг ${e.value} рівня!`,
     boss_defeat: `${nick} переміг боса ${target}!`,
-    enchant_10: `${nick} заточив ${target} на +10!`, // старі записи в базі (до v0.68) — лишаємо текст для сумісності
+    enchant_10: `${nick} заточив ${target} на +10!`,
     enchant_milestone: `${nick} заточив ${target} на +${e.value}!`,
     relic_found: `${nick} здобув реліквію ${target}!`,
     demonic_item_found: `${nick} виборов демонічний предмет ${target}!`,
@@ -832,7 +823,7 @@ function renderEventLine(e){
   const en = {
     level_milestone: `${nick} reached level ${e.value}!`,
     boss_defeat: `${nick} defeated ${target}!`,
-    enchant_10: `${nick} enchanted ${target} to +10!`, // old rows already in the DB (pre-v0.68) — text kept for compatibility
+    enchant_10: `${nick} enchanted ${target} to +10!`,
     enchant_milestone: `${nick} enchanted ${target} to +${e.value}!`,
     relic_found: `${nick} found the relic ${target}!`,
     demonic_item_found: `${nick} won a demonic item, ${target}!`,
@@ -846,13 +837,7 @@ function renderEventLine(e){
   };
   return (lang==='en' ? en : uk)[e.event_type] || '';
 }
-// Заточка демонічного/легендарного предмета на кожен НОВИЙ поріг +10
-// (10, 20, 30...) — гравець прямо попросив більше активу в стрічці
-// лідерборду. Звичайні/незвичайні/рідкісні/епічні рідкості свідомо не
-// репортуємо тут — не такі видовищні, спамили б стрічку дрібницями.
-// tierAfter*10 — НАЙВИЩИЙ поріг, досягнутий за цей виклик (якщо "На всі"
-// перескочив одразу кілька порогів за раз — репортимо один раз, за
-// найвищий, а не по разу на кожен пройдений поріг).
+
 function checkEnchantMilestoneEvent(it, enchantBefore){
   if(it.rarity!=='legendary' && it.rarity!=='demonic') return;
   const tierBefore = Math.floor(enchantBefore/10);
@@ -861,23 +846,7 @@ function checkEnchantMilestoneEvent(it, enchantBefore){
     reportEvent('enchant_milestone', {targetName:L(it,'name'), targetRarity:it.rarity, value:tierAfter*10});
   }
 }
-// v0.80: ЧЕРГА подій замість миттєвого insert. Причина, знайдена й
-// перевірена ЖИВОЮ базою (500 останніх записів): events_validate на
-// боці сервера відхиляє повторний запис від того самого гравця
-// частіше ніж раз на 5с — а grantRelic()/grantDemonicItem() (та
-// enchant/level-майлстоуни) майже завжди спрацьовують ОДРАЗУ ПІСЛЯ
-// reportEvent('boss_defeat'/'game_completed') в межах ОДНІЄЇ й тієї ж
-// функції перемоги над босом, за мілісекунди — тобто програють цю
-// гонку систематично, а не зрідка. Результат: 484 enchant_milestone,
-// 14 level_milestone, 2 boss_defeat — і РІВНО 0 relic_found/
-// demonic_item_found/prestige/castle_complete/game_completed за 500
-// записів. Фікс без жодних змін на сервері: кожен reportEvent() лише
-// СТАВИТЬ подію в локальну чергу; чергу розбирає flushEventQueue() не
-// частіше ніж раз на EVENT_SEND_GAP_MS (з запасом понад серверні 5с),
-// і завжди спершу найвищий пріоритет (EVENT_PRIORITY) — тож рідкісні,
-// видовищні події (реліквія, демонічний предмет, фінал) більше не
-// губляться позаду рутинних (рівень/бос), навіть коли всі спрацювали
-// одним сплеском.
+
 const EVENT_PRIORITY = {
   game_completed:100, castle_complete:90, prestige:80,
   relic_found:70, demonic_item_found:65, legendary_found:60,
@@ -899,19 +868,12 @@ function reportEvent(kind, extra){
 async function flushEventQueue(){
   eventQueueTimer = null;
   if(eventQueue.length===0) return;
-  // Найвищий пріоритет спершу; за рівного — порядок надходження
-  // (Array.prototype.sort стабільний у всіх сучасних рушіях).
+
   eventQueue.sort((a,b)=>b.priority-a.priority);
   const ev = eventQueue.shift();
   lastEventSentAt = Date.now();
   try{
-    // supabase-js .insert() при відхиленні тригером (events_validate) чи
-    // RLS зазвичай НЕ кидає виняток — повертає {error} у результаті, який
-    // try/catch не ловить (нічого не кинуто). Раніше це ігнорувалось
-    // повністю — тепер логуємо у консоль, щоб бачити РЕАЛЬНУ причину
-    // (гравець підтвердив живцем: relic_found і далі не долітають навіть
-    // після черги з пріоритетом — отже причина відмови, найімовірніше,
-    // НЕ в 5-секундному троттлі, а в чомусь ще, що поки не видно).
+
     const { error: insertErr } = await sbClient.from('events').insert({
       player_id: sbPlayerId, nickname: state.nickname, event_type: ev.kind,
       target_name: ev.extra && ev.extra.targetName!=null ? ev.extra.targetName : null,
@@ -919,15 +881,12 @@ async function flushEventQueue(){
       value: ev.extra && ev.extra.value!=null ? ev.extra.value : null
     });
     if(insertErr) console.warn('[reportEvent] insert rejected', insertErr, ev);
-  }catch(e){ /* мережа — подія просто губиться, наступна в черзі й далі піде */ }
+  }catch(e){  }
   if(eventQueue.length>0){
     eventQueueTimer = setTimeout(flushEventQueue, EVENT_SEND_GAP_MS);
   }
 }
 
-// Нікнейм — ЛИШЕ автогенерація, навмисно без ручного вводу тексту, щоб
-// на публічному лідерборді не було місця для образливих слів.
-// Прикметник+іменник, окремі списки під UA/EN.
 const NICKNAME_ADJ_UK = ['Тіньовий','Грозовий','Демонічний','Крижаний','Вогняний','Швидкий','Древній','Забутий','Прокляний','Золотий','Легендарний','Нічний','Кривавий','Залізний','Дикий','Примарний','Безстрашний','Похмурий','Сяючий','Могутній'];
 const NICKNAME_NOUN_UK = ['Мечник','Слеєр','Мандрівник','Ведмідь','Дракон','Вовк','Лицар','Мисливець','Демон','Страж','Воїн','Клинок','Тінь','Привид','Титан','Сокіл','Барон','Чаклун','Розбійник','Легенда'];
 const NICKNAME_ADJ_EN = ['Shadow','Storm','Demonic','Frozen','Blazing','Swift','Ancient','Forgotten','Cursed','Golden','Legendary','Nightly','Bloody','Iron','Feral','Ghostly','Fearless','Grim','Radiant','Mighty'];
@@ -938,74 +897,29 @@ function generateNickname(){
   return adjs[Math.floor(Math.random()*adjs.length)] + ' ' + nouns[Math.floor(Math.random()*nouns.length)];
 }
 
-/* =====================================================================
-   КОНФІГ ГРИДУ РАННЕРА
-   ===================================================================== */
 const GRID_COLS = 60;
 const PLAYER_COL = 8;
-// CELL_W/CELL_H/TOP_PAD/BOTTOM_PAD — БАЗОВІ (десктопні) значення. На
-// десктопі вікно бігу зумисно дуже широке й низьке (980×136, ~7.2:1) —
-// canvas розтягується по ширині контейнера (width:100%), а висота йде
-// за aspect-ratio, тож на вузькому мобільному екрані ця ж пропорція
-// перетворює вікно бігу на ниточку в кілька пікселів заввишки. Гравець
-// прямо попросив: зробити вікно вищим на мобільному (як міське) і
-// елементи в ньому більшими — updateRunGeometryForViewport() нижче
-// масштабує ЛИШЕ вертикальні величини (не GRID_COLS/CELL_W — ширина й
-// так розтягується по контейнеру незалежно від них). screenCol()/
-// геймплейна логіка ніде НЕ читає ці pixel-константи (лише малювання),
-// тож зміна їх безпечна й не впливає на саму гру, тільки на вигляд.
+
 const CELL_W_BASE = 16, CELL_H_BASE = 28;
 const TOP_PAD_BASE = 44, PAD_LEFT = 10, BOTTOM_PAD_BASE = 8;
 let CELL_W = CELL_W_BASE, CELL_H = CELL_H_BASE;
 let TOP_PAD = TOP_PAD_BASE, BOTTOM_PAD = BOTTOM_PAD_BASE;
-// ROW_GAP — ОКРЕМА від CELL_H відстань МІЖ трьома ігровими рядками
-// (повітря/земля/підлога), яку читає yForRow(). Раніше (перша спроба
-// фіксу) yForRow() брав ту саму величезну CELL_H, що й TOP_PAD/фон —
-// на мобільному це рознесло сутності (гравець/моби/монети — рядок
-// ROW_GROUND) ДУЖЕ далеко ВІД дороги (ROW_FLOOR), бо відстань між
-// рядками буквально дорівнювала висоті всього неба зверху. Виглядало,
-// за словами гравця, "ніби це в космосі летить". TOP_PAD (скільки неба
-// зверху) і ROW_GAP (наскільки далеко рядки один від одного) — це ДВІ
-// різні речі, і плутати їх — та сама помилка, що вже була зі шрифтом.
+
 const ROW_GAP_BASE = CELL_H_BASE;
 let ROW_GAP = ROW_GAP_BASE;
 const ROW_AIR = 0, ROW_GROUND = 1, ROW_FLOOR = 2;
 let INTERNAL_W = PAD_LEFT*2 + GRID_COLS*CELL_W;
 let INTERNAL_H = TOP_PAD + 3*ROW_GAP + BOTTOM_PAD;
-// ВАЖЛИВО (знайдено живим тестом на реальному телефоні): на екрані
-// шириною container_width канвас завжди розтягується по ширині
-// (width:100%), тож видима на екрані ширина ОДНІЄЇ колонки завжди ≈
-// container_width/GRID_COLS — і це геометрично НЕ залежить від того,
-// яке саме число ми поставимо в CELL_W/CELL_H всередині буфера (більший
-// CELL_W пропорційно збільшує й INTERNAL_W, а значить пропорційно
-// ЗМЕНШує масштаб показу — обидва ефекти скасовують одне одного). Тобто
-// саму ширину колонки на екрані збільшити нічим не можна, не змінюючи
-// GRID_COLS (а це вже геймплейна константа, чіпати не можна).
-// Через це РАНІШЕ (перша спроба) шрифт масштабувався РАЗОМ із CELL_H
-// (той самий множник) — і на мобільному гліфи (гравець показав скрін)
-// стали набагато ширшими за незмінну ширину колонки й почали жахливо
-// налазити один на одного ("гроші, моби... дуже кучно"). Правильний
-// підхід — ДВА окремих множники: CELL_H/TOP_PAD/BOTTOM_PAD ростуть
-// сильно (вікно справді вище, більше повітря між рядками — це гравцю
-// сподобалось), а розмір ШРИФТУ — окремий, значно скромніший множник
-// (RUN_FONT_SCALE), підібраний так, щоб гліфи ставали помітно більшими,
-// але й далі влазили в ту саму (незмінну) ширину колонки без накладання.
+
 let RUN_FONT_SCALE = 1;
 function runFontPx(basePx){ return Math.round(basePx * RUN_FONT_SCALE); }
-function isMobileViewport(){ return window.innerWidth <= 760; } // той самий поріг, що й .panels вище
-// Той самий сигнал, що й CSS @media(pointer:coarse) — керує показом
-// стрибка/Люті ПІД канвасом (.run-controls-row) замість тексту-підказки.
-// НАВМИСНО не isMobileViewport() (та — просто вузька ширина, могла б
-// бути звичайна звужена вкладка з мишкою й клавіатурою) — інакше на
-// вузькому ДЕСКТОПНОМУ вікні підказка зникла б, а кнопки під канвасом
-// (ті самі, що й підказку замінюють) не з'явились би — гравець лишився
-// б взагалі без жодного пояснення керування.
+function isMobileViewport(){ return window.innerWidth <= 760; }
+
 function isTouchDevice(){
   try{ return window.matchMedia('(pointer: coarse)').matches; }catch(err){ return false; }
 }
 function updateRunGeometryForViewport(){
   const mobile = isMobileViewport();
-  // heightScale 3.6→6.5: гравець прямо попросив "розмір вікна збільшити
 
   const heightScale = mobile ? 6.5 : 1;
 

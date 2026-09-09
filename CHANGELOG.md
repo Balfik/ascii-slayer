@@ -5,6 +5,8 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.85] — Minor fixes
+
 ## [0.84] — Minor fixes
 
 ## [0.83] — Admin notifications now arrive instantly
