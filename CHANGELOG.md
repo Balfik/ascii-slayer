@@ -5,6 +5,27 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.81] — Fixed the jump button, the New Game warning, and relic events actually reaching the feed
+
+### Fixed
+- The jump button on mobile lost its styling in v0.80 (showed as a
+  plain unstyled circle) — restored.
+- The New Game warning added in v0.80 was rendering behind the title
+  screen, making it look like nothing happened until you clicked
+  Continue. It now shows up front and center right away.
+- Relics were still never showing up in the event feed even after
+  v0.80's fix — turns out the database was silently rejecting every
+  single one for an unrelated reason. Fixed at the source; relics now
+  post correctly.
+- The event feed could show a blank row (just a timestamp, no text)
+  for an event type your browser tab hadn't loaded support for yet —
+  such rows are now skipped instead of showing empty.
+
+### Known issue
+- The public leaderboard has a hard ceiling on tracked level for very
+  long-running characters; a fix is planned but needs a database-side
+  change, not a client update.
+
 ## [0.80] — Leaderboard integrity, a livelier event feed, and a reworked mobile town
 
 ### Fixed

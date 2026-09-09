@@ -251,7 +251,13 @@
       gap:10px; padding:8px 4px 0;
     }
   }
-  .town-controls-row button{
+  /* v0.80 БАГ, знайдений гравцем живцем: .run-controls-row #btnJump тут
+     раніше НЕ згадувався (лише .town-controls-row button) — коли хрестик
+     переїхав у власний .town-controls-row, кнопка стрибка (вона в
+     ІНШОМУ рядку, .run-controls-row) втратила фон/рамку/колір і лишилась
+     голим непідписаним білим кружечком. Обидва рядки мають виглядати
+     однаково — правило знову спільне на них. */
+  .town-controls-row button, .run-controls-row #btnJump{
     font-family:inherit;color:var(--accent);background:rgba(18,36,23,.82);
     border:1px solid var(--border);border-radius:8px;
     -webkit-user-select:none;user-select:none;touch-action:none;
@@ -607,8 +613,14 @@
      кольорі небезпеки (--demonic), а не звична title-btn/акцент. НЕ
      прив'язана до modalBackdrop/modalKind (той механізм ще не готовий
      тут — стартовий екран показується ДО init()) — повністю окремий,
-     самодостатній оверлей лише для цього одного попередження. -->
-<div class="modal-backdrop" id="newGameConfirmBackdrop" hidden>
+     самодостатній оверлей лише для цього одного попередження.
+     БАГ, знайдений гравцем живцем: .modal-backdrop за замовчуванням
+     z-index:50, а #titleScreen — z-index:200 (щоб перекривати ВСЕ під
+     час завантаження) — модалка малювалась ПІД титульним екраном,
+     повністю невидима, поки titleScreen сам не сховається (тобто
+     виглядало так, ніби вона "з'являється тільки після Продовжити").
+     inline style нижче — z-index:210, явно вище titleScreen. -->
+<div class="modal-backdrop" id="newGameConfirmBackdrop" style="z-index:210;" hidden>
   <div class="modal" style="max-width:420px;">
     <div class="modal-head">
       <h2 data-i18n="confirm.newGame.title">⚠ Нова гра</h2>
@@ -778,7 +790,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.80';
+const GAME_VERSION = '0.81';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -843,20 +855,27 @@ async function syncLeaderboard(){
     // все життя персонажа), тож перед записом читаємо, що вже є на
     // сервері, і пишемо max(сервер, моє) для кожного окремо — жодне
     // поле більше не може випадково "просісти" назад.
-    const { data: existing } = await sbClient.from('players')
+    const { data: existing, error: selectErr } = await sbClient.from('players')
       .select('best_level,prestige_count,castle_level')
       .eq('id', sbPlayerId).maybeSingle();
+    if(selectErr) console.warn('[syncLeaderboard] select failed', selectErr);
     const bestLevel = Math.max(state.lifetime.bestLevel||0, (existing && existing.best_level)||0);
     const prestigeCount = Math.max(state.lifetime.prestigeCount||0, (existing && existing.prestige_count)||0);
     const castleLevel = Math.max(state.castleLevel||0, (existing && existing.castle_level)||0);
-    await sbClient.from('players').upsert({
+    // ВАЖЛИВО: supabase-js .upsert() при відхиленні тригером/RLS зазвичай
+    // НЕ кидає виняток — повертає {error} у результаті. Старий код це
+    // ігнорував (просто await без деструктуризації), тож будь-яка мовчазна
+    // відмова запису (напр. players_validate — межі на числа) була
+    // повністю невидимою: try/catch тут її не ловив, бо нічого не кидало.
+    const { error: upsertErr } = await sbClient.from('players').upsert({
       id: sbPlayerId,
       nickname: state.nickname,
       best_level: bestLevel,
       prestige_count: prestigeCount,
       castle_level: castleLevel
     });
-  }catch(e){ /* мережа/rate-limit — не критично для гри, спробуємо наступного разу */ }
+    if(upsertErr) console.warn('[syncLeaderboard] upsert rejected', upsertErr, {bestLevel, prestigeCount, castleLevel});
+  }catch(e){ /* мережа — не критично для гри, спробуємо наступного разу */ }
 }
 
 /* =====================================================================
@@ -970,7 +989,17 @@ const LEADERBOARD_NICK_COLOR = 'var(--accent)';
 function nickSpan(nick){ return `<span style="color:${LEADERBOARD_NICK_COLOR}">${escapeHtml(nick)}</span>`; }
 function renderEventLine(e){
   const nick = nickSpan(e.nickname);
-  const rarityColor = e.target_rarity ? RARITY_COLOR[e.target_rarity] : null;
+  // v0.80/81 БАГ, підтверджений живим тестом напряму на Supabase: колонка
+  // target_rarity в events має server-side перевірку, що приймає ЛИШЕ
+  // справжні рідкості предметів (common..demonic) — 'relic' НЕ серед
+  // них, тож будь-який relic_found із targetRarity:'relic' незмінно
+  // відхилявся ("target_rarity invalid"), НАЗАВЖДИ, незалежно від черги/
+  // троттлінгу (звідси й 0 relic_found за 1000+ записів навіть ПІСЛЯ
+  // фіксу черги). Фікс: relic_found більше не шле target_rarity в БД
+  // взагалі (grantRelic() нижче) — фіолетовий колір реліквії тепер суто
+  // клієнтський, вибирається тут за event_type, а не за (недопустимим)
+  // значенням із бази.
+  const rarityColor = e.event_type==='relic_found' ? RARITY_COLOR.relic : (e.target_rarity ? RARITY_COLOR[e.target_rarity] : null);
   const target = e.target_name!=null ? `«<span style="color:${rarityColor||'var(--text)'}">${escapeHtml(e.target_name)}</span>»` : '';
   const uk = {
     level_milestone: `${nick} досяг ${e.value} рівня!`,
@@ -1063,13 +1092,21 @@ async function flushEventQueue(){
   const ev = eventQueue.shift();
   lastEventSentAt = Date.now();
   try{
-    await sbClient.from('events').insert({
+    // supabase-js .insert() при відхиленні тригером (events_validate) чи
+    // RLS зазвичай НЕ кидає виняток — повертає {error} у результаті, який
+    // try/catch не ловить (нічого не кинуто). Раніше це ігнорувалось
+    // повністю — тепер логуємо у консоль, щоб бачити РЕАЛЬНУ причину
+    // (гравець підтвердив живцем: relic_found і далі не долітають навіть
+    // після черги з пріоритетом — отже причина відмови, найімовірніше,
+    // НЕ в 5-секундному троттлі, а в чомусь ще, що поки не видно).
+    const { error: insertErr } = await sbClient.from('events').insert({
       player_id: sbPlayerId, nickname: state.nickname, event_type: ev.kind,
       target_name: ev.extra && ev.extra.targetName!=null ? ev.extra.targetName : null,
       target_rarity: ev.extra && ev.extra.targetRarity!=null ? ev.extra.targetRarity : null,
       value: ev.extra && ev.extra.value!=null ? ev.extra.value : null
     });
-  }catch(e){ /* мережа/rate-limit — подія просто губиться, наступна в черзі й далі піде */ }
+    if(insertErr) console.warn('[reportEvent] insert rejected', insertErr, ev);
+  }catch(e){ /* мережа — подія просто губиться, наступна в черзі й далі піде */ }
   if(eventQueue.length>0){
     eventQueueTimer = setTimeout(flushEventQueue, EVENT_SEND_GAP_MS);
   }
@@ -2465,8 +2502,11 @@ function grantRelic(){
   state.relics[relic.id] = true;
   // Стрічка подій лідерборду — гравець прямо попросив більше активу там:
   // реліквія рідкісна й видовищна подія (лише 5 у грі, кожна раз назавжди),
-  // ідеально пасує для публічної стрічки.
-  reportEvent('relic_found', {targetName:L(relic,'name'), targetRarity:'relic'});
+  // ідеально пасує для публічної стрічки. БЕЗ targetRarity — сервер
+  // приймає в цій колонці лише справжні рідкості предметів, 'relic' туди
+  // не проходить (перевірено живцем, завжди відхилялось); колір реліквії
+  // тепер обирається клієнтом за event_type у renderEventLine().
+  reportEvent('relic_found', {targetName:L(relic,'name')});
   return relic;
 }
 let relicQuestTimer = 0;
@@ -6530,10 +6570,18 @@ async function renderLeaderboard(){
     }
     if(nearby && !amInTop50) html += renderNearbyRankHtml(nearby);
     html += `<div style="margin:14px 0 4px;color:var(--purple);font-size:12px;letter-spacing:1px;">${t('leaderboard.feedHeader')}</div>`;
-    const events = eventsRes.data||[];
+    // v0.80: гравець зловив живцем порожній рядок у стрічці (лише
+    // таймстемп, без тексту) — renderEventLine(e) повертає '' для
+    // event_type, якого це ЦЕ завантаження JS ще не знає (типове, коли
+    // вкладка відкрита ще з ПОПЕРЕДНЬОЇ версії гри й через realtime
+    // прилітає щойно доданий тип події, якого стара копія коду не
+    // впізнає). Раніше такий рядок все одно рендерився — порожній
+    // <div class="mrow"> з голим "N хв тому". Тепер такі рядки просто
+    // НЕ показуємо (map+filter), замість дірки без сенсу.
+    const events = (eventsRes.data||[]).map(e=>({e, line:renderEventLine(e)})).filter(x=>x.line);
     html += events.length===0
       ? `<div class="empty-msg">${t('leaderboard.feedEmpty')}</div>`
-      : events.map(e=>`<div class="mrow"><div class="up-name">${renderEventLine(e)}<small>${formatAgo(new Date(e.created_at).getTime())}</small></div></div>`).join('');
+      : events.map(({e,line})=>`<div class="mrow"><div class="up-name">${line}<small>${formatAgo(new Date(e.created_at).getTime())}</small></div></div>`).join('');
     modalBody.innerHTML = html;
   }catch(e){
     if(modalKind==='leaderboard') modalBody.innerHTML = `<div class="empty-msg">${t('leaderboard.unavailable')}</div>`;
