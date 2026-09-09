@@ -5,6 +5,13 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.83] — Admin notifications now arrive instantly
+
+### Changed
+- Internal-only: the admin Telegram notification for a new player now
+  fires the moment the player joins, instead of waiting for a
+  scheduled check every few minutes.
+
 ## [0.82] — Admin notifications for new players
 
 ### Added

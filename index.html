@@ -790,7 +790,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.82';
+const GAME_VERSION = '0.83';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -891,6 +891,19 @@ async function syncLeaderboard(){
     }
     const { error: upsertErr } = await sbClient.from('players').upsert(payload);
     if(upsertErr) console.warn('[syncLeaderboard] upsert rejected', upsertErr, payload);
+    // v0.83: миттєве адмінське сповіщення в Telegram про нового гравця —
+    // дзвонимо в Edge Function напряму (fire-and-forget, catch ковтає
+    // будь-яку помилку мовчки — це суто адмінська фіча, жодним чином не
+    // критична для самої гри). ЛИШЕ якщо !existing і сам upsert щойно
+    // успішно пройшов — інакше на 5-хвилинний GitHub Actions крон (той
+    // самий фільтр nickname NOT LIKE 'ZZTest%') лишається як резервний
+    // канал, якщо цей виклик не пройшов (adblock/мережа гравця).
+    if(!existing && !upsertErr){
+      fetch('https://vfaveuenkublhxgatbcn.supabase.co/functions/v1/telegram-bot', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({internal_notify_nickname: state.nickname})
+      }).catch(()=>{});
+    }
   }catch(e){ /* мережа — не критично для гри, спробуємо наступного разу */ }
 }
 
