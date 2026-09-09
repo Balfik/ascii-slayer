@@ -1,0 +1,51 @@
+name: Notify Telegram on new players
+
+# Адмінське сповіщення: раз на ~5 хв перевіряємо публічну (RLS: SELECT
+# для всіх) таблицю players на нові рядки за останні кілька хвилин і
+# шлемо повідомлення в Telegram (може бути кілька chat_id одразу,
+# TELEGRAM_CHAT_ID через кому). Без збереження стану між запусками —
+# просто "created_at за останні 6 хв" (трохи більше за 5-хвилинний
+# інтервал, про запас, якщо конкретний запуск затримався).
+#
+# nickname=not.ilike.ZZTest* — тестові персонажі, які я створюю під
+# час живого тестування, ЗАВЖДИ мають нік, що починається на "ZZTest "
+# (див. NOTES_FOR_CLAUDE.txt) і тому сюди ніколи не потрапляють.
+# ВАЖЛИВО: підкреслення/цифри в ніку сервер відхиляє (та сама
+# валідація, що й для звичайних автоген-нікнеймів — лише літери +
+# один пробіл, рівно два слова), тож префікс саме "ZZTest <Слово>",
+# без "_".
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for new players and notify Telegram
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          set -uo pipefail
+          SINCE=$(date -u -d '6 minutes ago' +%Y-%m-%dT%H:%M:%S)
+          RESP=$(curl -sf "https://vfaveuenkublhxgatbcn.supabase.co/rest/v1/players?select=nickname,created_at&created_at=gte.${SINCE}&nickname=not.ilike.ZZTest*&order=created_at.asc" \
+            -H "apikey: ${SUPABASE_KEY}") || { echo "Supabase query failed"; exit 0; }
+
+          echo "$RESP" | jq -c '.[]' | while read -r row; do
+            NICK=$(echo "$row" | jq -r '.nickname')
+            CREATED=$(echo "$row" | jq -r '.created_at')
+            TIME_FMT=$(date -u -d "$CREATED" +"%Y-%m-%d %H:%M UTC")
+            MSG="🆕 Новий гравець: ${NICK}
+Час: ${TIME_FMT}"
+
+            IFS=',' read -ra CHATS <<< "$TELEGRAM_CHAT_ID"
+            for CHAT in "${CHATS[@]}"; do
+              curl -sf -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+                --data-urlencode "chat_id=${CHAT}" \
+                --data-urlencode "text=${MSG}" > /dev/null \
+                || echo "Failed to notify chat ${CHAT}"
+            done
+          done

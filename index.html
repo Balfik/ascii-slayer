@@ -790,7 +790,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.81';
+const GAME_VERSION = '0.82';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -867,14 +867,30 @@ async function syncLeaderboard(){
     // ігнорував (просто await без деструктуризації), тож будь-яка мовчазна
     // відмова запису (напр. players_validate — межі на числа) була
     // повністю невидимою: try/catch тут її не ловив, бо нічого не кидало.
-    const { error: upsertErr } = await sbClient.from('players').upsert({
+    const payload = {
       id: sbPlayerId,
       nickname: state.nickname,
       best_level: bestLevel,
       prestige_count: prestigeCount,
       castle_level: castleLevel
-    });
-    if(upsertErr) console.warn('[syncLeaderboard] upsert rejected', upsertErr, {bestLevel, prestigeCount, castleLevel});
+    };
+    // v0.82: referrer/locale/timezone — суто для адмінського
+    // Telegram-сповіщення про нових гравців (звідки прийшли, груба
+    // мова/пояс замість точної IP-геолокації — свідомо, приватність).
+    // Пишемо їх ЛИШЕ при ПЕРШОМУ синку цього sbPlayerId (existing===null,
+    // тобто рядка в players ще не було) — інакше повторний вхід із
+    // прямого посилання (document.referrer порожній) затер би вже
+    // збережене справжнє джерело переходу пустим значенням щоразу.
+    // Обрізаємо довжину — це не звалидовується на боці бази (на
+    // відміну від nickname/events), тож самі не пускаємо нічого
+    // абсурдно довгого в чужу публічну таблицю.
+    if(!existing){
+      payload.referrer = (document.referrer || '').slice(0, 200) || null;
+      payload.locale = (navigator.language || '').slice(0, 20) || null;
+      try{ payload.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone.slice(0, 60) || null; }catch(e){ payload.timezone = null; }
+    }
+    const { error: upsertErr } = await sbClient.from('players').upsert(payload);
+    if(upsertErr) console.warn('[syncLeaderboard] upsert rejected', upsertErr, payload);
   }catch(e){ /* мережа — не критично для гри, спробуємо наступного разу */ }
 }
 
@@ -6517,12 +6533,16 @@ function leaderboardRowHtml(rank, p, mine){
 // й знизу — 3 легкі запити замість одного важкого.
 async function fetchNearbyRank(){
   const myLevel = state.lifetime.bestLevel;
+  // .not('nickname','ilike','ZZTest%') — тестові персонажі (мій живий
+  // тест ЗАВЖДИ з ніком "ZZTest ...", див. NOTES_FOR_CLAUDE.txt) не
+  // мають потрапляти в жодне число/рядок, який бачить реальний гравець
+  // — ні в позицію в рейтингу, ні в сусідні рядки.
   const [rankRes, aboveRes, belowRes] = await Promise.all([
-    sbClient.from('players').select('id', {count:'exact', head:true}).gt('best_level', myLevel),
+    sbClient.from('players').select('id', {count:'exact', head:true}).gt('best_level', myLevel).not('nickname', 'ilike', 'ZZTest%'),
     sbClient.from('players').select('nickname,best_level,prestige_count,castle_level,created_at')
-      .gt('best_level', myLevel).order('best_level', {ascending:true}).limit(3),
+      .gt('best_level', myLevel).not('nickname', 'ilike', 'ZZTest%').order('best_level', {ascending:true}).limit(3),
     sbClient.from('players').select('nickname,best_level,prestige_count,castle_level,created_at')
-      .lt('best_level', myLevel).order('best_level', {ascending:false}).limit(3)
+      .lt('best_level', myLevel).not('nickname', 'ilike', 'ZZTest%').order('best_level', {ascending:false}).limit(3)
   ]);
   if(rankRes.error || aboveRes.error || belowRes.error) return null;
   const myRank = (rankRes.count||0) + 1;
@@ -6548,13 +6568,17 @@ async function renderLeaderboard(){
   }
   try{
     const wantNearby = sbReady && sbPlayerId;
+    // .not('nickname','ilike','ZZTest%') на ОБОХ запитах — мої власні
+    // тестові персонажі (завжди "ZZTest ...", див. NOTES_FOR_CLAUDE.txt)
+    // не мають бути видимі реальним гравцям НІДЕ в лідерборді — ні в
+    // топ-50, ні в стрічці подій.
     const [playersRes, eventsRes, nearby] = await Promise.all([
       sbClient.from('players').select('id,nickname,best_level,prestige_count,castle_level,created_at')
-        .order('best_level', {ascending:false}).limit(50),
+        .not('nickname', 'ilike', 'ZZTest%').order('best_level', {ascending:false}).limit(50),
       // Стрічка й так обмежена в базі (events_prune лишає не більше 500
       // записів загалом) — тут беремо ще менше, останні 30, для показу.
       sbClient.from('events').select('nickname,event_type,target_name,target_rarity,value,created_at')
-        .order('created_at', {ascending:false}).limit(30),
+        .not('nickname', 'ilike', 'ZZTest%').order('created_at', {ascending:false}).limit(30),
       wantNearby ? fetchNearbyRank().catch(()=>null) : Promise.resolve(null)
     ]);
     if(modalKind!=='leaderboard') return; // гравець встиг закрити/відкрити щось інше, поки чекали мережу
@@ -8893,7 +8917,11 @@ async function fetchPlayerCount(){
   }catch(e){}
   if(!sbClient) return;
   try{
-    const { count, error } = await sbClient.from('players').select('id', {count:'exact', head:true});
+    // .not('nickname','ilike','ZZTest%') — той самий фільтр, що й у
+    // renderLeaderboard(): цей лічильник гравець прямо описав як "реальні
+    // дані" (footer.visitorCountTitle) — мої тестові персонажі не мають
+    // його роздувати.
+    const { count, error } = await sbClient.from('players').select('id', {count:'exact', head:true}).not('nickname', 'ilike', 'ZZTest%');
     if(!error && typeof count==='number'){
       updateVisitorCountUi(count);
       try{ localStorage.setItem(PLAYER_COUNT_CACHE_KEY, String(count)); }catch(e){}

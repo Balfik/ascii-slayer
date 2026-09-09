@@ -5,6 +5,17 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.82] — Admin notifications for new players
+
+### Added
+- An admin-only Telegram notification fires for each genuinely new
+  player joining the public leaderboard.
+
+### Changed
+- Internal-only: a couple of test/debug accounts used during
+  development are now excluded from the public leaderboard, activity
+  feed, and player count everywhere they could appear.
+
 ## [0.81] — Fixed the jump button, the New Game warning, and relic events actually reaching the feed
 
 ### Fixed
