@@ -2,7 +2,11 @@
 <html lang="uk">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- v0.80: maximum-scale=1 + user-scalable=no — гравець попросив прибрати
+     випадковий зум на швидких повторних тапах (класичний double-tap-zoom
+     мобільного браузера); фіксований ігровий інтерфейс і так не потребує
+     масштабування пальцями. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <title>ASCII SLAYER</title>
 <meta name="description" content="Free browser idle-runner: auto-battle, build a castle by hand, fight scaling bosses, and climb a live public leaderboard. No install — just open and play." />
 <!-- Іконка вкладки — інлайн SVG як data: URI, свідомо НЕ окремий файл: уся
@@ -51,13 +55,25 @@
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
+  /* v0.80: гравець попросив прибрати два мобільні "глюки" довгого/швидкого
+     тапання: 1) double-tap-zoom (touch-action:manipulation — дозволяє
+     звичайний скрол/тап, але вимикає жест масштабування на подвійному
+     тапі, разом із maximum-scale/user-scalable у viewport вище);
+     2) синє виділення тексту, коли палець "зʼїжджає" під час тапу
+     (user-select:none). Обидва — на всьому body, ОКРІМ полів вводу
+     (.cloud-input — юзернейм/пароль хмарного акаунта), де виділення й
+     звичайна поведінка тексту потрібні як завжди. */
   body{
     background:var(--bg);
     color:var(--text);
     font-family:'Courier New', Consolas, monospace;
     padding:16px;
     min-height:100vh;
+    touch-action:manipulation;
+    -webkit-user-select:none;user-select:none;
+    -webkit-tap-highlight-color:transparent;
   }
+  .cloud-input{ -webkit-user-select:text;user-select:text; }
   .wrap{max-width:1000px;margin:0 auto;}
   header{text-align:center;margin-bottom:10px;}
   header h1{
@@ -221,15 +237,21 @@
      не media max-width, щоб тачскрін-ноутбук з мишкою його не бачив, а
      планшет у landscape бачив). Потрібні лише в місті — під час бігу/
      бою з босом/Гаунтлета керувати тут нічим (стрибок — окремо, у
-     .run-controls-row вище, поза цим абсолютним оверлеєм). */
-  .touch-controls{
-    display:none;position:absolute;left:0;right:0;bottom:8px;
-    padding:0 10px;pointer-events:none;z-index:5;
-    justify-content:space-between;align-items:flex-end;
+     .run-controls-row вище). v0.80: раніше цей блок був абсолютним
+     оверлеєм ПОВЕРХ canvas (position:absolute, bottom:8px) — гравець
+     показав скрін, де хрестик закривав вид на місто. Тепер, як і
+     .run-controls-row, це звичайний блок ПІД canvas у нормальному
+     потоці — той самий підхід, що вже спрацював для стрибка/Люті.
+     На десктопі рядок лишається порожнім на вигляд (display:none за
+     замовчуванням нижче), місця не займає. */
+  .town-controls-row{ display:none; }
+  @media (pointer:coarse){
+    .town-controls-row{
+      display:flex; justify-content:space-between; align-items:flex-end;
+      gap:10px; padding:8px 4px 0;
+    }
   }
-  @media (pointer:coarse){ .touch-controls{display:flex;} }
-  .touch-controls > *{pointer-events:auto;}
-  .touch-controls button, .run-controls-row #btnJump{
+  .town-controls-row button{
     font-family:inherit;color:var(--accent);background:rgba(18,36,23,.82);
     border:1px solid var(--border);border-radius:8px;
     -webkit-user-select:none;user-select:none;touch-action:none;
@@ -246,7 +268,9 @@
     width:54px;height:54px;border-radius:50%;font-size:14px;font-weight:bold;
   }
   .touch-action-btn:active{background:rgba(77,255,184,.25);}
-  #btnInteract[hidden], #dpadTown[hidden]{display:none;}
+  /* [hidden] МАЄ перебити display:flex/grid вище — той самий гач, що й
+     #btnJump у .run-controls-row (JS ставить hidden поза містом). */
+  .town-controls-row #dpadTown[hidden], .town-controls-row #btnInteract[hidden]{display:none;}
   .termbar{
     display:flex;gap:10px;align-items:center;justify-content:space-between;
     background:#12201a;border:1px solid var(--border);border-bottom:none;
@@ -575,6 +599,29 @@
     </div>
   </div>
 </div>
+<!-- v0.80: власна модалка-попередження замість нативного confirm() для
+     "Нова гра" — гравець на мобільному випадково тапнув крізь стандартний
+     браузерний діалог і втратив збереження. Свій діалог (та сама
+     .modal-backdrop/.modal розмітка, що й решта гри) складніше тапнути
+     "не думаючи": текст явно каже про хмару/файл, кнопка видалення — в
+     кольорі небезпеки (--demonic), а не звична title-btn/акцент. НЕ
+     прив'язана до modalBackdrop/modalKind (той механізм ще не готовий
+     тут — стартовий екран показується ДО init()) — повністю окремий,
+     самодостатній оверлей лише для цього одного попередження. -->
+<div class="modal-backdrop" id="newGameConfirmBackdrop" hidden>
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-head">
+      <h2 data-i18n="confirm.newGame.title">⚠ Нова гра</h2>
+    </div>
+    <div class="modal-body" style="font-size:13px;line-height:1.6;">
+      <p data-i18n="confirm.newGame.body">Це видалить поточне збереження персонажа з цього браузера НАЗАВЖДИ, якщо ти не зберіг його в хмару чи у файл.</p>
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button id="newGameConfirmCancel" class="title-btn secondary" style="flex:1;padding:10px;" data-i18n="confirm.newGame.cancel">Скасувати</button>
+        <button id="newGameConfirmProceed" class="title-btn" style="flex:1;padding:10px;border-color:var(--demonic);color:var(--demonic);" data-i18n="confirm.newGame.proceed">Так, видалити й почати нову</button>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="wrap">
   <header>
     <h1>ASCII SLAYER</h1>
@@ -637,7 +684,22 @@
       <span id="termLabel" data-i18n="term.runLabel">світ безкінечно біжить праворуч →</span>
     </div>
     <canvas id="game"></canvas>
-    <div class="touch-controls" id="touchControls">
+    <!-- Стрибок і Лють — звичайний блок ПІД канвасом (не оверлей): на
+         мобільному раніше кнопка стрибка лежала поверх персонажа
+         знизу-зліва, гравець показав скрін. #abilityBtn лишається
+         position:absolute й на десктопі "виходить" із цього порожнього
+         на вигляд рядка до .stage (найближчого позиційованого предка) —
+         тут порожній div
+         нічого не важить і нічого не зсуває. -->
+    <div class="run-controls-row" id="runControlsRow">
+      <button class="touch-action-btn" id="btnJump" data-i18n-title="touch.jump">⤴</button>
+      <button id="abilityBtn" class="ability-btn">⚡</button>
+    </div>
+    <!-- v0.80: хрестик WASD + E для міста теж переїхав із абсолютного
+         оверлею (лежав поверх canvas і закривав вид на місто, гравець
+         показав скрін) у звичайний потік ПІД вікном — той самий підхід,
+         що вже застосований до стрибка/Люті вище. -->
+    <div class="town-controls-row" id="townControlsRow">
       <div class="dpad" id="dpadTown" hidden>
         <button class="dpad-up" id="btnUp" aria-label="Up" data-i18n-title="touch.up">▲</button>
         <button class="dpad-left" id="btnLeft" aria-label="Left" data-i18n-title="touch.left">◀</button>
@@ -647,18 +709,6 @@
       <div class="touch-actions">
         <button class="touch-action-btn" id="btnInteract" hidden data-i18n-title="touch.interact">E</button>
       </div>
-    </div>
-    <!-- Стрибок і Лють НАВМИСНО поза .touch-controls (той — абсолютний
-         оверлей поверх канвасу, потрібен лише в місті для хрестика/E).
-         Цей рядок — звичайний блок ПІД канвасом: на мобільному раніше
-         кнопка стрибка лежала поверх персонажа знизу-зліва, гравець
-         показав скрін. #abilityBtn лишається position:absolute й на
-         десктопі "виходить" із цього порожнього на вигляд рядка до
-         .stage (найближчого позиційованого предка) — тут порожній div
-         нічого не важить і нічого не зсуває. -->
-    <div class="run-controls-row" id="runControlsRow">
-      <button class="touch-action-btn" id="btnJump" data-i18n-title="touch.jump">⤴</button>
-      <button id="abilityBtn" class="ability-btn">⚡</button>
     </div>
   </div>
   <div class="hint" id="hintText"></div>
@@ -728,7 +778,7 @@
 // пов'язаний з version:8 у buildSaveObject() (те — версія ФОРМАТУ
 // збереження, зовсім інша річ). Онови це число при кожному новому
 // релізі (той самий номер, що йде в тег git і CHANGELOG.txt).
-const GAME_VERSION = '0.79';
+const GAME_VERSION = '0.80';
 
 /* =====================================================================
    ЛІДЕРБОРД (Supabase) — публічний, тільки для читання лідерборду й
@@ -783,12 +833,28 @@ async function ensureSupabaseSession(){
 async function syncLeaderboard(){
   if(!sbReady || !sbClient || !sbPlayerId) return;
   try{
+    // v0.80: раніше писали state.* БЕЗУМОВНО, перезаписуючи будь-яке
+    // вище значення, що вже було на сервері — якщо той самий персонаж
+    // синкається з іншого пристрою/сесії зі СТАРІШИМ локальним прогресом
+    // (напр. ще не підтягнув свіжий хмарний сейв), він тихо занижував
+    // свій же публічний рядок лідерборду (гравець впіймав живцем: #1
+    // показував менший рівень, ніж щойно бачили). Ці три поля — по суті
+    // lifetime-максимуми (найкращі рівень/переродження/рівень замку за
+    // все життя персонажа), тож перед записом читаємо, що вже є на
+    // сервері, і пишемо max(сервер, моє) для кожного окремо — жодне
+    // поле більше не може випадково "просісти" назад.
+    const { data: existing } = await sbClient.from('players')
+      .select('best_level,prestige_count,castle_level')
+      .eq('id', sbPlayerId).maybeSingle();
+    const bestLevel = Math.max(state.lifetime.bestLevel||0, (existing && existing.best_level)||0);
+    const prestigeCount = Math.max(state.lifetime.prestigeCount||0, (existing && existing.prestige_count)||0);
+    const castleLevel = Math.max(state.castleLevel||0, (existing && existing.castle_level)||0);
     await sbClient.from('players').upsert({
       id: sbPlayerId,
       nickname: state.nickname,
-      best_level: state.lifetime.bestLevel,
-      prestige_count: state.lifetime.prestigeCount,
-      castle_level: state.castleLevel
+      best_level: bestLevel,
+      prestige_count: prestigeCount,
+      castle_level: castleLevel
     });
   }catch(e){ /* мережа/rate-limit — не критично для гри, спробуємо наступного разу */ }
 }
@@ -915,7 +981,11 @@ function renderEventLine(e){
     demonic_item_found: `${nick} виборов демонічний предмет ${target}!`,
     prestige: `${nick} здійснив Переродження (№${e.value})!`,
     castle_complete: `${nick} добудував Замок до кінця!`,
-    game_completed: `${nick} переміг Стража Вічності — гру пройдено!`
+    game_completed: `${nick} переміг Стража Вічності — гру пройдено!`,
+    legendary_found: `${nick} знайшов легендарний предмет ${target}!`,
+    companion_unlocked: `${nick} розблокував компаньйона ${target}!`,
+    set_completed: `${nick} зібрав повний ${e.target_rarity?rarityLabel(e.target_rarity):''} комплект!`,
+    distance_milestone: `${nick} пробіг ${formatNum(e.value)} м!`
   };
   const en = {
     level_milestone: `${nick} reached level ${e.value}!`,
@@ -926,7 +996,11 @@ function renderEventLine(e){
     demonic_item_found: `${nick} won a demonic item, ${target}!`,
     prestige: `${nick} performed a Prestige (#${e.value})!`,
     castle_complete: `${nick} finished building the Castle!`,
-    game_completed: `${nick} defeated the Guardian of Eternity — the game is complete!`
+    game_completed: `${nick} defeated the Guardian of Eternity — the game is complete!`,
+    legendary_found: `${nick} found a legendary item, ${target}!`,
+    companion_unlocked: `${nick} unlocked a companion, ${target}!`,
+    set_completed: `${nick} completed a full ${e.target_rarity?rarityLabel(e.target_rarity):''} set!`,
+    distance_milestone: `${nick} ran ${formatNum(e.value)} m!`
   };
   return (lang==='en' ? en : uk)[e.event_type] || '';
 }
@@ -945,16 +1019,60 @@ function checkEnchantMilestoneEvent(it, enchantBefore){
     reportEvent('enchant_milestone', {targetName:L(it,'name'), targetRarity:it.rarity, value:tierAfter*10});
   }
 }
-async function reportEvent(kind, extra){
+// v0.80: ЧЕРГА подій замість миттєвого insert. Причина, знайдена й
+// перевірена ЖИВОЮ базою (500 останніх записів): events_validate на
+// боці сервера відхиляє повторний запис від того самого гравця
+// частіше ніж раз на 5с — а grantRelic()/grantDemonicItem() (та
+// enchant/level-майлстоуни) майже завжди спрацьовують ОДРАЗУ ПІСЛЯ
+// reportEvent('boss_defeat'/'game_completed') в межах ОДНІЄЇ й тієї ж
+// функції перемоги над босом, за мілісекунди — тобто програють цю
+// гонку систематично, а не зрідка. Результат: 484 enchant_milestone,
+// 14 level_milestone, 2 boss_defeat — і РІВНО 0 relic_found/
+// demonic_item_found/prestige/castle_complete/game_completed за 500
+// записів. Фікс без жодних змін на сервері: кожен reportEvent() лише
+// СТАВИТЬ подію в локальну чергу; чергу розбирає flushEventQueue() не
+// частіше ніж раз на EVENT_SEND_GAP_MS (з запасом понад серверні 5с),
+// і завжди спершу найвищий пріоритет (EVENT_PRIORITY) — тож рідкісні,
+// видовищні події (реліквія, демонічний предмет, фінал) більше не
+// губляться позаду рутинних (рівень/бос), навіть коли всі спрацювали
+// одним сплеском.
+const EVENT_PRIORITY = {
+  game_completed:100, castle_complete:90, prestige:80,
+  relic_found:70, demonic_item_found:65, legendary_found:60,
+  companion_unlocked:50, set_completed:45, boss_defeat:40,
+  distance_milestone:35, enchant_milestone:30, level_milestone:10
+};
+const EVENT_SEND_GAP_MS = 5500;
+let eventQueue = [];
+let eventQueueTimer = null;
+let lastEventSentAt = 0;
+function reportEvent(kind, extra){
   if(!sbReady || !sbClient || !sbPlayerId) return;
+  eventQueue.push({kind, extra, priority: EVENT_PRIORITY[kind]||0});
+  if(!eventQueueTimer){
+    const wait = Math.max(0, EVENT_SEND_GAP_MS - (Date.now()-lastEventSentAt));
+    eventQueueTimer = setTimeout(flushEventQueue, wait);
+  }
+}
+async function flushEventQueue(){
+  eventQueueTimer = null;
+  if(eventQueue.length===0) return;
+  // Найвищий пріоритет спершу; за рівного — порядок надходження
+  // (Array.prototype.sort стабільний у всіх сучасних рушіях).
+  eventQueue.sort((a,b)=>b.priority-a.priority);
+  const ev = eventQueue.shift();
+  lastEventSentAt = Date.now();
   try{
     await sbClient.from('events').insert({
-      player_id: sbPlayerId, nickname: state.nickname, event_type: kind,
-      target_name: extra && extra.targetName!=null ? extra.targetName : null,
-      target_rarity: extra && extra.targetRarity!=null ? extra.targetRarity : null,
-      value: extra && extra.value!=null ? extra.value : null
+      player_id: sbPlayerId, nickname: state.nickname, event_type: ev.kind,
+      target_name: ev.extra && ev.extra.targetName!=null ? ev.extra.targetName : null,
+      target_rarity: ev.extra && ev.extra.targetRarity!=null ? ev.extra.targetRarity : null,
+      value: ev.extra && ev.extra.value!=null ? ev.extra.value : null
     });
-  }catch(e){ /* мережа/rate-limit (не частіше раз на 5с з боку бази) — тихо ігноруємо */ }
+  }catch(e){ /* мережа/rate-limit — подія просто губиться, наступна в черзі й далі піде */ }
+  if(eventQueue.length>0){
+    eventQueueTimer = setTimeout(flushEventQueue, EVENT_SEND_GAP_MS);
+  }
 }
 
 // Нікнейм — ЛИШЕ автогенерація, навмисно без ручного вводу тексту, щоб
@@ -1107,6 +1225,35 @@ const TOWN_H = TOWN_PAD*2 + TOWN_ROWS*TCELL_H;
 const TOWN_SPEED = 4.2; // тайлів/с
 const BOSS_W = 700, BOSS_H = 320; // окремий екран для бою з босом
 const TOWN_SPAWN = {x:7.5, y:6.5};
+
+// v0.80: на мобільному ввесь 32-колонковий TOWN_MAP в один екран не
+// влазить нормально (гравець показав скрін — тісно, замок налазить на
+// решту) — камера на мобільному показує ЛИШЕ MOBILE_TOWN_VIEWPORT_COLS
+// колонок за раз, одним із двох "екранів": "місто" (ліва частина,
+// будівлі — offset 0) або "зона Замку" (права частина — offset
+// TOWN_COLS-MOBILE_TOWN_VIEWPORT_COLS, впритул до правої стіни).
+// 21 колонка замість 32 — це саме те співвідношення (32/21≈1.52), що
+// дає приблизно +50% видимої висоти вікна на тій самій ширині екрана
+// (canvas.style.aspectRatio = w/h, ширина 100% контейнера — менший w
+// при тому самому h геометрично ДАЄ більшу висоту, без окремого
+// множника; той самий принцип, що вже описаний вище про
+// container_width/GRID_COLS). Перемикання екрана — коли гравець
+// фізично перетинає MOBILE_TOWN_SPLIT_COL, з гістерезисом ±0.5
+// колонки, щоб не блимало туди-сюди точно на межі. На десктопі
+// (isMobileViewport()===false) камера завжди показує ВСЮ карту
+// (offset завжди 0) — жодних змін там.
+const MOBILE_TOWN_VIEWPORT_COLS = 21;
+const MOBILE_TOWN_SPLIT_COL = 12.5; // трохи лівіше townXForCol(13) — початку ~ ділянки Замку
+let mobileTownOnCastleSide = false;
+function updateMobileTownCamera(){
+  if(!isMobileViewport()){ mobileTownOnCastleSide = false; return; }
+  if(!mobileTownOnCastleSide && townPos.x > MOBILE_TOWN_SPLIT_COL+0.5) mobileTownOnCastleSide = true;
+  else if(mobileTownOnCastleSide && townPos.x < MOBILE_TOWN_SPLIT_COL-0.5) mobileTownOnCastleSide = false;
+}
+function townCameraColOffset(){
+  if(!isMobileViewport()) return 0;
+  return mobileTownOnCastleSide ? (TOWN_COLS-MOBILE_TOWN_VIEWPORT_COLS) : 0;
+}
 
 const COLORS = {
   player:'#4dffb8', playerFight:'#ffffff',
@@ -1527,7 +1674,10 @@ const I18N = {
     'title.tagline':'ASCII-раннер: біжи, бий, качайся, стань легендою',
     'title.continueBtn':'▶ Продовжити',
     'title.newGameBtn':'✦ Нова гра',
-    'confirm.newGame':'Почати нову гру? Поточне збереження буде видалено назавжди.',
+    'confirm.newGame.title':'⚠ Нова гра',
+    'confirm.newGame.body':'Це видалить поточне збереження персонажа з цього браузера НАЗАВЖДИ, якщо ти не зберіг його в хмару чи у файл.',
+    'confirm.newGame.cancel':'Скасувати',
+    'confirm.newGame.proceed':'Так, видалити й почати нову',
     'hud.distanceLabel':'Дистанція',
     'hud.regionLabel':'Регіон',
     'hud.zoneFixed':'🔒 фарм тут', 'hud.zoneFrontier':'🗺 передова',
@@ -1845,7 +1995,10 @@ const I18N = {
     'title.tagline':'An ASCII runner: run, fight, level up, become a legend',
     'title.continueBtn':'▶ Continue',
     'title.newGameBtn':'✦ New Game',
-    'confirm.newGame':'Start a new game? Your current save will be deleted permanently.',
+    'confirm.newGame.title':'⚠ New Game',
+    'confirm.newGame.body':"This will delete your character's current save from this browser FOREVER, unless you've backed it up to the cloud or a file.",
+    'confirm.newGame.cancel':'Cancel',
+    'confirm.newGame.proceed':'Yes, delete and start new',
     'hud.distanceLabel':'Distance',
     'hud.regionLabel':'Region',
     'hud.zoneFixed':'🔒 farming here', 'hud.zoneFrontier':'🗺 frontier',
@@ -2089,7 +2242,15 @@ function setLang(newLang){
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 function currentCanvasSize(){
-  if(mode==='town') return {w:TOWN_W,h:TOWN_H};
+  if(mode==='town'){
+    // Мобільна камера показує лише MOBILE_TOWN_VIEWPORT_COLS колонок —
+    // див. коментар біля MOBILE_TOWN_VIEWPORT_COLS вище. Висота (h)
+    // навмисно НЕ чіпається (той самий TOWN_H, що й на десктопі) —
+    // саме менша ширина при незмінній висоті й дає потрібні +50%
+    // видимої висоти через aspectRatio, без окремого множника.
+    if(isMobileViewport()) return {w: TOWN_PAD*2 + MOBILE_TOWN_VIEWPORT_COLS*TCELL_W, h:TOWN_H};
+    return {w:TOWN_W,h:TOWN_H};
+  }
   if(mode==='boss' || mode==='gauntlet') return {w:BOSS_W,h:BOSS_H};
   return {w:INTERNAL_W,h:INTERNAL_H};
 }
@@ -2107,7 +2268,7 @@ function setupCanvas(){
 
 function xForCol(c){ return PAD_LEFT + c*CELL_W; }
 function yForRow(r){ return TOP_PAD + r*ROW_GAP + ROW_GAP*0.72; }
-function townXForCol(tx){ return TOWN_PAD + tx*TCELL_W; }
+function townXForCol(tx){ return TOWN_PAD + (tx-townCameraColOffset())*TCELL_W; }
 function townYForRow(ty){ return TOWN_PAD + ty*TCELL_H + TCELL_H*0.72; }
 
 /* =====================================================================
@@ -2192,7 +2353,16 @@ function computeSetBonusPct(){
     // Запис "коли-небудь завершив" — постійний, на відміну від живого
     // s.complete (який стане false, якщо потім продати предмет із сету).
     if(!state.lifetime.setsCompleted) state.lifetime.setsCompleted = {};
-    state.lifetime.setsCompleted[s.rarity] = true;
+    if(!state.lifetime.setsCompleted[s.rarity]){
+      state.lifetime.setsCompleted[s.rarity] = true;
+      // Стрічка подій (v0.80) — лише В МОМЕНТ першого завершення (ця
+      // функція викликається щокадру через recomputeStats(), тож без
+      // цього guard'а подія летіла б на кожен тік). Передаємо лише
+      // "сиру" рідкість (target_rarity), без готового тексту —
+      // renderEventLine() сам збудує фразу з rarityLabel() МОВОЮ
+      // ГЛЯДАЧА в момент показу (той самий принцип, що й решта стрічки).
+      reportEvent('set_completed', {targetRarity:s.rarity});
+    }
   }
   return pct;
 }
@@ -2898,6 +3068,11 @@ function checkAchievements(){
     if(a.reward.gold) state.gold += a.reward.gold;
     if(a.reward.crystals) state.crystals += a.reward.crystals;
     if(a.reward.souls) state.souls += a.reward.souls;
+    // Стрічка подій (v0.80) — розблокування компаньйона прив'язане до
+    // конкретного досягнення (unlockAch), а не окремої дії гравця, тож
+    // найпростіше й найнадійніше зловити момент саме тут.
+    const unlockedCompanion = COMPANION_TYPES.find(c=>c.unlockAch===a.id);
+    if(unlockedCompanion) reportEvent('companion_unlocked', {targetName:L(unlockedCompanion,'name')});
     addLog('log.achievement', 'levelup', {name:L(a,'name'), reward:achievementRewardText(a.reward)});
     spawnFloatingText(PLAYER_COL, `🏆 ${L(a,'name')}`, '#ffd94d');
     sfxLevelUp();
@@ -5071,6 +5246,8 @@ function gainXp(amount){
 // 10000 фіксований список закінчується — гравець попросив продовжити
 // кожні 1000 рівнів і далі (11000, 12000, ...), а не просто зупинитись.
 const LEVEL_MILESTONE_EVENTS = [50,100,200,300,500,750,1000,1500,2000,3000,5000,7500,10000];
+// Ті самі "пороги для стрічки" — окремо для дистанції (updateHud(), не тут).
+const DISTANCE_MILESTONE_EVENTS = [1000,5000,10000,25000,50000,100000,250000,500000,1000000];
 function isLevelMilestone(level){
   return LEVEL_MILESTONE_EVENTS.includes(level) || (level>10000 && level%1000===0);
 }
@@ -5100,6 +5277,9 @@ function tryDropItem(mtype){
     recomputeStats();
     if(inst.rarity==='legendary'){
       addLog('log.legendaryFound', 'item', {name:L(inst,'name')});
+      // Стрічка подій (v0.80) — лише НОВИЙ предмет (ця гілка, не дублікат
+      // вище), інакше повторні дропи того самого легендарного спамили б.
+      reportEvent('legendary_found', {targetName:L(inst,'name'), targetRarity:'legendary'});
     } else {
       addLog('log.itemFound', 'item', {name:L(inst,'name'), rarity:rarityLabel(inst.rarity)});
     }
@@ -5755,6 +5935,7 @@ function updateTown(dt){
   const tile = (TOWN_MAP[Math.floor(townPos.y)]||'')[Math.floor(townPos.x)];
   if(tile==='G'){ exitTown(); return; }
   nearBuilding = findNearbyBuilding();
+  updateMobileTownCamera();
   renderTown();
 }
 function interactBuilding(){
@@ -5803,7 +5984,10 @@ function renderTownFireworks(){
   for(let i=0;i<9;i++){
     const cycle = (now*0.55 + i*1.31) % 3.4;
     if(cycle > 1.2) continue; // "вибух" триває коротко, решта — пауза до наступного
-    const fx = 24 + ((i*71) % (TOWN_W-48));
+    // currentCanvasSize().w, а не константа TOWN_W — на мобільному
+    // (v0.80) буфер вужчий за MOBILE_TOWN_VIEWPORT_COLS, TOWN_W там
+    // розкидав би частину салюту за межі видимого канвасу.
+    const fx = 24 + ((i*71) % (currentCanvasSize().w-48));
     const fy = 22 + ((i*37) % 70);
     const alpha = Math.max(0, 1 - cycle/1.2);
     ctx.globalAlpha = alpha;
@@ -6000,7 +6184,10 @@ function updateModeUiText(){
   // Підказку про Пробіл/T на дорозі на мобільному прибираємо (гравець
   // попросив) — там її роль тепер виконують самі кнопки під вікном гри
   // (стрибок/Лють), клавіатурні підказки на тач-пристрої однаково зайві.
-  document.getElementById('hintText').innerHTML = mode==='town' ? t('hint.town') : ((mode==='boss'||mode==='gauntlet') ? '' : (isTouchDevice() ? '' : t('hint.run')));
+  // v0.80: та сама логіка тепер і для міста — WASD/E підказка на
+  // мобільному теж зайва (там свій d-pad + кнопка взаємодії), раніше
+  // цю гілку забули прикрити isTouchDevice(), і вона лишалась видимою.
+  document.getElementById('hintText').innerHTML = mode==='town' ? (isTouchDevice() ? '' : t('hint.town')) : ((mode==='boss'||mode==='gauntlet') ? '' : (isTouchDevice() ? '' : t('hint.run')));
   const retreatBtn = document.getElementById('bossRetreatBtn');
   const continueBossBtn = document.getElementById('bossContinueBtn');
   retreatBtn.hidden = !((mode==='boss' && bossFight && !bossResult) || (mode==='gauntlet' && gauntletFight && !gauntletResult));
@@ -6026,6 +6213,12 @@ function enterTown(){
   mode = 'town';
   townPos = {x:TOWN_SPAWN.x, y:TOWN_SPAWN.y};
   nearBuilding = null;
+  // TOWN_SPAWN завжди на "міському" боці — мобільна камера мала б лишитись
+  // з минулого разу на "боці Замку" (persistent module-level змінна), якщо
+  // гравець виходив звідти; без явного скидання тут гравець спавнився б
+  // невидимим за кадром, поки не пройде досить, щоб гістерезис перемкнув
+  // камеру назад.
+  mobileTownOnCastleSide = false;
   setupCanvas();
   updateModeUiText();
   addLog('log.enterTown', 'upgrade');
@@ -7780,7 +7973,12 @@ function updateHud(){
   document.getElementById('rankTitle').textContent = '«'+L(getRankTitle(state.level),'title')+'»';
 
   if(mode==='run' && distanceCols > state.lifetime.bestDistance){
+    const before = state.lifetime.bestDistance;
     state.lifetime.bestDistance = distanceCols;
+    // Стрічка подій (v0.80) — той самий принцип, що й level_milestone:
+    // фіксований список порогів, лише коли перетнули (не кожен кадр).
+    const crossed = DISTANCE_MILESTONE_EVENTS.find(m=>before<m && distanceCols>=m);
+    if(crossed) reportEvent('distance_milestone', {value:crossed});
   }
   checkAchievements();
   checkMilestones();
@@ -8915,11 +9113,20 @@ document.getElementById('rerollNicknameBtn').addEventListener('click', ()=>{
   document.getElementById('titleNickname').textContent = state.nickname;
 });
 continueBtn.addEventListener('click', ()=>{ hideTitleScreen(); init(); });
-newGameBtn.addEventListener('click', ()=>{
-  if(hasExistingSave() && !confirm(t('confirm.newGame'))) return;
+function startNewGame(){
   try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
   hideTitleScreen();
   init();
+}
+const newGameConfirmBackdrop = document.getElementById('newGameConfirmBackdrop');
+newGameBtn.addEventListener('click', ()=>{
+  if(!hasExistingSave()){ startNewGame(); return; }
+  newGameConfirmBackdrop.hidden = false;
+});
+document.getElementById('newGameConfirmCancel').addEventListener('click', ()=>{ newGameConfirmBackdrop.hidden = true; });
+document.getElementById('newGameConfirmProceed').addEventListener('click', ()=>{
+  newGameConfirmBackdrop.hidden = true;
+  startNewGame();
 });
 
 showTitleScreen();

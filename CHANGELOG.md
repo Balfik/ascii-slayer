@@ -5,6 +5,40 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.80] — Leaderboard integrity, a livelier event feed, and a reworked mobile town
+
+### Fixed
+- The public leaderboard could show a lower level for a player than
+  what was already recorded, if that character synced from a device
+  or session with older local progress — the leaderboard now always
+  keeps the higher value instead of letting a stale sync overwrite it.
+- Rare, exciting events (finding a relic, winning a demonic item,
+  Prestige, finishing the Castle, beating the game) almost never
+  actually reached the public event feed — they were consistently
+  losing a race against the server's spam limit to more common events
+  fired in the same moment (like a boss kill). Events are now queued
+  and spaced out client-side so nothing gets silently dropped anymore.
+- On mobile, the WASD/E hint text below the town view stayed visible
+  even though touch controls already cover that role.
+- "New Game" used to delete your save with only the browser's plain
+  confirmation popup, which was easy to tap through by accident on
+  mobile. It's now a proper in-game warning that explains exactly
+  what will be lost, with a clear Cancel option.
+- Removed the double-tap-to-zoom and accidental text-selection
+  highlight that could trigger on mobile during quick taps or drags.
+
+### Added
+- The event feed now reports a few more kinds of moments: finding a
+  new legendary item, unlocking a companion, completing a full item
+  set, and hitting a new personal distance record.
+
+### Changed
+- The town view on mobile is taller and the tiles read larger and
+  clearer. Since the whole town (including the Castle) no longer fits
+  comfortably in one screen at that size, it's now split into two
+  connected views — walk right past the buildings to reach the
+  Castle's own area, and left again to come back to the rest of town.
+
 ## [0.79] — Castle rebuilt to match the original design exactly
 
 ### Fixed
