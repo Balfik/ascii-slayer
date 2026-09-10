@@ -647,7 +647,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = '0.85';
+const GAME_VERSION = '0.86';
 
 const SUPABASE_URL = 'https://vfaveuenkublhxgatbcn.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_PkeJBe1KSw0ZWUSgcAIZFA_SuG8Ilyo';
@@ -714,7 +714,12 @@ async function syncLeaderboard(){
     if(!existing && !upsertErr){
       fetch('https://vfaveuenkublhxgatbcn.supabase.co/functions/v1/telegram-bot', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({internal_notify_nickname: state.nickname})
+        body: JSON.stringify({
+          internal_notify_nickname: state.nickname,
+          internal_notify_referrer: payload.referrer,
+          internal_notify_locale: payload.locale,
+          internal_notify_timezone: payload.timezone
+        })
       }).catch(()=>{});
     }
   }catch(e){  }
@@ -3470,6 +3475,7 @@ function grantDemonicItem(){
 }
 
 function updateBossFight(dt){
+  bgTime += dt;
   if(!bossFight) return;
   const bf = bossFight;
   bf.timeLeft -= dt;
@@ -3643,6 +3649,7 @@ function resetBossCompanionTimers(){
 }
 
 function updateBossCompanions(dt, dealDamage){
+  updateHitParticles(dt);
   for(const c of COMPANION_TYPES){
     if(!companionUnlocked(c.id)) continue;
     const bc = bossCompanionTimers[c.id] || (bossCompanionTimers[c.id] = {timer:0, flash:0});
@@ -3652,6 +3659,7 @@ function updateBossCompanions(dt, dealDamage){
     if(bc.timer >= interval){
       bc.timer -= interval;
       bc.flash = 0.25;
+      spawnHitParticles(BOSS_W/2, 170, c.color, 7);
       if(c.role==='dps'){
         const pct = COMPANION_BLADE_PCT_BASE + (companionLevel('blade')-1)*COMPANION_BLADE_PCT_STEP;
         dealDamage(Math.max(1, Math.round(effectiveAttack()*pct)));
@@ -3688,6 +3696,64 @@ function renderBossCompanionsRow(targetX, targetY){
       drawCompanionBeam(cx+4, cy-10, targetX, targetY, c.color, Math.min(1, bc.flash/0.25));
     }
   }
+  drawHitParticles();
+}
+
+// Player's own beam during boss fights and the Gauntlet: one straight
+// white core plus two colored strands winding around it in a double-
+// helix (opposite sine phase), tapered to a point at both ends so they
+// meet exactly at the player and the target. Runs continuously for the
+// whole fight (driven by bgTime, not the attack-tick flash) and just
+// gets a brief amplitude/width boost on each actual hit.
+function drawPlayerBeam(fromX, fromY, toX, toY, time, intense){
+  const dx = toX-fromX, dy = toY-fromY;
+  const len = Math.hypot(dx, dy) || 1;
+  const px = -dy/len, py = dx/len;
+  const segments = 26;
+  const amp = intense ? 7 : 4.5;
+  const freq = 10, speed = 6;
+
+  ctx.save();
+  ctx.globalAlpha = 0.22;
+  ctx.strokeStyle = COLORS.player;
+  ctx.lineWidth = intense ? 10 : 6;
+  ctx.shadowColor = COLORS.player;
+  ctx.shadowBlur = 14;
+  ctx.beginPath();
+  ctx.moveTo(fromX, fromY);
+  ctx.lineTo(toX, toY);
+  ctx.stroke();
+
+  function strand(color, phase){
+    ctx.globalAlpha = intense ? 0.95 : 0.75;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    for(let i=0;i<=segments;i++){
+      const s = i/segments;
+      const wave = Math.sin(s*freq + time*speed + phase) * amp * Math.sin(s*Math.PI);
+      const x = fromX + dx*s + px*wave;
+      const y = fromY + dy*s + py*wave;
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+  strand('#4dd2ff', 0);
+  strand('#c77dff', Math.PI);
+
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = intense ? 2.6 : 1.8;
+  ctx.shadowColor = '#ffffff';
+  ctx.shadowBlur = 10;
+  ctx.beginPath();
+  ctx.moveTo(fromX, fromY);
+  ctx.lineTo(toX, toY);
+  ctx.stroke();
+  ctx.restore();
+  ctx.globalAlpha = 1;
 }
 
 function renderBossResult(){
@@ -3775,6 +3841,7 @@ function renderBossFight(){
     ctx.fillStyle = '#ffd94d';
     ctx.fillText('*', 66, BOSS_H-32);
   }
+  drawPlayerBeam(64, BOSS_H-34, BOSS_W/2, 170, bgTime, bf.attackFlash>0);
   renderBossCompanionsRow(BOSS_W/2, 170);
 }
 
@@ -3820,6 +3887,7 @@ function gauntletRewards(waves){
   };
 }
 function updateGauntlet(dt){
+  bgTime += dt;
   if(!gauntletFight) return;
   const gf = gauntletFight;
   gf.timeLeft -= dt;
@@ -3973,6 +4041,7 @@ function renderGauntletFight(){
     ctx.fillStyle = '#ffd94d';
     ctx.fillText('*', 66, BOSS_H-32);
   }
+  drawPlayerBeam(64, BOSS_H-34, BOSS_W/2, 170, bgTime, gf.attackFlash>0);
   renderBossCompanionsRow(BOSS_W/2, 170);
 }
 
@@ -4123,6 +4192,39 @@ let isJumping = false, jumpTimer = 0;
 let isFighting = false, fightTarget = null, fightAttackTimer = 0;
 let isStumbling = false, stumbleTimer = 0;
 let floatingTexts = [];
+// Small reusable spark-particle pool for hit/impact feedback (combat
+// beam hits, road-combat strikes). Not for anything gameplay-affecting.
+let hitParticles = [];
+function spawnHitParticles(x, y, color, count){
+  for(let i=0;i<(count||6);i++){
+    const ang = Math.random()*Math.PI*2;
+    const spd = 26 + Math.random()*46;
+    hitParticles.push({
+      x, y, vx:Math.cos(ang)*spd, vy:Math.sin(ang)*spd,
+      life:0.28+Math.random()*0.16, maxLife:0.44, color
+    });
+  }
+}
+function updateHitParticles(dt){
+  for(const p of hitParticles){ p.x += p.vx*dt; p.y += p.vy*dt; p.life -= dt; }
+  hitParticles = hitParticles.filter(p=>p.life>0);
+}
+function drawHitParticles(){
+  if(hitParticles.length===0) return;
+  ctx.save();
+  for(const p of hitParticles){
+    const a = Math.max(0, p.life/p.maxLife);
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 1+1.6*a, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
 let lastTs = 0;
 let combo = 0, comboTimer = 0;
 let lastSaveTimestamp = null;
@@ -4646,6 +4748,7 @@ function updateFight(dt){
     const dmg = isCrit ? atk*2 : atk;
     fightTarget.hp -= dmg;
     spawnFloatingText(PLAYER_COL+1, isCrit?`-${dmg.toFixed(0)} ${t('combat.crit')}`:`-${dmg.toFixed(0)}`, isCrit?'#ffb347':'#ff8080');
+    spawnHitParticles(xForCol(screenCol(fightTarget)), yForRow(ROW_GROUND), isCrit?'#ffb347':'#ff8080', isCrit?9:5);
     sfxHit();
     if(fightTarget.hp <= 0){
       awardKill(fightTarget, true);
@@ -4663,6 +4766,7 @@ function updateRun(dt){
     if(jumpTimer >= stats.jumpDuration) isJumping = false;
   }
   updateFight(dt);
+  updateHitParticles(dt);
   updateCompanion(dt);
   if(isStumbling){
     stumbleTimer -= dt;
@@ -4918,6 +5022,7 @@ function renderRun(){
     ctx.fillText(t.text, xForCol(t.col)+(t.xJitter||0), t.y);
   }
   ctx.globalAlpha = 1;
+  drawHitParticles();
 }
 
 function isWalkableAt(x,y){

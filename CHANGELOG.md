@@ -5,6 +5,19 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.86] — A beam of your own, and more impact effects
+
+### Added
+- The player character now fires their own animated three-strand beam
+  during boss fights and the Gauntlet, alongside the companions'
+  beams.
+- A small particle burst plays wherever a companion's beam lands.
+- Regular road combat hits now throw a few sparks on impact.
+
+### Changed
+- Internal-only: the admin Telegram notification for a new player now
+  includes their referrer, language, and timezone when available.
+
 ## [0.85] — Minor fixes
 
 ## [0.84] — Minor fixes
