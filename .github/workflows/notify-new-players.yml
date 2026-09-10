@@ -54,3 +54,37 @@ jobs:
                 || echo "Failed to notify chat ${CHAT}"
             done
           done
+
+      # Окремо: гра сама (validate_player_write() на Supabase) автоматично
+      # ховає читера, коли рівень фізично неможливий за час існування
+      # акаунта — ban_reason тоді НЕ null, banned_at ставиться рівно
+      # один раз у момент переходу false->true. Перевіряємо banned_at
+      # (не is_banned саму по собі — інакше кожен наступний синк уже
+      # відомого забаненого акаунта знову й знову спамив би це саме
+      # повідомлення), тож фільтр за ban_reason відсіює й ручні /ban
+      # (ті ban_reason не ставлять узагалі).
+      - name: Check for auto-banned cheaters and notify Telegram
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          set -uo pipefail
+          SINCE=$(date -u -d '6 minutes ago' +%Y-%m-%dT%H:%M:%S)
+          RESP=$(curl -sf "https://vfaveuenkublhxgatbcn.supabase.co/rest/v1/players?select=nickname,best_level,ban_reason,banned_at&banned_at=gte.${SINCE}&ban_reason=not.is.null&order=banned_at.asc" \
+            -H "apikey: ${SUPABASE_KEY}") || { echo "Supabase query failed"; exit 0; }
+
+          echo "$RESP" | jq -c '.[]' | while read -r row; do
+            NICK=$(echo "$row" | jq -r '.nickname')
+            LVL=$(echo "$row" | jq -r '.best_level')
+            REASON=$(echo "$row" | jq -r '.ban_reason')
+            MSG="⚠️ Автоматично приховано: ${NICK}"$'\n'"Рівень: ${LVL}"$'\n'"Причина: ${REASON}"
+
+            IFS=',' read -ra CHATS <<< "$TELEGRAM_CHAT_ID"
+            for CHAT in "${CHATS[@]}"; do
+              curl -sf -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+                --data-urlencode "chat_id=${CHAT}" \
+                --data-urlencode "text=${MSG}" > /dev/null \
+                || echo "Failed to notify chat ${CHAT}"
+            done
+          done
