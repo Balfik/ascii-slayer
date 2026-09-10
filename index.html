@@ -6,6 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <title>ASCII SLAYER</title>
 <meta name="description" content="Free browser idle-runner: auto-battle, build a castle by hand, fight scaling bosses, and climb a live public leaderboard. No install — just open and play." />
+<script src="https://js.hcaptcha.com/1/api.js?render=explicit" async defer></script>
 
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgPHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTMiIGZpbGw9IiMwYTBmMGEiLz4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHJ4PSIxMSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMjU0MDI1IiBzdHJva2Utd2lkdGg9IjIiLz4KICA8dGV4dCB4PSIzMiIgeT0iNDUiIGZvbnQtZmFtaWx5PSInQ291cmllciBOZXcnLCBDb25zb2xhcywgbW9ub3NwYWNlIiBmb250LXNpemU9IjMyIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iIzRkZmZiOCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Jmd0O188L3RleHQ+Cjwvc3ZnPgo=" />
 
@@ -474,6 +475,7 @@
 </style>
 </head>
 <body>
+<div id="hcaptchaContainer" style="position:absolute;width:0;height:0;overflow:hidden;"></div>
 <div id="titleScreen">
   <canvas id="titleCanvas"></canvas>
   <div class="title-content">
@@ -647,7 +649,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = '0.86';
+const GAME_VERSION = '0.88';
 
 const SUPABASE_URL = 'https://vfaveuenkublhxgatbcn.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_PkeJBe1KSw0ZWUSgcAIZFA_SuG8Ilyo';
@@ -661,13 +663,38 @@ function initSupabase(){
   }catch(e){ sbClient = null; }
 }
 
+// hCaptcha на анонімний вхід — лише для СПРАВЖНЬОГО створення нового
+// акаунта (гілка !session нижче), не для щораз повернення існуючого
+// гравця. Invisible-режим: жодного чекбоксу, гравець нічого не бачить,
+// якщо hCaptcha не вирішить, що потрібен виклик. Якщо скрипт
+// заблокований (adblock/мережа) — просто йдемо без токена; Supabase
+// тоді відхилить сам sign-in, ensureSupabaseSession() і так це ловить
+// у try/catch — гра лишається повністю грабельною локально, просто
+// без хмари/лідерборду для цього конкретного відвідування.
+const HCAPTCHA_SITE_KEY = '5d9a5b72-35c4-424c-9fae-33566590de72';
+let hcaptchaWidgetId = null;
+function ensureHcaptchaWidget(){
+  if(hcaptchaWidgetId!=null || typeof hcaptcha==='undefined') return;
+  try{ hcaptchaWidgetId = hcaptcha.render('hcaptchaContainer', {sitekey:HCAPTCHA_SITE_KEY, size:'invisible'}); }catch(e){}
+}
+async function getCaptchaToken(){
+  try{
+    if(typeof hcaptcha==='undefined') return undefined;
+    ensureHcaptchaWidget();
+    if(hcaptchaWidgetId==null) return undefined;
+    const res = await hcaptcha.execute(hcaptchaWidgetId, {async:true});
+    return (res && res.response) ? res.response : undefined;
+  }catch(e){ return undefined; }
+}
+
 async function ensureSupabaseSession(){
   if(!sbClient) return null;
   try{
     const got = await sbClient.auth.getSession();
     let session = got.data && got.data.session;
     if(!session){
-      const signIn = await sbClient.auth.signInAnonymously();
+      const captchaToken = await getCaptchaToken();
+      const signIn = await sbClient.auth.signInAnonymously(captchaToken ? {options:{captchaToken}} : undefined);
       if(signIn.error || !signIn.data.user) return null;
       sbPlayerId = signIn.data.user.id;
     } else {
@@ -5438,11 +5465,11 @@ async function fetchNearbyRank(){
   const myLevel = state.lifetime.bestLevel;
 
   const [rankRes, aboveRes, belowRes] = await Promise.all([
-    sbClient.from('players').select('id', {count:'exact', head:true}).gt('best_level', myLevel).not('nickname', 'ilike', 'ZZTest%'),
+    sbClient.from('players').select('id', {count:'exact', head:true}).gt('best_level', myLevel).not('nickname', 'ilike', 'ZZTest%').eq('is_banned', false),
     sbClient.from('players').select('nickname,best_level,prestige_count,castle_level,created_at')
-      .gt('best_level', myLevel).not('nickname', 'ilike', 'ZZTest%').order('best_level', {ascending:true}).limit(3),
+      .gt('best_level', myLevel).not('nickname', 'ilike', 'ZZTest%').eq('is_banned', false).order('best_level', {ascending:true}).limit(3),
     sbClient.from('players').select('nickname,best_level,prestige_count,castle_level,created_at')
-      .lt('best_level', myLevel).not('nickname', 'ilike', 'ZZTest%').order('best_level', {ascending:false}).limit(3)
+      .lt('best_level', myLevel).not('nickname', 'ilike', 'ZZTest%').eq('is_banned', false).order('best_level', {ascending:false}).limit(3)
   ]);
   if(rankRes.error || aboveRes.error || belowRes.error) return null;
   const myRank = (rankRes.count||0) + 1;
@@ -5469,12 +5496,24 @@ async function renderLeaderboard(){
   try{
     const wantNearby = sbReady && sbPlayerId;
 
+    // events не має власного is_banned — фільтруємо за player_id забаненого
+    // гравця (не за ніком: ніки не гарантовано унікальні, різний акаунт
+    // міг згенерувати той самий рандомний нік, що й у чітера).
+    let bannedIds = [];
+    try{
+      const { data: bannedRows } = await sbClient.from('players').select('id').eq('is_banned', true);
+      bannedIds = (bannedRows||[]).map(p=>p.id);
+    }catch(e){}
+
+    let eventsQuery = sbClient.from('events').select('nickname,event_type,target_name,target_rarity,value,created_at')
+      .not('nickname', 'ilike', 'ZZTest%');
+    if(bannedIds.length>0) eventsQuery = eventsQuery.not('player_id', 'in', `(${bannedIds.join(',')})`);
+    eventsQuery = eventsQuery.order('created_at', {ascending:false}).limit(30);
+
     const [playersRes, eventsRes, nearby] = await Promise.all([
       sbClient.from('players').select('id,nickname,best_level,prestige_count,castle_level,created_at')
-        .not('nickname', 'ilike', 'ZZTest%').order('best_level', {ascending:false}).limit(50),
-
-      sbClient.from('events').select('nickname,event_type,target_name,target_rarity,value,created_at')
-        .not('nickname', 'ilike', 'ZZTest%').order('created_at', {ascending:false}).limit(30),
+        .not('nickname', 'ilike', 'ZZTest%').eq('is_banned', false).order('best_level', {ascending:false}).limit(50),
+      eventsQuery,
       wantNearby ? fetchNearbyRank().catch(()=>null) : Promise.resolve(null)
     ]);
     if(modalKind!=='leaderboard') return;
@@ -7524,7 +7563,7 @@ async function fetchPlayerCount(){
   if(!sbClient) return;
   try{
 
-    const { count, error } = await sbClient.from('players').select('id', {count:'exact', head:true}).not('nickname', 'ilike', 'ZZTest%');
+    const { count, error } = await sbClient.from('players').select('id', {count:'exact', head:true}).not('nickname', 'ilike', 'ZZTest%').eq('is_banned', false);
     if(!error && typeof count==='number'){
       updateVisitorCountUi(count);
       try{ localStorage.setItem(PLAYER_COUNT_CACHE_KEY, String(count)); }catch(e){}

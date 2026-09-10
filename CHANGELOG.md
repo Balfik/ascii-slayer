@@ -5,6 +5,21 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.88] — Leaderboard protection
+
+### Added
+- New accounts now go through an invisible bot check before their
+  first sync, to stop scripted fake accounts from flooding the public
+  leaderboard.
+
+### Changed
+- Internal-only: admins can now hide a cheater's account from the
+  leaderboard and activity feed.
+
+### Fixed
+- Cleaned up a batch of fake accounts with inflated stats that briefly
+  appeared on the public leaderboard.
+
 ## [0.86] — A beam of your own, and more impact effects
 
 ### Added
