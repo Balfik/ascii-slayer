@@ -69,8 +69,8 @@ jobs:
           case "$TIER" in
             1)
               SINCE=$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%S)
-              FILTER="best_level=eq.1&is_banned=eq.false&updated_at=lt.${SINCE}"
-              LABEL="Ярус 1 (рівень=1, неактивні >24г)"
+              FILTER="best_level=eq.1&prestige_count=eq.0&is_banned=eq.false&updated_at=lt.${SINCE}"
+              LABEL="Ярус 1 (рівень=1, без переродження, неактивні >24г)"
               ;;
             2)
               SINCE=$(date -u -d '10 days ago' +%Y-%m-%dT%H:%M:%S)
