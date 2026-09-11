@@ -5,6 +5,12 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.90] — Minor fixes
+
+### Changed
+- Cloud save accounts now require an 8-character password (was 6).
+  Existing accounts are unaffected.
+
 ## [0.89] — Leaderboard now starts at level 100
 
 ### Changed

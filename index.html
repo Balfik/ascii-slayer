@@ -649,7 +649,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = '0.89';
+const GAME_VERSION = '0.90';
 
 const SUPABASE_URL = 'https://vfaveuenkublhxgatbcn.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_PkeJBe1KSw0ZWUSgcAIZFA_SuG8Ilyo';
@@ -764,7 +764,7 @@ let cloudLastSyncTs = null;
 async function registerCloudAccount(username, password){
   if(!sbClient || !sbReady) return {error:'offline'};
   if(!validCloudUsername(username)) return {error:'badUsername'};
-  if(password.length < 6) return {error:'badPassword'};
+  if(password.length < 8) return {error:'badPassword'};
   try{
     const { data, error } = await sbClient.auth.updateUser({
       email: emailForUsername(username), password
@@ -1403,13 +1403,13 @@ const I18N = {
     'cloud.explain':'Прив\'яжи логін і пароль до прогресу — і зможеш зайти з іншого пристрою (телефон/ПК) та підтягнути те, що там напрацював. Це не справжня пошта, лише логін — тож відновити забутий пароль неможливо.',
     'cloud.usernameLabel':'Логін', 'cloud.passwordLabel':'Пароль',
     'cloud.usernameHint':'Лише латинські літери, цифри, підкреслення — 3–20 символів',
-    'cloud.passwordHint':'Щонайменше 6 символів',
+    'cloud.passwordHint':'Щонайменше 8 символів',
     'cloud.registerHeader':'Прив\'язати цей прогрес (уперше)',
     'cloud.registerBtn':'Прив\'язати логін і пароль',
     'cloud.loginHeader':'Уже є акаунт? Увійти (замінить локальний прогрес)',
     'cloud.loginBtn':'Увійти',
     'cloud.err.badUsername':'Логін: лише латинські літери/цифри/підкреслення, 3–20 символів.',
-    'cloud.err.badPassword':'Пароль має бути щонайменше 6 символів.',
+    'cloud.err.badPassword':'Пароль має бути щонайменше 8 символів.',
     'cloud.err.taken':'Цей логін уже зайнятий — обери інший.',
     'cloud.err.invalid':'Невірний логін або пароль.',
     'cloud.err.network':'Немає зв\'язку з сервером — спробуй пізніше.',
@@ -1725,13 +1725,13 @@ const I18N = {
     'cloud.explain':'Link a username and password to your progress, and you\'ll be able to sign in on another device (phone/PC) and pull down what you did there. This isn\'t a real email, just a username — so a forgotten password can\'t be recovered.',
     'cloud.usernameLabel':'Username', 'cloud.passwordLabel':'Password',
     'cloud.usernameHint':'Latin letters, digits, underscore only — 3–20 characters',
-    'cloud.passwordHint':'At least 6 characters',
+    'cloud.passwordHint':'At least 8 characters',
     'cloud.registerHeader':'Link this progress (first time)',
     'cloud.registerBtn':'Link username and password',
     'cloud.loginHeader':'Already have an account? Sign in (replaces local progress)',
     'cloud.loginBtn':'Sign in',
     'cloud.err.badUsername':'Username: letters/digits/underscore only, 3–20 characters.',
-    'cloud.err.badPassword':'Password must be at least 6 characters.',
+    'cloud.err.badPassword':'Password must be at least 8 characters.',
     'cloud.err.taken':'That username is already taken — pick another.',
     'cloud.err.invalid':'Wrong username or password.',
     'cloud.err.network':'Can\'t reach the server — try again later.',
@@ -7265,7 +7265,7 @@ async function handleCloudRegisterClick(){
   const pass = document.getElementById('cloudRegPass').value;
   const msgEl = document.getElementById('cloudRegMsg');
   if(!validCloudUsername(user)){ msgEl.className='cloud-err'; msgEl.textContent=t('cloud.err.badUsername'); return; }
-  if(pass.length<6){ msgEl.className='cloud-err'; msgEl.textContent=t('cloud.err.badPassword'); return; }
+  if(pass.length<8){ msgEl.className='cloud-err'; msgEl.textContent=t('cloud.err.badPassword'); return; }
   msgEl.className=''; msgEl.textContent='';
   const res = await registerCloudAccount(user, pass);
   if(!res.ok){
