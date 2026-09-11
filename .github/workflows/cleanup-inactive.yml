@@ -14,11 +14,20 @@ name: Auto-cleanup inactive characters
 # Забанених (is_banned=true) НЕ чіпаємо — це докази атак, лишаються
 # для перегляду через /banned.
 #
-# DELETE вимагає SERVICE ROLE ключа — у players немає DELETE-політики
-# для anon/authenticated (RLS за замовчуванням забороняє), тож
-# публічний ключ фізично не може видаляти рядки. Це саме той самий
-# ключ, що вже є в Supabase Edge Function Secrets — окремий GitHub
-# secret, бо це два різні сховища.
+# Ярус events: окремо, раз на тиждень — видаляє рядки public.events
+# (стрічка подій) старші за 7 днів, незалежно від того, живий гравець
+# чи ні. events НЕ чиститься каскадом при видаленні гравця вище (FK
+# events_player_id_fkey -> players ON DELETE CASCADE вже є і прибирає
+# події видалених гравців, але для активних/рівень 100+ гравців, яких
+# ми ніколи не видаляємо, стрічка інакше росла б необмежено). Тиждень
+# — свідомий запас, щоб встигнути вирішити, чи треба щось із цих даних
+# витягнути, перш ніж вони підуть.
+#
+# DELETE вимагає SERVICE ROLE ключа — у players/events немає
+# DELETE-політики для anon/authenticated (RLS за замовчуванням
+# забороняє), тож публічний ключ фізично не може видаляти рядки. Це
+# саме той самий ключ, що вже є в Supabase Edge Function Secrets —
+# окремий GitHub secret, бо це два різні сховища.
 #
 # dry_run (лише для workflow_dispatch): рахує, скільки БУЛО Б
 # видалено, без реального DELETE — для перевірки перед першим
@@ -28,10 +37,11 @@ on:
     - cron: '0 3 * * *'      # щодня 03:00 UTC — ярус 1
     - cron: '0 3 */5 * *'    # ~раз на 5 днів — ярус 2
     - cron: '0 3 * * 0'      # щонеділі — ярус 3
+    - cron: '0 4 * * 0'      # щонеділі, окремий час — ярус events
   workflow_dispatch:
     inputs:
       tier:
-        description: 'Який ярус запустити вручну (1, 2 або 3)'
+        description: 'Який ярус запустити вручну (1, 2, 3 або events)'
         required: true
         default: '1'
       dry_run:
@@ -51,6 +61,7 @@ jobs:
             '0 3 * * *') echo "tier=1" >> "$GITHUB_OUTPUT"; echo "dry_run=false" >> "$GITHUB_OUTPUT" ;;
             '0 3 */5 * *') echo "tier=2" >> "$GITHUB_OUTPUT"; echo "dry_run=false" >> "$GITHUB_OUTPUT" ;;
             '0 3 * * 0') echo "tier=3" >> "$GITHUB_OUTPUT"; echo "dry_run=false" >> "$GITHUB_OUTPUT" ;;
+            '0 4 * * 0') echo "tier=events" >> "$GITHUB_OUTPUT"; echo "dry_run=false" >> "$GITHUB_OUTPUT" ;;
             *)
               echo "tier=${{ github.event.inputs.tier }}" >> "$GITHUB_OUTPUT"
               echo "dry_run=${{ github.event.inputs.dry_run }}" >> "$GITHUB_OUTPUT"
@@ -64,23 +75,31 @@ jobs:
           DRY_RUN: ${{ steps.cfg.outputs.dry_run }}
         run: |
           set -uo pipefail
-          BASE="https://vfaveuenkublhxgatbcn.supabase.co/rest/v1/players"
 
           case "$TIER" in
             1)
+              BASE="https://vfaveuenkublhxgatbcn.supabase.co/rest/v1/players"
               SINCE=$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%S)
               FILTER="best_level=eq.1&prestige_count=eq.0&is_banned=eq.false&updated_at=lt.${SINCE}"
               LABEL="Ярус 1 (рівень=1, без переродження, неактивні >24г)"
               ;;
             2)
+              BASE="https://vfaveuenkublhxgatbcn.supabase.co/rest/v1/players"
               SINCE=$(date -u -d '10 days ago' +%Y-%m-%dT%H:%M:%S)
               FILTER="best_level=gt.1&best_level=lt.50&prestige_count=eq.0&is_banned=eq.false&updated_at=lt.${SINCE}"
               LABEL="Ярус 2 (рівень 2-49, без переродження, неактивні >10д)"
               ;;
             3)
+              BASE="https://vfaveuenkublhxgatbcn.supabase.co/rest/v1/players"
               SINCE=$(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%S)
               FILTER="best_level=gte.50&best_level=lt.100&prestige_count=eq.0&is_banned=eq.false&updated_at=lt.${SINCE}"
               LABEL="Ярус 3 (рівень 50-99, без переродження, неактивні >14д)"
+              ;;
+            events)
+              BASE="https://vfaveuenkublhxgatbcn.supabase.co/rest/v1/events"
+              SINCE=$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%S)
+              FILTER="created_at=lt.${SINCE}"
+              LABEL="Ярус events (стрічка подій, старші за 7д)"
               ;;
             *)
               echo "Невідомий ярус: $TIER"; exit 1 ;;
@@ -100,5 +119,7 @@ jobs:
               -H "Prefer: return=representation") || { echo "DELETE failed"; exit 0; }
             COUNT=$(echo "$RESP" | jq 'length')
             echo "Видалено рядків: ${COUNT}"
-            echo "$RESP" | jq -r '.[] | "  - \(.nickname) (Lv.\(.best_level))"'
+            if [ "$TIER" != "events" ]; then
+              echo "$RESP" | jq -r '.[] | "  - \(.nickname) (Lv.\(.best_level))"'
+            fi
           fi
