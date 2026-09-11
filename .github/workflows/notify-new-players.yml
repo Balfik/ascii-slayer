@@ -88,3 +88,39 @@ jobs:
                 || echo "Failed to notify chat ${CHAT}"
             done
           done
+
+      # Сигнал можливої атаки: рахуємо реєстрації за останню ГОДИНУ —
+      # те саме вікно, що й сам ліміт нових акаунтів у
+      # validate_player_write() на Supabase (наразі 5/год). Поріг
+      # навмисно = самому ліміту, не довільне менше число — так сигнал
+      # означає "хтось реально впирається в межу", а не просто "кілька
+      # людей прийшли одночасно" (яке само по собі не підозріле).
+      # Без збереження стану між запусками (той самий стиль, що й в
+      # усьому проєкті) — поки сплеск триває, це повідомлення повторно
+      # приходитиме кожні ~5 хв, це навмисно (краще нагадати, що
+      # ситуація ще триває, ніж один раз і забути).
+      - name: Check for a registration burst (possible attack) and alert
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          set -uo pipefail
+          THRESHOLD=5
+          SINCE=$(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%S)
+          RESP=$(curl -sf "https://vfaveuenkublhxgatbcn.supabase.co/rest/v1/players?select=nickname&created_at=gte.${SINCE}&nickname=not.ilike.ZZTest*&order=created_at.asc" \
+            -H "apikey: ${SUPABASE_KEY}") || { echo "Supabase query failed"; exit 0; }
+
+          COUNT=$(echo "$RESP" | jq 'length')
+          if [ "$COUNT" -ge "$THRESHOLD" ]; then
+            NAMES=$(echo "$RESP" | jq -r '[.[].nickname] | join(", ")')
+            MSG="🚨 Можлива атака: ${COUNT} нових акаунтів за останню годину (ліміт ${THRESHOLD})"$'\n'"${NAMES}"
+
+            IFS=',' read -ra CHATS <<< "$TELEGRAM_CHAT_ID"
+            for CHAT in "${CHATS[@]}"; do
+              curl -sf -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+                --data-urlencode "chat_id=${CHAT}" \
+                --data-urlencode "text=${MSG}" > /dev/null \
+                || echo "Failed to notify chat ${CHAT}"
+            done
+          fi
