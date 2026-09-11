@@ -649,7 +649,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = '0.88';
+const GAME_VERSION = '0.89';
 
 const SUPABASE_URL = 'https://vfaveuenkublhxgatbcn.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_PkeJBe1KSw0ZWUSgcAIZFA_SuG8Ilyo';
@@ -1239,6 +1239,7 @@ const I18N = {
     'leaderboard.youTag':'(ти)', 'leaderboard.since':'приєднався {time}',
     'leaderboard.feedHeader':'СТРІЧКА ПОДІЙ', 'leaderboard.feedEmpty':'Поки що подій не було.',
     'leaderboard.yourRankHeader':'ТВОЯ ПОЗИЦІЯ', 'leaderboard.rankOf':'#{rank} з {total}', 'leaderboard.rankOnly':'#{rank}',
+    'leaderboard.notRankedYet':'Ще не в рейтингу — потрібен 100 рівень',
     'world.explain':'Обери регіон — і моби там лишаться саме такими (той самий рівень складності), скільки б ти не бігав, поки сам не оберешся в інший. Дистанція й рівень персонажа ростуть завжди, як завжди — фіксується лише складність мобів у регіоні. Рекомендований рівень — орієнтир: якщо він набагато вищий за твій, той регіон тобі зараз не пройти.',
     'world.farmingTag':'фармиш тут',
     'world.frontier':'Слідувати за прогресом',
@@ -1560,6 +1561,7 @@ const I18N = {
     'leaderboard.youTag':'(you)', 'leaderboard.since':'joined {time}',
     'leaderboard.feedHeader':'ACTIVITY FEED', 'leaderboard.feedEmpty':'No events yet.',
     'leaderboard.yourRankHeader':'YOUR RANK', 'leaderboard.rankOf':'#{rank} of {total}', 'leaderboard.rankOnly':'#{rank}',
+    'leaderboard.notRankedYet':'Not ranked yet — reach level 100',
     'world.explain':'Pick a region and its monsters stay at that exact difficulty, no matter how long you run, until you pick another one yourself. Distance and character level always keep climbing as usual — only the region\'s monster difficulty gets pinned. Recommended level is a guide: if it\'s far above yours, you can\'t clear that region yet.',
     'world.farmingTag':'farming here',
     'world.frontier':'Follow real progress',
@@ -5465,11 +5467,11 @@ async function fetchNearbyRank(){
   const myLevel = state.lifetime.bestLevel;
 
   const [rankRes, aboveRes, belowRes] = await Promise.all([
-    sbClient.from('players').select('id', {count:'exact', head:true}).gt('best_level', myLevel).not('nickname', 'ilike', 'ZZTest%').eq('is_banned', false),
+    sbClient.from('players').select('id', {count:'exact', head:true}).gt('best_level', myLevel).not('nickname', 'ilike', 'ZZTest%').eq('is_banned', false).gte('best_level', 100),
     sbClient.from('players').select('nickname,best_level,prestige_count,castle_level,created_at')
-      .gt('best_level', myLevel).not('nickname', 'ilike', 'ZZTest%').eq('is_banned', false).order('best_level', {ascending:true}).limit(3),
+      .gt('best_level', myLevel).not('nickname', 'ilike', 'ZZTest%').eq('is_banned', false).gte('best_level', 100).order('best_level', {ascending:true}).limit(3),
     sbClient.from('players').select('nickname,best_level,prestige_count,castle_level,created_at')
-      .lt('best_level', myLevel).not('nickname', 'ilike', 'ZZTest%').eq('is_banned', false).order('best_level', {ascending:false}).limit(3)
+      .lt('best_level', myLevel).not('nickname', 'ilike', 'ZZTest%').eq('is_banned', false).gte('best_level', 100).order('best_level', {ascending:false}).limit(3)
   ]);
   if(rankRes.error || aboveRes.error || belowRes.error) return null;
   const myRank = (rankRes.count||0) + 1;
@@ -5494,25 +5496,29 @@ async function renderLeaderboard(){
     return;
   }
   try{
-    const wantNearby = sbReady && sbPlayerId;
+    const myLevel = state.lifetime.bestLevel||0;
+    const amRanked = myLevel >= 100;
+    const wantNearby = sbReady && sbPlayerId && amRanked;
 
-    // events не має власного is_banned — фільтруємо за player_id забаненого
-    // гравця (не за ніком: ніки не гарантовано унікальні, різний акаунт
-    // міг згенерувати той самий рандомний нік, що й у чітера).
-    let bannedIds = [];
+    // events не має власного is_banned/рівня — фільтруємо за player_id
+    // (не за ніком: ніки не гарантовано унікальні, різний акаунт міг
+    // згенерувати той самий рандомний нік). Виключаємо і забанених, і
+    // тих, хто ще не дійшов до 100 рівня — той самий поріг, що й у
+    // самому лідерборді.
+    let excludedIds = [];
     try{
-      const { data: bannedRows } = await sbClient.from('players').select('id').eq('is_banned', true);
-      bannedIds = (bannedRows||[]).map(p=>p.id);
+      const { data: excludedRows } = await sbClient.from('players').select('id').or('is_banned.eq.true,best_level.lt.100');
+      excludedIds = (excludedRows||[]).map(p=>p.id);
     }catch(e){}
 
     let eventsQuery = sbClient.from('events').select('nickname,event_type,target_name,target_rarity,value,created_at')
       .not('nickname', 'ilike', 'ZZTest%');
-    if(bannedIds.length>0) eventsQuery = eventsQuery.not('player_id', 'in', `(${bannedIds.join(',')})`);
+    if(excludedIds.length>0) eventsQuery = eventsQuery.not('player_id', 'in', `(${excludedIds.join(',')})`);
     eventsQuery = eventsQuery.order('created_at', {ascending:false}).limit(30);
 
     const [playersRes, eventsRes, nearby] = await Promise.all([
       sbClient.from('players').select('id,nickname,best_level,prestige_count,castle_level,created_at')
-        .not('nickname', 'ilike', 'ZZTest%').eq('is_banned', false).order('best_level', {ascending:false}).limit(50),
+        .not('nickname', 'ilike', 'ZZTest%').eq('is_banned', false).gte('best_level', 100).order('best_level', {ascending:false}).limit(50),
       eventsQuery,
       wantNearby ? fetchNearbyRank().catch(()=>null) : Promise.resolve(null)
     ]);
@@ -5527,7 +5533,11 @@ async function renderLeaderboard(){
     } else {
       html += rows.map((p,i)=>leaderboardRowHtml(i+1, p, p.id===sbPlayerId)).join('');
     }
-    if(nearby && !amInTop50) html += renderNearbyRankHtml(nearby);
+    if(sbPlayerId && !amRanked){
+      html += `<div style="margin:14px 0 4px;color:var(--dim);font-size:12px;letter-spacing:1px;">${t('leaderboard.notRankedYet')}</div>`;
+    } else if(nearby && !amInTop50){
+      html += renderNearbyRankHtml(nearby);
+    }
     html += `<div style="margin:14px 0 4px;color:var(--purple);font-size:12px;letter-spacing:1px;">${t('leaderboard.feedHeader')}</div>`;
 
     const events = (eventsRes.data||[]).map(e=>({e, line:renderEventLine(e)})).filter(x=>x.line);

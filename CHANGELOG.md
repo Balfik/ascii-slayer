@@ -5,6 +5,14 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.89] — Leaderboard now starts at level 100
+
+### Changed
+- The public leaderboard and activity feed only show characters that
+  have reached level 100. Below that, your character still exists and
+  keeps its progress — it just shows "Not ranked yet" instead of a
+  rank until it qualifies.
+
 ## [0.88] — Leaderboard protection
 
 ### Added
