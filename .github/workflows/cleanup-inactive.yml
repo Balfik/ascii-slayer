@@ -1,0 +1,104 @@
+name: Auto-cleanup inactive characters
+
+# Триярусне автоматичне очищення бази від покинутих персонажів —
+# гравець попросив саме таку градацію (чим менше прогресу, тим
+# частіше чистимо):
+#   Ярус 1: рівень = 1 (взагалі без прогресу)           — щодня
+#   Ярус 2: рівень 2-49, БЕЗ переродження                — раз на 5 днів
+#   Ярус 3: рівень 50-99, БЕЗ переродження                — раз на тиждень
+#   Рівень 100+ — ніколи не чіпаємо автоматично.
+#
+# "Неактивний" — updated_at давніше за вікно, довше за сам інтервал
+# запуску (запас, щоб не зачепити тих, хто просто грає рідше).
+#
+# Забанених (is_banned=true) НЕ чіпаємо — це докази атак, лишаються
+# для перегляду через /banned.
+#
+# DELETE вимагає SERVICE ROLE ключа — у players немає DELETE-політики
+# для anon/authenticated (RLS за замовчуванням забороняє), тож
+# публічний ключ фізично не може видаляти рядки. Це саме той самий
+# ключ, що вже є в Supabase Edge Function Secrets — окремий GitHub
+# secret, бо це два різні сховища.
+#
+# dry_run (лише для workflow_dispatch): рахує, скільки БУЛО Б
+# видалено, без реального DELETE — для перевірки перед першим
+# реальним запуском.
+on:
+  schedule:
+    - cron: '0 3 * * *'      # щодня 03:00 UTC — ярус 1
+    - cron: '0 3 */5 * *'    # ~раз на 5 днів — ярус 2
+    - cron: '0 3 * * 0'      # щонеділі — ярус 3
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: 'Який ярус запустити вручну (1, 2 або 3)'
+        required: true
+        default: '1'
+      dry_run:
+        description: 'Сухий прогін — лише порахувати, без видалення'
+        type: boolean
+        required: true
+        default: true
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine tier and mode
+        id: cfg
+        run: |
+          case "${{ github.event.schedule }}" in
+            '0 3 * * *') echo "tier=1" >> "$GITHUB_OUTPUT"; echo "dry_run=false" >> "$GITHUB_OUTPUT" ;;
+            '0 3 */5 * *') echo "tier=2" >> "$GITHUB_OUTPUT"; echo "dry_run=false" >> "$GITHUB_OUTPUT" ;;
+            '0 3 * * 0') echo "tier=3" >> "$GITHUB_OUTPUT"; echo "dry_run=false" >> "$GITHUB_OUTPUT" ;;
+            *)
+              echo "tier=${{ github.event.inputs.tier }}" >> "$GITHUB_OUTPUT"
+              echo "dry_run=${{ github.event.inputs.dry_run }}" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+      - name: Run cleanup for the selected tier
+        env:
+          SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          TIER: ${{ steps.cfg.outputs.tier }}
+          DRY_RUN: ${{ steps.cfg.outputs.dry_run }}
+        run: |
+          set -uo pipefail
+          BASE="https://vfaveuenkublhxgatbcn.supabase.co/rest/v1/players"
+
+          case "$TIER" in
+            1)
+              SINCE=$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%S)
+              FILTER="best_level=eq.1&is_banned=eq.false&updated_at=lt.${SINCE}"
+              LABEL="Ярус 1 (рівень=1, неактивні >24г)"
+              ;;
+            2)
+              SINCE=$(date -u -d '10 days ago' +%Y-%m-%dT%H:%M:%S)
+              FILTER="best_level=gt.1&best_level=lt.50&prestige_count=eq.0&is_banned=eq.false&updated_at=lt.${SINCE}"
+              LABEL="Ярус 2 (рівень 2-49, без переродження, неактивні >10д)"
+              ;;
+            3)
+              SINCE=$(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%S)
+              FILTER="best_level=gte.50&best_level=lt.100&prestige_count=eq.0&is_banned=eq.false&updated_at=lt.${SINCE}"
+              LABEL="Ярус 3 (рівень 50-99, без переродження, неактивні >14д)"
+              ;;
+            *)
+              echo "Невідомий ярус: $TIER"; exit 1 ;;
+          esac
+
+          echo "=== $LABEL ==="
+
+          if [ "$DRY_RUN" = "true" ]; then
+            COUNT=$(curl -sf "${BASE}?select=id&${FILTER}" \
+              -H "apikey: ${SERVICE_KEY}" -H "Authorization: Bearer ${SERVICE_KEY}" \
+              -H "Prefer: count=exact" -H "Range: 0-0" -D - -o /dev/null \
+              | grep -i content-range | sed -E 's#.*/##' | tr -d '\r')
+            echo "СУХИЙ ПРОГІН: було б видалено ${COUNT:-0} рядків."
+          else
+            RESP=$(curl -sf -X DELETE "${BASE}?${FILTER}" \
+              -H "apikey: ${SERVICE_KEY}" -H "Authorization: Bearer ${SERVICE_KEY}" \
+              -H "Prefer: return=representation") || { echo "DELETE failed"; exit 0; }
+            COUNT=$(echo "$RESP" | jq 'length')
+            echo "Видалено рядків: ${COUNT}"
+            echo "$RESP" | jq -r '.[] | "  - \(.nickname) (Lv.\(.best_level))"'
+          fi
