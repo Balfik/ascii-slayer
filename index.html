@@ -649,7 +649,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = '0.90';
+const GAME_VERSION = '0.91';
 
 const SUPABASE_URL = 'https://vfaveuenkublhxgatbcn.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_PkeJBe1KSw0ZWUSgcAIZFA_SuG8Ilyo';
@@ -872,8 +872,22 @@ function renderEventLine(e){
 
 function checkEnchantMilestoneEvent(it, enchantBefore){
   if(it.rarity!=='legendary' && it.rarity!=='demonic') return;
+  const after = it.enchant||0;
+  if(after<=enchantBefore) return;
+  // Вище +10 — кожен окремий рівень (+11, +12, ...), а не лише кожні
+  // 10. Але ЛИШЕ для демонічних (червоних) — легендарки (жовтогарячі)
+  // лишаються на старій логіці "кожні 10". Це один виклик на дію
+  // (клік/макс-клік/один тик автозаточки), а не по циклу на кожен
+  // рівень — навіть якщо автозаточка підняла предмет одразу на тисячі
+  // рівнів за один тик, це все одно рівно один reportEvent(), як і
+  // раніше (черга нижче додатково не дає цьому забити чергу
+  // застарілими значеннями).
+  if(it.rarity==='demonic' && after>10){
+    reportEvent('enchant_milestone', {targetName:L(it,'name'), targetRarity:it.rarity, value:after});
+    return;
+  }
   const tierBefore = Math.floor(enchantBefore/10);
-  const tierAfter = Math.floor((it.enchant||0)/10);
+  const tierAfter = Math.floor(after/10);
   if(tierAfter>tierBefore && tierAfter>0){
     reportEvent('enchant_milestone', {targetName:L(it,'name'), targetRarity:it.rarity, value:tierAfter*10});
   }
@@ -891,6 +905,19 @@ let eventQueueTimer = null;
 let lastEventSentAt = 0;
 function reportEvent(kind, extra){
   if(!sbReady || !sbClient || !sbPlayerId) return;
+  // Дедуп у черзі за kind+targetName: якщо для того самого предмета
+  // вже лежить непроminнута подія того самого типу — замінюємо її
+  // новим значенням замість додавання ще однієї. Без цього
+  // автозаточка (тикає раз/сек, checkEnchantMilestoneEvent тепер
+  // репортить кожен рівень вище +10) могла б наповнювати чергу
+  // швидше, ніж вона встигає зливатись (1 подія/5.5с) — черга росла
+  // б необмежено за довгу сесію, і назовні зрештою просочувались би
+  // застарілі проміжні значення. Тепер у черзі завжди лише останнє.
+  const targetName = extra && extra.targetName;
+  if(targetName!=null){
+    const dupIdx = eventQueue.findIndex(e=>e.kind===kind && e.extra && e.extra.targetName===targetName);
+    if(dupIdx!==-1){ eventQueue[dupIdx] = {kind, extra, priority: EVENT_PRIORITY[kind]||0}; return; }
+  }
   eventQueue.push({kind, extra, priority: EVENT_PRIORITY[kind]||0});
   if(!eventQueueTimer){
     const wait = Math.max(0, EVENT_SEND_GAP_MS - (Date.now()-lastEventSentAt));
@@ -1028,11 +1055,13 @@ const COMPANION_TYPES = [
   {id:'hunter',  name:'Дух Мисливця',   name_en:'Hunter Spirit',  unlockAch:'boss_20', glyph:'h', color:'#4dd2ff', role:'utility'}
 ];
 
-const MAX_COMPANION_LEVEL = 200;
+const MAX_COMPANION_LEVEL = 300;
 const COMPANION_LATE_LEVEL = 100;
+const COMPANION_LATE2_LEVEL = 200;
 const COMPANION_BASE_COST = 300, COMPANION_COST_STEP = 200;
 const COMPANION_COST_STEP_LATE = 500;
 const COMPANION_CRYSTAL_BASE = 10, COMPANION_CRYSTAL_STEP = 5;
+const COMPANION_SOUL_BASE = 3, COMPANION_SOUL_STEP = 0.5;
 const COMPANION_ATTACK_INTERVAL = 5;
 const COMPANION_BLADE_PCT_BASE = 0.25;
 const COMPANION_BLADE_PCT_STEP = 0.015;
@@ -1055,16 +1084,24 @@ function companionCost(id){
   const lvl = companionLevel(id);
   if(lvl >= MAX_COMPANION_LEVEL) return null;
   if(lvl < COMPANION_LATE_LEVEL){
-    return {gold: Math.round(COMPANION_BASE_COST + lvl*COMPANION_COST_STEP), crystals:0};
+    return {gold: Math.round(COMPANION_BASE_COST + lvl*COMPANION_COST_STEP), crystals:0, souls:0};
   }
   const over = lvl - COMPANION_LATE_LEVEL;
   const goldAtLate = COMPANION_BASE_COST + COMPANION_LATE_LEVEL*COMPANION_COST_STEP;
-  return {
+  const cost = {
     gold: Math.round(goldAtLate + over*COMPANION_COST_STEP_LATE),
-    crystals: Math.round(COMPANION_CRYSTAL_BASE + over*COMPANION_CRYSTAL_STEP)
+    crystals: Math.round(COMPANION_CRYSTAL_BASE + over*COMPANION_CRYSTAL_STEP),
+    souls: 0
   };
+  // 200-300: та сама формула золота/кристалів продовжується без
+  // розриву (over рахується від тих самих 100), плюс тепер душі босів.
+  if(lvl >= COMPANION_LATE2_LEVEL){
+    const over2 = lvl - COMPANION_LATE2_LEVEL;
+    cost.souls = Math.round(COMPANION_SOUL_BASE + over2*COMPANION_SOUL_STEP);
+  }
+  return cost;
 }
-function companionCanAfford(cost){ return !!cost && state.gold>=cost.gold && state.crystals>=cost.crystals; }
+function companionCanAfford(cost){ return !!cost && state.gold>=cost.gold && state.crystals>=cost.crystals && state.souls>=(cost.souls||0); }
 
 function activeCompanion(){
   let id = state.companions.active;
@@ -1092,6 +1129,7 @@ function buyCompanionLevel(id){
   }
   state.gold -= cost.gold;
   state.crystals -= cost.crystals;
+  state.souls -= (cost.souls||0);
   state.companions.level[id] = companionLevel(id)+1;
   recomputeStats();
   renderCompanionsIfOpen();
@@ -1106,6 +1144,7 @@ function buyCompanionLevelMax(id){
     if(!companionCanAfford(cost)) break;
     state.gold -= cost.gold;
     state.crystals -= cost.crystals;
+    state.souls -= (cost.souls||0);
     state.companions.level[id] = companionLevel(id)+1;
     count++;
   }
@@ -1221,8 +1260,8 @@ const I18N = {
     'streak.bonusAtk':'+{pct}% сили атаки', 'streak.bonusGold':'+{pct}% золота', 'streak.bonusDrop':'+{pct}% шансу дропу',
     'streak.noBonusYet':'Зайди в гру завтра, щоб почати стрик і здобути перший бонус.',
     'streak.atCap':'Стеля бонусу досягнута — довший стрик уже не підсилює його далі.',
-    'streak.weekendActiveNow':'🎉 Вихідний! ×{mult} на золото, досвід і душі босів діє прямо зараз.',
-    'streak.weekendInfo':'По суботах і неділях завжди діє ×{mult} на золото, досвід і душі босів (позначено ×{mult} на клітинках нижче) — незалежно від стріку.',
+    'streak.weekendActiveNow':'🎉 Вихідний! ×{mult} на золото, досвід і душі босів, а кулдаун босів і Гаунтлета вдвічі коротший — діє прямо зараз.',
+    'streak.weekendInfo':'По суботах і неділях завжди діє ×{mult} на золото, досвід і душі босів (позначено ×{mult} на клітинках нижче), а кулдаун босів і Гаунтлета вдвічі коротший — незалежно від стріку.',
     'streak.explain':'Заходь у гру щодня, щоб не перервати стрик. За кожен новий день — разова нагорода золотом/кристалами (цикл на 7 днів, далі повторюється), а сам стрик увесь час дає постійний бонус до атаки/золота/шансу дропу, поки триває. Пропустив хоч один день — стрик скидається до 1.',
     'library.tab.world':'🌍 Світ', 'library.tab.castle':'🏰 Замок', 'library.tab.monsters':'👹 Монстри',
     'library.tab.bosses':'💀 Боси', 'library.tab.items':'⚔ Спорядження', 'library.tab.relics':'◆ Реліквії',
@@ -1543,8 +1582,8 @@ const I18N = {
     'streak.bonusAtk':'+{pct}% attack power', 'streak.bonusGold':'+{pct}% gold', 'streak.bonusDrop':'+{pct}% drop chance',
     'streak.noBonusYet':'Come back tomorrow to start a streak and earn your first bonus.',
     'streak.atCap':'Bonus cap reached — a longer streak no longer boosts it further.',
-    'streak.weekendActiveNow':'🎉 Weekend! ×{mult} gold, XP and boss souls is active right now.',
-    'streak.weekendInfo':'Saturdays and Sundays always get ×{mult} gold, XP and boss souls (marked ×{mult} on the cells below) — regardless of your streak.',
+    'streak.weekendActiveNow':'🎉 Weekend! ×{mult} gold, XP and boss souls, plus half cooldown on bosses and the Gauntlet — active right now.',
+    'streak.weekendInfo':'Saturdays and Sundays always get ×{mult} gold, XP and boss souls (marked ×{mult} on the cells below), plus half cooldown on bosses and the Gauntlet — regardless of your streak.',
     'streak.explain':"Log in every day to keep the streak alive. Each new day gives a one-time gold/crystal reward (a 7-day cycle that then repeats), while the streak itself grants a standing bonus to attack, gold, and drop chance for as long as it lasts. Miss even one day and the streak resets to 1.",
     'library.tab.world':'🌍 World', 'library.tab.castle':'🏰 Castle', 'library.tab.monsters':'👹 Monsters',
     'library.tab.bosses':'💀 Bosses', 'library.tab.items':'⚔ Gear', 'library.tab.relics':'◆ Relics',
@@ -2662,31 +2701,61 @@ const MILESTONE_TRACKS = [
     {threshold:50000,  reward:{gold:15000,  crystals:250, souls:5}},
     {threshold:100000, reward:{gold:40000,  crystals:500, souls:10}},
     {threshold:250000, reward:{gold:120000, crystals:1200, souls:25}},
-    {threshold:500000, reward:{gold:300000, crystals:3000, souls:50}}
+    {threshold:500000, reward:{gold:300000, crystals:3000, souls:50}},
+    {threshold:1000000,   reward:{gold:750000,    crystals:7000,   souls:100}},
+    {threshold:2500000,   reward:{gold:1800000,   crystals:16000,  souls:220}},
+    {threshold:5000000,   reward:{gold:4000000,   crystals:35000,  souls:450}},
+    {threshold:10000000,  reward:{gold:9000000,   crystals:75000,  souls:900}},
+    {threshold:25000000,  reward:{gold:22000000,  crystals:180000, souls:2000}},
+    {threshold:50000000,  reward:{gold:50000000,  crystals:400000, souls:4000}},
+    {threshold:100000000, reward:{gold:110000000, crystals:900000, souls:8000}},
+    {threshold:250000000, reward:{gold:280000000, crystals:2200000,souls:20000}},
+    {threshold:500000000, reward:{gold:600000000, crystals:5000000,souls:45000}}
   ]},
   {stat:'totalKills', icon:'⚔', name:'Вбивства', name_en:'Kills', unit:'', tiers:[
     {threshold:1000,  reward:{gold:1500,  crystals:40}},
     {threshold:2500,  reward:{gold:4000,  crystals:100}},
     {threshold:5000,  reward:{gold:10000, crystals:220, souls:5}},
     {threshold:10000, reward:{gold:25000, crystals:450, souls:12}},
-    {threshold:25000, reward:{gold:70000, crystals:1000, souls:25}}
+    {threshold:25000, reward:{gold:70000, crystals:1000, souls:25}},
+    {threshold:50000,   reward:{gold:150000,   crystals:2200,  souls:55}},
+    {threshold:100000,  reward:{gold:320000,   crystals:4800,  souls:120}},
+    {threshold:250000,  reward:{gold:800000,   crystals:12000, souls:300}},
+    {threshold:500000,  reward:{gold:1700000,  crystals:26000, souls:650}},
+    {threshold:1000000, reward:{gold:3800000,  crystals:58000, souls:1400}},
+    {threshold:2500000, reward:{gold:9500000,  crystals:145000,souls:3500}},
+    {threshold:5000000, reward:{gold:20000000, crystals:310000,souls:7500}},
+    {threshold:10000000,reward:{gold:45000000, crystals:700000,souls:16000}},
+    {threshold:20000000,reward:{gold:100000000,crystals:1600000,souls:35000}}
   ]},
   {stat:'bossesDefeated', icon:'👹', name:'Боси', name_en:'Bosses', unit:'', tiers:[
     {threshold:30, reward:{gold:5000,  crystals:150, souls:15}},
     {threshold:50, reward:{gold:12000, crystals:300, souls:30}},
     {threshold:75, reward:{gold:25000, crystals:600, souls:50}},
-    {threshold:100,reward:{gold:50000, crystals:1200, souls:100}}
+    {threshold:100,reward:{gold:50000, crystals:1200, souls:100}},
+    {threshold:150, reward:{gold:100000, crystals:2500,  souls:200}},
+    {threshold:200, reward:{gold:200000, crystals:5000,  souls:400}},
+    {threshold:300, reward:{gold:400000, crystals:10000, souls:800}},
+    {threshold:500, reward:{gold:900000, crystals:22000, souls:1800}},
+    {threshold:1000,reward:{gold:2200000,crystals:55000, souls:4500}}
   ]},
   {stat:'questsCompleted', icon:'📜', name:'Квести', name_en:'Quests', unit:'', tiers:[
     {threshold:100,  reward:{gold:3000,  crystals:80}},
     {threshold:250,  reward:{gold:8000,  crystals:200}},
     {threshold:500,  reward:{gold:18000, crystals:450, souls:10}},
-    {threshold:1000, reward:{gold:40000, crystals:900, souls:25}}
+    {threshold:1000, reward:{gold:40000, crystals:900, souls:25}},
+    {threshold:2000, reward:{gold:90000,   crystals:2000,  souls:60}},
+    {threshold:5000, reward:{gold:220000,  crystals:5000,  souls:150}},
+    {threshold:10000,reward:{gold:480000,  crystals:11000, souls:320}},
+    {threshold:25000,reward:{gold:1200000, crystals:28000, souls:800}}
   ]},
   {stat:'totalGoldEarned', icon:'💰', name:'Золото зароблено', name_en:'Gold Earned', unit:'$', tiers:[
     {threshold:1000000,   reward:{crystals:200}},
     {threshold:10000000,  reward:{crystals:600}},
-    {threshold:100000000, reward:{crystals:1800, souls:20}}
+    {threshold:100000000, reward:{crystals:1800, souls:20}},
+    {threshold:1000000000,   reward:{crystals:5000,  souls:60}},
+    {threshold:10000000000,  reward:{crystals:14000, souls:180}},
+    {threshold:100000000000, reward:{crystals:40000, souls:500}}
   ]}
 ];
 function milestoneKey(stat, threshold){ return stat+'_'+threshold; }
@@ -3489,6 +3558,7 @@ function grantDemonicItem(){
     recomputeStats();
     addLog('log.itemDuplicate', 'item', {name:L(existing,'name'), count:existing.count, rarity:rarityLabel(existing.rarity)});
     sfxItem(existing.rarity);
+    reportEvent('demonic_item_found', {targetName:L(existing,'name'), targetRarity:'demonic'});
     renderInventory();
     return L(existing,'name');
   }
@@ -3546,7 +3616,7 @@ function endBossFight(won, retreated){
   const cooldownSkipped = hasRelic('patience_crystal') && Math.random() < RELIC_COOLDOWN_SKIP_CHANCE;
   if(!cooldownSkipped){
     const cdReducePct = Math.min(60, computePrestigeTreeBonuses().bossCooldownPct);
-    state.bossCooldowns[boss.id] = Date.now() + boss.cooldownHours*3600*1000*(1-cdReducePct/100);
+    state.bossCooldowns[boss.id] = Date.now() + boss.cooldownHours*3600*1000*(1-cdReducePct/100)*weekendCooldownMult();
   }
   const result = {boss, won, retreated, gold:0, souls:0, xp:0, demonicName:null, relicName:null, cooldownSkipped, isEnding:false};
   if(won){
@@ -3953,7 +4023,7 @@ function endGauntlet(retreated){
   const cooldownSkipped = hasRelic('patience_crystal') && Math.random() < RELIC_COOLDOWN_SKIP_CHANCE;
   if(!cooldownSkipped){
     const cdReducePct = Math.min(60, computePrestigeTreeBonuses().bossCooldownPct);
-    state.gauntletCooldown = Date.now() + GAUNTLET_COOLDOWN_HOURS*3600*1000*(1-cdReducePct/100);
+    state.gauntletCooldown = Date.now() + GAUNTLET_COOLDOWN_HOURS*3600*1000*(1-cdReducePct/100)*weekendCooldownMult();
   }
   const rw = gauntletRewards(wavesCleared);
   const fullReward = wavesCleared >= GAUNTLET_MIN_WAVES_FOR_FULL_REWARD;
@@ -4311,8 +4381,10 @@ function nightAmount(){ return (1 - Math.cos(dayPhase()*Math.PI*2))/2; }
 function dayNightGoldMult(){ return 1 + (nightAmount()*NIGHT_GOLD_BONUS_PCT)/100; }
 
 const WEEKEND_MULT = 2;
+const WEEKEND_COOLDOWN_MULT = 0.5;
 function isWeekendBonus(){ const d = new Date().getDay(); return d===0 || d===6; }
 function weekendMult(){ return isWeekendBonus() ? WEEKEND_MULT : 1; }
+function weekendCooldownMult(){ return isWeekendBonus() ? WEEKEND_COOLDOWN_MULT : 1; }
 function goldMultEff(){ return stats.goldMult * (1+comboMultBonus()) * dayNightGoldMult() * goldRushMult() * weekendMult(); }
 
 function computeSkillBonuses(){
@@ -6199,8 +6271,8 @@ function renderCompanions(){
     const isActive = active && active.id===c.id;
     const canBuy = companionCanAfford(cost);
 
-    const costLabel = cost ? `<span class="cost-g">${formatNum(cost.gold)}$</span>${cost.crystals>0?` <span class="cost-c">${formatNum(cost.crystals)}◆</span>`:''}` : '';
-    const costTitle = cost ? `${formatExact(cost.gold)}$${cost.crystals>0?` + ${formatExact(cost.crystals)}◆`:''}` : '';
+    const costLabel = cost ? `<span class="cost-g">${formatNum(cost.gold)}$</span>${cost.crystals>0?` <span class="cost-c">${formatNum(cost.crystals)}◆</span>`:''}${cost.souls>0?` <span class="cost-s">${formatNum(cost.souls)}👹</span>`:''}` : '';
+    const costTitle = cost ? `${formatExact(cost.gold)}$${cost.crystals>0?` + ${formatExact(cost.crystals)}◆`:''}${cost.souls>0?` + ${formatExact(cost.souls)}👹`:''}` : '';
     html += `<div class="mrow stack">
       <div class="up-name" style="color:${c.color};">${L(c,'name')} <span class="lvl">Lv.${lvl}</span>
         <small style="color:var(--dim);">${companionEffectText(c, lvl)}</small>

@@ -5,6 +5,24 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.91] — Companions to 300, weekend boss cooldowns, more milestones
+
+### Added
+- Companions can now be leveled up to 300 (was 200) — levels 200-300
+  also cost boss souls on top of the usual gold and crystals.
+- Weekends now also halve boss and Gauntlet cooldowns, on top of the
+  existing gold/XP/boss-soul bonus.
+- Bestiary milestone tracks (distance, kills, bosses, quests, gold
+  earned) extended much further.
+
+### Changed
+- Demonic (red) item drops now always appear in the activity feed,
+  including repeat drops of an item you already own (previously only
+  the first time). Legendary (orange) items are unchanged.
+- Enchanting a demonic item past +10 now reports every single level
+  in the activity feed (+11, +12, +13, ...), not just every 10th.
+  Legendary items are unchanged.
+
 ## [0.90] — Minor fixes
 
 ### Changed
