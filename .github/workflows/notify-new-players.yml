@@ -71,14 +71,25 @@ jobs:
         run: |
           set -uo pipefail
           SINCE=$(date -u -d '6 minutes ago' +%Y-%m-%dT%H:%M:%S)
-          RESP=$(curl -sf "https://vfaveuenkublhxgatbcn.supabase.co/rest/v1/players?select=nickname,best_level,ban_reason,banned_at&banned_at=gte.${SINCE}&ban_reason=not.is.null&order=banned_at.asc" \
+          RESP=$(curl -sf "https://vfaveuenkublhxgatbcn.supabase.co/rest/v1/players?select=id,nickname,best_level,castle_level,prestige_count,ban_reason,banned_at,created_at,referrer,locale,timezone&banned_at=gte.${SINCE}&ban_reason=not.is.null&order=banned_at.asc" \
             -H "apikey: ${SUPABASE_KEY}") || { echo "Supabase query failed"; exit 0; }
 
           echo "$RESP" | jq -c '.[]' | while read -r row; do
+            ID=$(echo "$row" | jq -r '.id')
             NICK=$(echo "$row" | jq -r '.nickname')
             LVL=$(echo "$row" | jq -r '.best_level')
+            CASTLE=$(echo "$row" | jq -r '.castle_level')
+            PRESTIGE=$(echo "$row" | jq -r '.prestige_count')
             REASON=$(echo "$row" | jq -r '.ban_reason')
-            MSG="⚠️ Автоматично приховано: ${NICK}"$'\n'"Рівень: ${LVL}"$'\n'"Причина: ${REASON}"
+            CREATED=$(echo "$row" | jq -r '.created_at')
+            BANNED=$(echo "$row" | jq -r '.banned_at')
+            REFERRER=$(echo "$row" | jq -r '.referrer // "—"')
+            LOCALE=$(echo "$row" | jq -r '.locale // "—"')
+            TZ=$(echo "$row" | jq -r '.timezone // "—"')
+            CREATED_S=$(date -u -d "$CREATED" +%s)
+            BANNED_S=$(date -u -d "$BANNED" +%s)
+            AGE_MIN=$(( (BANNED_S - CREATED_S) / 60 ))
+            MSG="⚠️ Автоматично приховано: ${NICK}"$'\n'"ID: ${ID}"$'\n'"Рівень: ${LVL} · Замок: ${CASTLE} · Переродження: ${PRESTIGE}"$'\n'"Вік акаунта на момент бану: ${AGE_MIN} хв (створено ${CREATED})"$'\n'"Мова/пояс: ${LOCALE} / ${TZ}"$'\n'"Звідки: ${REFERRER}"$'\n'"Причина: ${REASON}"
 
             IFS=',' read -ra CHATS <<< "$TELEGRAM_CHAT_ID"
             for CHAT in "${CHATS[@]}"; do
