@@ -100,6 +100,44 @@ jobs:
             done
           done
 
+      # М'який сигнал (11-12 вересня, за проханням гравця): рівень уже
+      # підозріло високий для віку акаунта (<5 хв), але ще НЕ настільки,
+      # щоб спрацював жорсткий автобан вище — не банить, не ховає,
+      # лише повідомляє для ручної перевірки. flagged_fast_start_at
+      # ставиться рівно один раз на false->true перехід у тригері, тож
+      # тут так само перевіряємо саме цей timestamp (не сам прапорець),
+      # щоб не переспамити той самий випадок повторно.
+      - name: Check for soft-flagged fast-start accounts and notify Telegram
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          set -uo pipefail
+          SINCE=$(date -u -d '6 minutes ago' +%Y-%m-%dT%H:%M:%S)
+          RESP=$(curl -sf "https://vfaveuenkublhxgatbcn.supabase.co/rest/v1/players?select=id,nickname,best_level,created_at,flagged_fast_start_at&flagged_fast_start_at=gte.${SINCE}&order=flagged_fast_start_at.asc" \
+            -H "apikey: ${SUPABASE_KEY}") || { echo "Supabase query failed"; exit 0; }
+
+          echo "$RESP" | jq -c '.[]' | while read -r row; do
+            ID=$(echo "$row" | jq -r '.id')
+            NICK=$(echo "$row" | jq -r '.nickname')
+            LVL=$(echo "$row" | jq -r '.best_level')
+            CREATED=$(echo "$row" | jq -r '.created_at')
+            FLAGGED=$(echo "$row" | jq -r '.flagged_fast_start_at')
+            CREATED_S=$(date -u -d "$CREATED" +%s)
+            FLAGGED_S=$(date -u -d "$FLAGGED" +%s)
+            AGE_SEC=$(( FLAGGED_S - CREATED_S ))
+            MSG="🕵️ Підозріло швидкий старт (не забанено, лише перевір): ${NICK}"$'\n'"ID: ${ID}"$'\n'"Рівень: ${LVL} за ${AGE_SEC} сек від створення акаунта"
+
+            IFS=',' read -ra CHATS <<< "$TELEGRAM_CHAT_ID"
+            for CHAT in "${CHATS[@]}"; do
+              curl -sf -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+                --data-urlencode "chat_id=${CHAT}" \
+                --data-urlencode "text=${MSG}" > /dev/null \
+                || echo "Failed to notify chat ${CHAT}"
+            done
+          done
+
       # Сигнал можливої атаки: рахуємо реєстрації за останню ГОДИНУ —
       # те саме вікно, що й сам ліміт нових акаунтів у
       # validate_player_write() на Supabase (наразі 5/год). Поріг
