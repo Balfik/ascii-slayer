@@ -14,6 +14,13 @@ name: Auto-cleanup inactive characters
 # Забанених (is_banned=true) НЕ чіпаємо — це докази атак, лишаються
 # для перегляду через /banned.
 #
+# Гравців із прив'язаним хмарним акаунтом (логін+пароль) теж НЕ
+# чіпаємо, незалежно від рівня/активності — вони свідомо створили
+# постійний акаунт, видаляти його автоматично через неактивність не
+# годиться. Ознака "має хмарний акаунт" — чи існує рядок у
+# public.player_saves для цього id (створюється лише один раз, при
+# першій успішній реєстрації, registerCloudAccount() в index.html).
+#
 # Ярус events: окремо, раз на тиждень — видаляє рядки public.events
 # (стрічка подій) старші за 7 днів, незалежно від того, живий гравець
 # чи ні. events НЕ чиститься каскадом при видаленні гравця вище (FK
@@ -76,23 +83,36 @@ jobs:
         run: |
           set -uo pipefail
 
+          # Список id з прив'язаним хмарним акаунтом — рахуємо ОДИН раз тут,
+          # під service role (RLS на player_saves не дає anon-ключу прочитати
+          # чужі рядки, лише сервісний ключ бачить усе). Порожньо для ярусу
+          # events — там це поняття не застосовне.
+          CLOUD_FILTER=""
+          if [ "$TIER" != "events" ]; then
+            CLOUD_IDS=$(curl -sf "https://vfaveuenkublhxgatbcn.supabase.co/rest/v1/player_saves?select=id" \
+              -H "apikey: ${SERVICE_KEY}" -H "Authorization: Bearer ${SERVICE_KEY}" | jq -r '[.[].id] | join(",")')
+            if [ -n "$CLOUD_IDS" ]; then
+              CLOUD_FILTER="&id=not.in.(${CLOUD_IDS})"
+            fi
+          fi
+
           case "$TIER" in
             1)
               BASE="https://vfaveuenkublhxgatbcn.supabase.co/rest/v1/players"
               SINCE=$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%S)
-              FILTER="best_level=eq.1&prestige_count=eq.0&is_banned=eq.false&updated_at=lt.${SINCE}"
+              FILTER="best_level=eq.1&prestige_count=eq.0&is_banned=eq.false&updated_at=lt.${SINCE}${CLOUD_FILTER}"
               LABEL="Ярус 1 (рівень=1, без переродження, неактивні >24г)"
               ;;
             2)
               BASE="https://vfaveuenkublhxgatbcn.supabase.co/rest/v1/players"
               SINCE=$(date -u -d '10 days ago' +%Y-%m-%dT%H:%M:%S)
-              FILTER="best_level=gt.1&best_level=lt.50&prestige_count=eq.0&is_banned=eq.false&updated_at=lt.${SINCE}"
+              FILTER="best_level=gt.1&best_level=lt.50&prestige_count=eq.0&is_banned=eq.false&updated_at=lt.${SINCE}${CLOUD_FILTER}"
               LABEL="Ярус 2 (рівень 2-49, без переродження, неактивні >10д)"
               ;;
             3)
               BASE="https://vfaveuenkublhxgatbcn.supabase.co/rest/v1/players"
               SINCE=$(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%S)
-              FILTER="best_level=gte.50&best_level=lt.100&prestige_count=eq.0&is_banned=eq.false&updated_at=lt.${SINCE}"
+              FILTER="best_level=gte.50&best_level=lt.100&prestige_count=eq.0&is_banned=eq.false&updated_at=lt.${SINCE}${CLOUD_FILTER}"
               LABEL="Ярус 3 (рівень 50-99, без переродження, неактивні >14д)"
               ;;
             events)
