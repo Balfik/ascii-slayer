@@ -694,7 +694,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = '0.93';
+const GAME_VERSION = '0.94';
 
 const SUPABASE_URL = 'https://vfaveuenkublhxgatbcn.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_PkeJBe1KSw0ZWUSgcAIZFA_SuG8Ilyo';
@@ -1565,7 +1565,7 @@ const I18N = {
     'region.newBiome':'🗺️ Новий регіон: {name}!',
     'biome.endgameLevel':'{name} Lv.{n}',
     'char.rankPrefix':'Звання', 'char.level':'Рівень', 'char.prestigePoints':'Очки Слави',
-    'char.prestigeCount':'Переродженнь здійснено',
+    'char.prestigeCount':'Перероджень здійснено',
     'char.base':'база', 'char.fromLevel':'з рівня', 'char.fromUpgrades':'з прокачки', 'char.fromItems':'з предметів',
     'char.skills':'навички', 'char.prestige':'слава', 'char.castle':'замок', 'char.fromSkillsOnly':'лише з навичок',
     'char.fromUpgradesSkills':'прокачка + навички', 'char.fromUpgradesItemsSkillsPrestige':'прокачка, предмети, навички, слава',
@@ -1583,19 +1583,19 @@ const I18N = {
     'nickcolor.emerald.name':'Смарагдовий', 'nickcolor.emerald.desc':'Розблоковано за 50 000 вбитих монстрів за все життя.', 'nickcolor.emerald.hint':'Вбий 50 000 монстрів за все життя, щоб розблокувати',
     'nickcolor.sapphire.name':'Сапфіровий', 'nickcolor.sapphire.desc':'Розблоковано за 5 000 000 м пройденої дистанції за все життя.', 'nickcolor.sapphire.hint':'Пройди 5 000 000 м за все життя, щоб розблокувати',
     'nickcolor.amethyst.name':'Аметистовий', 'nickcolor.amethyst.desc':'Розблоковано за 300 знайдених легендарних предметів.', 'nickcolor.amethyst.hint':'Знайди 300 легендарних предметів, щоб розблокувати',
-    'nickcolor.crimson.name':'Багряний', 'nickcolor.crimson.desc':'Розблоковано за 300 перемог над босами.', 'nickcolor.crimson.hint':'Перемож 300 босів, щоб розблокувати',
+    'nickcolor.crimson.name':'Багряний', 'nickcolor.crimson.desc':'Розблоковано за 300 перемог над босами.', 'nickcolor.crimson.hint':'Переможи 300 босів, щоб розблокувати',
     'nickcolor.golden.name':'Золотий', 'nickcolor.golden.desc':'Розблоковано за повне проходження гри.', 'nickcolor.golden.hint':'Пройди гру повністю, щоб розблокувати',
-    'nickcolor.obsidian.name':'Обсидіановий', 'nickcolor.obsidian.desc':'Розблоковано за 250 переродженнь на повністю збудованому замку.',
+    'nickcolor.obsidian.name':'Обсидіановий', 'nickcolor.obsidian.desc':'Розблоковано за 250 перероджень на повністю збудованому замку.',
     'nickcolor.blank.name':'Порожній', 'nickcolor.blank.desc':'Розблоковано за порожній інвентар на повністю збудованому замку.',
-    'nickcolor.chromatic.name':'Хроматичний', 'nickcolor.chromatic.desc':'Розблоковано за повне проходження гри й зібрані всі набори спорядження.',
+    'nickcolor.chromatic.name':'Хроматичний', 'nickcolor.chromatic.desc':'Розблоковано за повне проходження гри, зібравши всі набори спорядження.',
     'nickframe.chronicler.name':'Літописець', 'nickframe.chronicler.desc':'Розблоковано за 500 виконаних квестів.', 'nickframe.chronicler.hint':'Виконай 500 квестів, щоб розблокувати',
     'nickframe.hunter.name':'Мисливець', 'nickframe.hunter.desc':'Розблоковано за 500 000 вбитих монстрів за все життя.', 'nickframe.hunter.hint':'Вбий 500 000 монстрів за все життя, щоб розблокувати',
     'nickframe.wanderer.name':'Мандрівник', 'nickframe.wanderer.desc':'Розблоковано за 50 000 000 м пройденої дистанції за все життя.', 'nickframe.wanderer.hint':'Пройди 50 000 000 м за все життя, щоб розблокувати',
-    'nickframe.smith.name':'Ковач', 'nickframe.smith.desc':'Розблоковано за 5000 прокачок заточки предметів.', 'nickframe.smith.hint':'Прокач заточку предметів 5000 разів, щоб розблокувати',
-    'nickframe.shadowblade.name':'Тіньовий Клинок', 'nickframe.shadowblade.desc':'Розблоковано за 500 перемог над босами.', 'nickframe.shadowblade.hint':'Перемож 500 босів, щоб розблокувати',
+    'nickframe.smith.name':'Коваль', 'nickframe.smith.desc':'Розблоковано за прокачку спорядження 5000 разів.', 'nickframe.smith.hint':'Прокачай спорядження 5000 разів, щоб розблокувати',
+    'nickframe.shadowblade.name':'Тіньовий Клинок', 'nickframe.shadowblade.desc':'Розблоковано за 500 перемог над босами.', 'nickframe.shadowblade.hint':'Переможи 500 босів, щоб розблокувати',
     'nickframe.demonologist.name':'Демонолог', 'nickframe.demonologist.desc':'Розблоковано за 200 знайдених демонічних предметів.', 'nickframe.demonologist.hint':'Знайди 200 демонічних предметів, щоб розблокувати',
-    'nickframe.eternal.name':'Вічний', 'nickframe.eternal.desc':'Розблоковано за 500 переродженнь.', 'nickframe.eternal.hint':'Переродись 500 разів, щоб розблокувати',
-    'nickframe.architect.name':'Архітектор', 'nickframe.architect.desc':'Розблоковано за проходження гри без жодного разу купленого Автоковаля.',
+    'nickframe.eternal.name':'Вічний', 'nickframe.eternal.desc':'Розблоковано за 500 перероджень.', 'nickframe.eternal.hint':'Переродись 500 разів, щоб розблокувати',
+    'nickframe.architect.name':'Архітектор', 'nickframe.architect.desc':'Розблоковано за проходження гри, жодного разу не купивши навичку «Автоковаль».',
     'nickframe.phantom.name':'Привид', 'nickframe.phantom.desc':'Розблоковано за 300 хвиль, пройдених у Гаунтлеті.',
     'nickframe.ultimate.name':'Довершений', 'nickframe.ultimate.desc':'Розблоковано за 100% проходження: гра завершена, всі реліквії, замок збудований і всі досягнення здобуті.',
     'theme.default.name':'Термінал', 'theme.default.desc':'Класична зелена палітра — завжди доступна.',
@@ -2743,7 +2743,7 @@ const ACHIEVEMENTS = [
   {id:'kills_100000', tier:'legendary', name:'Кінець усього живого', name_en:'End of All Living Things', desc:'Вбити 100 000 монстрів',    desc_en:'Kill 100,000 monsters',     check:s=>s.totalKills>=100000,   reward:{crystals:300}},
   {id:'gold_1b',    tier:'legendary', name:'Володар світової скарбниці', name_en:'Master of the World\'s Treasury', desc:'Заробити 1 000 000 000 золота за все життя', desc_en:'Earn 1,000,000,000 gold in total', check:s=>s.totalGoldEarned>=1000000000, reward:{crystals:300}},
   {id:'level_5000', tier:'legendary', name:'За межею часу',    name_en:'Beyond Time',      desc:'Досягти 5000 рівня',                  desc_en:'Reach level 5000',          check:s=>s.bestLevel>=5000,      reward:{crystals:400}},
-  {id:'prestige_100', tier:'legendary', name:'Сотня переродженнь', name_en:'A Hundred Rebirths', desc:'Здійснити Переродження 100 разів', desc_en:'Rebirth 100 times',       check:s=>s.prestigeCount>=100,   reward:{crystals:350}},
+  {id:'prestige_100', tier:'legendary', name:'Сотня перероджень', name_en:'A Hundred Rebirths', desc:'Здійснити Переродження 100 разів', desc_en:'Rebirth 100 times',       check:s=>s.prestigeCount>=100,   reward:{crystals:350}},
   {id:'boss_final', tier:'legendary', name:'Переможець Кінця', name_en:'Vanquisher of the End', desc:'Перемогти Володаря Кінця', desc_en:'Defeat the Lord of the End', check:s=>((s.bossKills||{})['b1000']||0)>=1, reward:{crystals:300, souls:50}},
   {id:'quests_1000',tier:'legendary', name:'Тисяча контрактів', name_en:'A Thousand Contracts', desc:'Виконати 1000 квестів',          desc_en:'Complete 1,000 quests',     check:s=>(s.questsCompleted||0)>=1000, reward:{crystals:250}},
   {id:'gauntlet_50',tier:'legendary', name:'Півсотні хвиль',   name_en:'Fifty Waves',       desc:'Зачистити 50 хвиль за один Гаунтлет', desc_en:'Clear 50 waves in one Gauntlet run', check:s=>(s.bestGauntletWaves||0)>=50, reward:{crystals:250}},
