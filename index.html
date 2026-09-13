@@ -472,6 +472,51 @@
     background:#122417;border:1px solid var(--border);color:var(--text);
   }
   .title-nickname button:hover{background:#1a1a1a;}
+
+  /* Рамки й кольори ніку в лідерборді (НЕ у стрічці подій — там
+     завжди звичайний nickSpan()). Три рівні: звичайна кольорова рамка
+     (.nick-frame), м'яка блимаюча (.nick-frame-glow), і одна
+     надрідкісна з переливом кольору й іскрами (.nick-frame-ultra). */
+  .nick-frame{
+    display:inline-block; padding:1px 10px; border-radius:15px;
+    border:2px solid var(--frame-color, transparent); line-height:1.6;
+  }
+  .nick-frame-glow{ animation: nickFrameGlow 2.4s ease-in-out infinite; }
+  @keyframes nickFrameGlow{
+    0%,100%{ box-shadow:0 0 3px 0 var(--frame-color, transparent); }
+    50%{ box-shadow:0 0 10px 2px var(--frame-color, transparent); }
+  }
+  .nick-frame-ultra{
+    position:relative; animation: nickFrameRainbow 4s linear infinite;
+  }
+  @keyframes nickFrameRainbow{
+    0%{ border-color:#ff4d4d; box-shadow:0 0 6px 1px #ff4d4d66; }
+    20%{ border-color:#ffd94d; box-shadow:0 0 6px 1px #ffd94d66; }
+    40%{ border-color:#4dffb8; box-shadow:0 0 6px 1px #4dffb866; }
+    60%{ border-color:#4dd2ff; box-shadow:0 0 6px 1px #4dd2ff66; }
+    80%{ border-color:#c77dff; box-shadow:0 0 6px 1px #c77dff66; }
+    100%{ border-color:#ff4d4d; box-shadow:0 0 6px 1px #ff4d4d66; }
+  }
+  .nick-frame-ultra::before, .nick-frame-ultra::after{
+    content:'✦'; position:absolute; font-size:8px; color:#fff; opacity:0;
+    animation: nickFrameSparkle 2.6s ease-in-out infinite; pointer-events:none;
+  }
+  .nick-frame-ultra::before{ top:-7px; left:8%; animation-delay:.2s; }
+  .nick-frame-ultra::after{ bottom:-7px; right:8%; animation-delay:1.3s; }
+  @keyframes nickFrameSparkle{
+    0%,100%{ opacity:0; transform:scale(.4); }
+    50%{ opacity:1; transform:scale(1.1); }
+  }
+  .nick-color-glow{ animation: nickColorGlow 2.2s ease-in-out infinite; }
+  @keyframes nickColorGlow{
+    0%,100%{ text-shadow:0 0 2px currentColor; }
+    50%{ text-shadow:0 0 8px currentColor, 0 0 14px currentColor; }
+  }
+  .nick-color-rainbow{ animation: nickColorRainbow 4s linear infinite; }
+  @keyframes nickColorRainbow{
+    0%{color:#ff4d4d;} 20%{color:#ffd94d;} 40%{color:#4dffb8;}
+    60%{color:#4dd2ff;} 80%{color:#c77dff;} 100%{color:#ff4d4d;}
+  }
 </style>
 </head>
 <body>
@@ -649,7 +694,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = '0.91';
+const GAME_VERSION = '0.92';
 
 const SUPABASE_URL = 'https://vfaveuenkublhxgatbcn.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_PkeJBe1KSw0ZWUSgcAIZFA_SuG8Ilyo';
@@ -727,7 +772,9 @@ async function syncLeaderboard(){
       nickname: state.nickname,
       best_level: bestLevel,
       prestige_count: prestigeCount,
-      castle_level: castleLevel
+      castle_level: castleLevel,
+      nick_color: state.settings.nickColor || 'none',
+      nick_frame: state.settings.nickFrame || 'none'
     };
 
     if(!existing){
@@ -1528,6 +1575,29 @@ const I18N = {
     'char.setsHeader':'КОМПЛЕКТИ', 'char.setsPieces':'предметів', 'char.setsBonusActive':'бонус +{pct}% активний',
     'char.relicsHeader':'РЕЛІКВІЇ', 'char.relicUndiscovered':'Ще не здобута',
     'char.themesHeader':'ТЕМИ', 'char.themeActive':'Активна', 'char.themeSelect':'Обрати',
+    'char.nickColorsHeader':'КОЛЬОРИ НІКУ', 'char.nickFramesHeader':'РАМКИ НІКУ',
+    'char.nickCosmeticExplain':'Показуються в лідерборді (і в топ-50, і в твоїй позиції нижче) — ніколи в стрічці подій. Розблоковуються довгими/важкими досягненнями, частина — секретні.',
+    'char.nickNone':'Немає', 'char.secretUndiscovered':'Секретне досягнення — умова не розкривається заздалегідь.',
+    'nickcolor.bronze.name':'Бронзовий', 'nickcolor.bronze.desc':'Розблоковано за досягнення 500 рівня.', 'nickcolor.bronze.hint':'Досягни 500 рівня, щоб розблокувати',
+    'nickcolor.silver.name':'Срібний', 'nickcolor.silver.desc':'Розблоковано за досягнення 2500 рівня.', 'nickcolor.silver.hint':'Досягни 2500 рівня, щоб розблокувати',
+    'nickcolor.emerald.name':'Смарагдовий', 'nickcolor.emerald.desc':'Розблоковано за 50 000 вбитих монстрів за все життя.', 'nickcolor.emerald.hint':'Вбий 50 000 монстрів за все життя, щоб розблокувати',
+    'nickcolor.sapphire.name':'Сапфіровий', 'nickcolor.sapphire.desc':'Розблоковано за 5 000 000 м пробіжаної дистанції за все життя.', 'nickcolor.sapphire.hint':'Пробіжи 5 000 000 м за все життя, щоб розблокувати',
+    'nickcolor.amethyst.name':'Аметистовий', 'nickcolor.amethyst.desc':'Розблоковано за 300 знайдених легендарних предметів.', 'nickcolor.amethyst.hint':'Знайди 300 легендарних предметів, щоб розблокувати',
+    'nickcolor.crimson.name':'Багряний', 'nickcolor.crimson.desc':'Розблоковано за 300 перемог над босами.', 'nickcolor.crimson.hint':'Перемож 300 босів, щоб розблокувати',
+    'nickcolor.golden.name':'Золотий', 'nickcolor.golden.desc':'Розблоковано за повне проходження гри.', 'nickcolor.golden.hint':'Пройди гру повністю, щоб розблокувати',
+    'nickcolor.obsidian.name':'Обсидіановий', 'nickcolor.obsidian.desc':'Розблоковано за 250 переродженнь на повністю збудованому замку.',
+    'nickcolor.blank.name':'Порожній', 'nickcolor.blank.desc':'Розблоковано за порожній інвентар на повністю збудованому замку.',
+    'nickcolor.chromatic.name':'Хроматичний', 'nickcolor.chromatic.desc':'Розблоковано за повне проходження гри й зібрані всі набори спорядження.',
+    'nickframe.chronicler.name':'Літописець', 'nickframe.chronicler.desc':'Розблоковано за 500 виконаних квестів.', 'nickframe.chronicler.hint':'Виконай 500 квестів, щоб розблокувати',
+    'nickframe.hunter.name':'Мисливець', 'nickframe.hunter.desc':'Розблоковано за 500 000 вбитих монстрів за все життя.', 'nickframe.hunter.hint':'Вбий 500 000 монстрів за все життя, щоб розблокувати',
+    'nickframe.wanderer.name':'Мандрівник', 'nickframe.wanderer.desc':'Розблоковано за 50 000 000 м пробіжаної дистанції за все життя.', 'nickframe.wanderer.hint':'Пробіжи 50 000 000 м за все життя, щоб розблокувати',
+    'nickframe.smith.name':'Ковач', 'nickframe.smith.desc':'Розблоковано за 5000 прокачок заточки предметів.', 'nickframe.smith.hint':'Прокач заточку предметів 5000 разів, щоб розблокувати',
+    'nickframe.shadowblade.name':'Тіньовий Клинок', 'nickframe.shadowblade.desc':'Розблоковано за 500 перемог над босами.', 'nickframe.shadowblade.hint':'Перемож 500 босів, щоб розблокувати',
+    'nickframe.demonologist.name':'Демонолог', 'nickframe.demonologist.desc':'Розблоковано за 200 знайдених демонічних предметів.', 'nickframe.demonologist.hint':'Знайди 200 демонічних предметів, щоб розблокувати',
+    'nickframe.eternal.name':'Вічний', 'nickframe.eternal.desc':'Розблоковано за 500 переродженнь.', 'nickframe.eternal.hint':'Переродись 500 разів, щоб розблокувати',
+    'nickframe.architect.name':'Архітектор', 'nickframe.architect.desc':'Розблоковано за проходження гри без жодного разу купленого Автоковаля.',
+    'nickframe.phantom.name':'Привид', 'nickframe.phantom.desc':'Розблоковано за 300 хвиль, пройдених у Гаунтлеті.',
+    'nickframe.ultimate.name':'Довершений', 'nickframe.ultimate.desc':'Розблоковано за 100% проходження: гра завершена, всі реліквії, замок збудований і всі досягнення здобуті.',
     'theme.default.name':'Термінал', 'theme.default.desc':'Класична зелена палітра — завжди доступна.',
     'theme.blood.name':'Кривава', 'theme.blood.desc':'Розблоковано за перемогу над Стражем Вічності.',
     'theme.blood.hint':'Здолай Стража Вічності, щоб розблокувати',
@@ -1850,6 +1920,29 @@ const I18N = {
     'char.setsHeader':'SETS', 'char.setsPieces':'items', 'char.setsBonusActive':'+{pct}% bonus active',
     'char.relicsHeader':'RELICS', 'char.relicUndiscovered':'Not yet obtained',
     'char.themesHeader':'THEMES', 'char.themeActive':'Active', 'char.themeSelect':'Select',
+    'char.nickColorsHeader':'NICKNAME COLORS', 'char.nickFramesHeader':'NICKNAME FRAMES',
+    'char.nickCosmeticExplain':'Shown on the leaderboard (both the top 50 and your own rank below) — never in the activity feed. Unlocked by long or difficult achievements; some are secret.',
+    'char.nickNone':'None', 'char.secretUndiscovered':"Secret achievement — the condition isn't revealed in advance.",
+    'nickcolor.bronze.name':'Bronze', 'nickcolor.bronze.desc':'Unlocked by reaching level 500.', 'nickcolor.bronze.hint':'Reach level 500 to unlock',
+    'nickcolor.silver.name':'Silver', 'nickcolor.silver.desc':'Unlocked by reaching level 2500.', 'nickcolor.silver.hint':'Reach level 2500 to unlock',
+    'nickcolor.emerald.name':'Emerald', 'nickcolor.emerald.desc':'Unlocked by 50,000 lifetime monster kills.', 'nickcolor.emerald.hint':'Get 50,000 lifetime monster kills to unlock',
+    'nickcolor.sapphire.name':'Sapphire', 'nickcolor.sapphire.desc':'Unlocked by 5,000,000 m of lifetime distance.', 'nickcolor.sapphire.hint':'Travel 5,000,000 m in total to unlock',
+    'nickcolor.amethyst.name':'Amethyst', 'nickcolor.amethyst.desc':'Unlocked by finding 300 legendary items.', 'nickcolor.amethyst.hint':'Find 300 legendary items to unlock',
+    'nickcolor.crimson.name':'Crimson', 'nickcolor.crimson.desc':'Unlocked by defeating 300 bosses.', 'nickcolor.crimson.hint':'Defeat 300 bosses to unlock',
+    'nickcolor.golden.name':'Golden', 'nickcolor.golden.desc':'Unlocked by completing the game.', 'nickcolor.golden.hint':'Complete the game to unlock',
+    'nickcolor.obsidian.name':'Obsidian', 'nickcolor.obsidian.desc':'Unlocked by reaching 250 rebirths with a fully built Castle.',
+    'nickcolor.blank.name':'Blank', 'nickcolor.blank.desc':'Unlocked by having an empty inventory with a fully built Castle.',
+    'nickcolor.chromatic.name':'Chromatic', 'nickcolor.chromatic.desc':'Unlocked by completing the game with every gear set completed.',
+    'nickframe.chronicler.name':'Chronicler', 'nickframe.chronicler.desc':'Unlocked by completing 500 quests.', 'nickframe.chronicler.hint':'Complete 500 quests to unlock',
+    'nickframe.hunter.name':'Hunter', 'nickframe.hunter.desc':'Unlocked by 500,000 lifetime monster kills.', 'nickframe.hunter.hint':'Get 500,000 lifetime monster kills to unlock',
+    'nickframe.wanderer.name':'Wanderer', 'nickframe.wanderer.desc':'Unlocked by 50,000,000 m of lifetime distance.', 'nickframe.wanderer.hint':'Travel 50,000,000 m in total to unlock',
+    'nickframe.smith.name':'Smith', 'nickframe.smith.desc':'Unlocked by enchanting items 5000 times.', 'nickframe.smith.hint':'Enchant items 5000 times to unlock',
+    'nickframe.shadowblade.name':'Shadow Blade', 'nickframe.shadowblade.desc':'Unlocked by defeating 500 bosses.', 'nickframe.shadowblade.hint':'Defeat 500 bosses to unlock',
+    'nickframe.demonologist.name':'Demonologist', 'nickframe.demonologist.desc':'Unlocked by finding 200 demonic items.', 'nickframe.demonologist.hint':'Find 200 demonic items to unlock',
+    'nickframe.eternal.name':'Eternal', 'nickframe.eternal.desc':'Unlocked by 500 rebirths.', 'nickframe.eternal.hint':'Rebirth 500 times to unlock',
+    'nickframe.architect.name':'Architect', 'nickframe.architect.desc':'Unlocked by completing the game without ever buying Auto-Smith.',
+    'nickframe.phantom.name':'Phantom', 'nickframe.phantom.desc':'Unlocked by clearing 300 waves in the Gauntlet.',
+    'nickframe.ultimate.name':'Ultimate', 'nickframe.ultimate.desc':'Unlocked by 100% completion: the game finished, every relic, a fully built Castle, and every achievement earned.',
     'theme.default.name':'Terminal', 'theme.default.desc':'The classic green palette — always available.',
     'theme.blood.name':'Blood', 'theme.blood.desc':'Unlocked by defeating the Guardian of Eternity.',
     'theme.blood.hint':'Defeat the Guardian of Eternity to unlock',
@@ -5523,7 +5616,10 @@ function openLeaderboard(){
 }
 
 function leaderboardRowHtml(rank, p, mine){
-  const name = mine ? `${nickSpan(state.nickname)} <span class="lvl">${t('leaderboard.youTag')}</span>` : nickSpan(p.nickname);
+  const styledNick = mine
+    ? styledNickHtml(state.nickname, state.settings.nickColor, state.settings.nickFrame)
+    : styledNickHtml(p.nickname, p.nick_color, p.nick_frame);
+  const name = mine ? `${styledNick} <span class="lvl">${t('leaderboard.youTag')}</span>` : styledNick;
   const bestLevel = mine ? state.lifetime.bestLevel : p.best_level;
   const prestigeCount = mine ? state.lifetime.prestigeCount : p.prestige_count;
   const castleLevel = mine ? state.castleLevel : p.castle_level;
@@ -5540,9 +5636,9 @@ async function fetchNearbyRank(){
 
   const [rankRes, aboveRes, belowRes] = await Promise.all([
     sbClient.from('players').select('id', {count:'exact', head:true}).gt('best_level', myLevel).not('nickname', 'ilike', 'ZZTest%').eq('is_banned', false).gte('best_level', 100),
-    sbClient.from('players').select('nickname,best_level,prestige_count,castle_level,created_at')
+    sbClient.from('players').select('nickname,best_level,prestige_count,castle_level,created_at,nick_color,nick_frame')
       .gt('best_level', myLevel).not('nickname', 'ilike', 'ZZTest%').eq('is_banned', false).gte('best_level', 100).order('best_level', {ascending:true}).limit(3),
-    sbClient.from('players').select('nickname,best_level,prestige_count,castle_level,created_at')
+    sbClient.from('players').select('nickname,best_level,prestige_count,castle_level,created_at,nick_color,nick_frame')
       .lt('best_level', myLevel).not('nickname', 'ilike', 'ZZTest%').eq('is_banned', false).gte('best_level', 100).order('best_level', {ascending:false}).limit(3)
   ]);
   if(rankRes.error || aboveRes.error || belowRes.error) return null;
@@ -5589,7 +5685,7 @@ async function renderLeaderboard(){
     eventsQuery = eventsQuery.order('created_at', {ascending:false}).limit(30);
 
     const [playersRes, eventsRes, nearby] = await Promise.all([
-      sbClient.from('players').select('id,nickname,best_level,prestige_count,castle_level,created_at')
+      sbClient.from('players').select('id,nickname,best_level,prestige_count,castle_level,created_at,nick_color,nick_frame')
         .not('nickname', 'ilike', 'ZZTest%').eq('is_banned', false).gte('best_level', 100).order('best_level', {ascending:false}).limit(50),
       eventsQuery,
       wantNearby ? fetchNearbyRank().catch(()=>null) : Promise.resolve(null)
@@ -6067,6 +6163,89 @@ const THEMES = [
   {id:'crystal', swatch:'#4dd2ff', unlockCheck:()=>ACHIEVEMENTS.every(a=>state.achievements[a.id]),
     vars:{'--bg':'#050a10','--panel':'#081018','--border':'#1f3a4a','--text':'#d4f0ff','--dim':'#6f8fa0','--accent':'#4dd2ff','--crystal':'#8ff0ff','--purple':'#7db8ff'}}
 ];
+
+// Кольори й рамки ніку — показуються в лідерборді (топ-50 і "твоя
+// позиція"), НІКОЛИ в стрічці подій (там nickSpan() без стилю, як і
+// раніше). Кожен розблоковується довгою/важкою умовою; secret:true —
+// умова не пишеться прямо гравцю (в UI показується "???", той самий
+// підхід, що вже є для реліквій). Вибір лише клієнтський (яка умова
+// виконана — рахує клієнт), але САМЕ значення (яке kind обрано) іде
+// на сервер і звіряється з білим списком валідних id у
+// validate_player_write() — це не дає підробити довільний рядок, але
+// не перевіряє повторно, чи гравець ДІЙСНО виконав умову (для цього
+// довелось би синкати всю статистику в players, що явно
+// непропорційно для суто косметики) — той самий клас прийнятого
+// ризику, що вже є для локальних сейвів.
+const NICK_COLORS = [
+  {id:'bronze',    swatch:'#cd7f32', color:'#cd7f32', unlockCheck:()=>state.lifetime.bestLevel>=500},
+  {id:'silver',    swatch:'#c0c0c0', color:'#c0c0c0', unlockCheck:()=>state.lifetime.bestLevel>=2500},
+  {id:'emerald',   swatch:'#2ecc71', color:'#2ecc71', unlockCheck:()=>state.lifetime.totalKills>=50000},
+  {id:'sapphire',  swatch:'#3498db', color:'#3498db', unlockCheck:()=>state.lifetime.bestDistance>=5000000},
+  {id:'amethyst',  swatch:'#9b59b6', color:'#9b59b6', unlockCheck:()=>state.lifetime.legendaryFound>=300},
+  {id:'crimson',   swatch:'#e63950', color:'#e63950', unlockCheck:()=>state.lifetime.bossesDefeated>=300},
+  {id:'golden',    swatch:'#ffd700', color:'#ffd700', glow:true, unlockCheck:()=>!!state.lifetime.gameCompleted},
+  {id:'obsidian',  swatch:'#6a6a78', color:'#6a6a78', secret:true,
+    unlockCheck:()=>state.lifetime.prestigeCount>=250 && state.castleLevel>=CASTLE_MAX_LEVEL},
+  {id:'blank',     swatch:'#f0f0f0', color:'#f0f0f0', secret:true,
+    unlockCheck:()=>state.castleLevel>=CASTLE_MAX_LEVEL && state.inventory.length===0},
+  {id:'chromatic', swatch:'#ff4d4d', rainbow:true, secret:true,
+    unlockCheck:()=>{ const sets=ownedSetRarities(); return !!state.lifetime.gameCompleted && sets.length>0 && sets.every(s=>s.complete); }}
+];
+const NICK_FRAMES = [
+  {id:'chronicler',    swatch:'#8a7a4a', color:'#8a7a4a', tier:'plain', unlockCheck:()=>state.lifetime.questsCompleted>=500},
+  {id:'hunter',        swatch:'#4a8a4a', color:'#4a8a4a', tier:'plain', unlockCheck:()=>state.lifetime.totalKills>=500000},
+  {id:'wanderer',      swatch:'#4a6a8a', color:'#4a6a8a', tier:'plain', unlockCheck:()=>state.lifetime.bestDistance>=50000000},
+  {id:'smith',         swatch:'#8a4a4a', color:'#8a4a4a', tier:'plain', unlockCheck:()=>state.lifetime.itemsEnchanted>=5000},
+  {id:'shadowblade',   swatch:'#a04dff', color:'#a04dff', tier:'glow',  unlockCheck:()=>state.lifetime.bossesDefeated>=500},
+  {id:'demonologist',  swatch:'#ff2d4d', color:'#ff2d4d', tier:'glow',  unlockCheck:()=>state.lifetime.demonicFound>=200},
+  {id:'eternal',       swatch:'#e0c040', color:'#e0c040', tier:'glow',  unlockCheck:()=>state.lifetime.prestigeCount>=500},
+  {id:'architect',     swatch:'#5ad1c8', color:'#5ad1c8', tier:'plain', secret:true,
+    unlockCheck:()=>!!state.lifetime.gameCompleted && !(state.skills && state.skills['a3'])},
+  {id:'phantom',       swatch:'#c8c8ff', color:'#c8c8ff', tier:'glow', secret:true,
+    unlockCheck:()=>state.lifetime.bestGauntletWaves>=300},
+  {id:'ultimate',      swatch:'#ffffff', tier:'ultra', secret:true,
+    unlockCheck:()=>!!state.lifetime.gameCompleted && ownedRelicsCount()>=RELIC_POOL.length && state.castleLevel>=CASTLE_MAX_LEVEL && ACHIEVEMENTS.every(a=>state.achievements[a.id])}
+];
+function nickColorUnlocked(id){ if(id==='none') return true; const c=NICK_COLORS.find(x=>x.id===id); return !!c && c.unlockCheck(); }
+function nickFrameUnlocked(id){ if(id==='none') return true; const f=NICK_FRAMES.find(x=>x.id===id); return !!f && f.unlockCheck(); }
+function selectNickColor(id){
+  if(!nickColorUnlocked(id)) return;
+  state.settings.nickColor = id;
+  renderCharacterSheet();
+  save();
+  syncLeaderboard();
+}
+function selectNickFrame(id){
+  if(!nickFrameUnlocked(id)) return;
+  state.settings.nickFrame = id;
+  renderCharacterSheet();
+  save();
+  syncLeaderboard();
+}
+// nick/colorId/frameId -> готовий HTML-фрагмент для лідерборду. НЕ
+// використовувати в стрічці подій — там і далі лишається простий
+// nickSpan() без жодного стилю.
+function styledNickHtml(nick, colorId, frameId){
+  const safe = escapeHtml(nick);
+  const color = NICK_COLORS.find(c=>c.id===colorId);
+  let colorClass = '';
+  let colorStyle = `color:${LEADERBOARD_NICK_COLOR}`;
+  if(color){
+    if(color.rainbow){ colorClass = 'nick-color-rainbow'; }
+    else{
+      colorStyle = `color:${color.color}`;
+      if(color.glow) colorClass = 'nick-color-glow';
+    }
+  }
+  let inner = `<span class="${colorClass}" style="${colorStyle}">${safe}</span>`;
+  const frame = NICK_FRAMES.find(f=>f.id===frameId);
+  if(frame){
+    const frameClass = frame.tier==='ultra' ? 'nick-frame nick-frame-ultra' : (frame.tier==='glow' ? 'nick-frame nick-frame-glow' : 'nick-frame');
+    const frameColor = frame.color || '#ffffff';
+    inner = `<span class="${frameClass}" style="--frame-color:${frameColor}">${inner}</span>`;
+  }
+  return inner;
+}
 function themeUnlocked(id){
   const th = THEMES.find(th=>th.id===id);
   return !!th && th.unlockCheck();
@@ -6155,7 +6334,42 @@ function renderCharacterSheet(){
     </div>`;
   }).join('');
 
+  html += `<div style="margin:14px 0 4px;color:var(--purple);font-size:12px;letter-spacing:1px;">${t('char.nickColorsHeader')}</div>`;
+  html += `<div style="margin:0 0 8px;color:var(--dim);font-size:11.5px;line-height:1.5;">${t('char.nickCosmeticExplain')}</div>`;
+  html += renderNickCosmeticRow({id:'none', swatch:'transparent'}, 'nickColor', true, t('char.nickNone'), '');
+  html += NICK_COLORS.map(c=>{
+    const unlocked = c.unlockCheck();
+    const name = unlocked ? t('nickcolor.'+c.id+'.name') : '???';
+    const desc = unlocked ? t('nickcolor.'+c.id+'.desc') : (c.secret ? t('char.secretUndiscovered') : t('nickcolor.'+c.id+'.hint'));
+    return renderNickCosmeticRow(c, 'nickColor', unlocked, name, desc);
+  }).join('');
+
+  html += `<div style="margin:14px 0 4px;color:var(--purple);font-size:12px;letter-spacing:1px;">${t('char.nickFramesHeader')}</div>`;
+  html += renderNickCosmeticRow({id:'none', swatch:'transparent'}, 'nickFrame', true, t('char.nickNone'), '');
+  html += NICK_FRAMES.map(f=>{
+    const unlocked = f.unlockCheck();
+    const name = unlocked ? t('nickframe.'+f.id+'.name') : '???';
+    const desc = unlocked ? t('nickframe.'+f.id+'.desc') : (f.secret ? t('char.secretUndiscovered') : t('nickframe.'+f.id+'.hint'));
+    return renderNickCosmeticRow(f, 'nickFrame', unlocked, name, desc);
+  }).join('');
+
   modalBody.innerHTML = html;
+}
+// Спільний рендер одного рядка вибору кольору/рамки ніку — дзеркалить
+// вигляд секції тем вище, лише з додатковим прев'ю через
+// styledNickHtml(), щоб гравець одразу бачив, як це виглядатиме.
+function renderNickCosmeticRow(item, kind, unlocked, name, desc){
+  const active = (kind==='nickColor' ? (state.settings.nickColor||'none') : (state.settings.nickFrame||'none')) === item.id;
+  const preview = unlocked
+    ? styledNickHtml(state.nickname, kind==='nickColor' ? item.id : (state.settings.nickColor||'none'), kind==='nickFrame' ? item.id : (state.settings.nickFrame||'none'))
+    : '';
+  const action = kind==='nickColor' ? 'selectNickColor' : 'selectNickFrame';
+  return `<div class="mrow" style="${unlocked?'':'opacity:.5;'}">
+    <div class="up-name">${item.swatch!=='transparent'?`<span style="display:inline-block;width:11px;height:11px;border-radius:3px;background:${item.swatch};vertical-align:middle;margin-right:7px;"></span>`:''}${name}
+      <small>${desc}${preview?` · ${preview}`:''}</small>
+    </div>
+    ${unlocked?`<button class="buy-max${active?' active':''}" data-action="${action}" data-id="${item.id}"${active?' disabled':''}>${active?t('char.themeActive'):t('char.themeSelect')}</button>`:''}
+  </div>`;
 }
 
 let bestiaryTab = 'monsters';
@@ -6698,6 +6912,8 @@ modalBody.addEventListener('click', (e)=>{
   else if(btn.dataset.action==='worldMapJumpToTier') jumpToWorldMapZone();
   else if(btn.dataset.action==='closeEnding') closeEndingScreen();
   else if(btn.dataset.action==='selectTheme') selectTheme(btn.dataset.theme);
+  else if(btn.dataset.action==='selectNickColor') selectNickColor(btn.dataset.id);
+  else if(btn.dataset.action==='selectNickFrame') selectNickFrame(btn.dataset.id);
   else if(btn.dataset.action==='cloudRegister') handleCloudRegisterClick();
   else if(btn.dataset.action==='cloudLogin') handleCloudLoginClick();
   else if(btn.dataset.action==='cloudSaveNow') handleCloudSaveNowClick();
@@ -7157,6 +7373,12 @@ function applyLoadedData(d){
   };
   state.bossCooldowns = (d.bossCooldowns && typeof d.bossCooldowns==='object') ? d.bossCooldowns : {};
   state.gauntletCooldown = typeof d.gauntletCooldown==='number' ? d.gauntletCooldown : 0;
+  // state.relics МАЄ бути виставлений ДО блоку settings нижче —
+  // nickFrameUnlocked() для секретної рамки 'ultimate' викликає
+  // ownedRelicsCount(), яка читає саме це поле; якщо лишити
+  // призначення після settings (як було раніше), перевірка на
+  // завантаженні бачила б ще стару/порожню state.relics.
+  state.relics = (d.relics && typeof d.relics==='object') ? d.relics : {};
   const ds = (d.settings && typeof d.settings==='object') ? d.settings : {};
 
   const dlf = (ds.logFilters && typeof ds.logFilters==='object') ? ds.logFilters : {};
@@ -7168,12 +7390,13 @@ function applyLoadedData(d){
     },
 
     theme: themeUnlocked(ds.theme) ? ds.theme : 'default',
+    nickColor: nickColorUnlocked(ds.nickColor) ? ds.nickColor : 'none',
+    nickFrame: nickFrameUnlocked(ds.nickFrame) ? ds.nickFrame : 'none',
 
     autoEnchantEnabled: !!ds.autoEnchantEnabled,
     autoUpgradeEnabled: !!ds.autoUpgradeEnabled,
     autoSkillSpendEnabled: !!ds.autoSkillSpendEnabled
   };
-  state.relics = (d.relics && typeof d.relics==='object') ? d.relics : {};
   const dcomp = (d.companions && typeof d.companions==='object') ? d.companions : {};
   state.companions = {
     level: (dcomp.level && typeof dcomp.level==='object') ? dcomp.level : {},

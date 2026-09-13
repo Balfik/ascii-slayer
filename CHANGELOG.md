@@ -5,6 +5,17 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.92] — Nickname colors and frames
+
+### Added
+- 10 nickname colors and 10 nickname frames, unlocked by long or
+  difficult in-game achievements — some are openly stated, some are
+  secret and only reveal themselves once you've found them.
+- Shown on the public leaderboard (both the top 50 and your own rank
+  below it) — never in the activity feed.
+- Pick your unlocked color/frame from the Character sheet, the same
+  way you already pick a theme.
+
 ## [0.91] — Companions to 300, weekend boss cooldowns, more milestones
 
 ### Added
