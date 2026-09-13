@@ -5,6 +5,11 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.93] — Minor fixes
+
+### Fixed
+- A couple of incorrect Ukrainian words in newly-added text.
+
 ## [0.92] — Nickname colors and frames
 
 ### Added

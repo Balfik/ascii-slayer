@@ -694,7 +694,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = '0.92';
+const GAME_VERSION = '0.93';
 
 const SUPABASE_URL = 'https://vfaveuenkublhxgatbcn.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_PkeJBe1KSw0ZWUSgcAIZFA_SuG8Ilyo';
@@ -1438,7 +1438,7 @@ const I18N = {
     'log.prestige':'♻️ Переродження! +{pts} очок Слави (всього: {total}). Стартовий капітал за досягнення: {gold}$ {crystals}◆. Демонічні предмети й Душі лишились із тобою.',
     'log.savedToFile':'Гру збережено у файл.',
     'log.loadedFromFile':'Прогрес завантажено з файлу.',
-    'log.loadError':'Помилка завантаження: файл пошкоджений або невірного формату.',
+    'log.loadError':'Помилка завантаження: файл пошкоджений або неправильного формату.',
     'log.resetDone':'Прогрес скинуто. Новий забіг починається!',
     'log.offlineProgress':'💤 Офлайн-прогрес ({time}): +{gold} золота, +{xp} досвіду, +{dist} м{lvl}',
     'log.offlineLevelSuffix':', рівень {from}→{to}',
@@ -1497,7 +1497,7 @@ const I18N = {
     'cloud.err.badUsername':'Логін: лише латинські літери/цифри/підкреслення, 3–20 символів.',
     'cloud.err.badPassword':'Пароль має бути щонайменше 8 символів.',
     'cloud.err.taken':'Цей логін уже зайнятий — обери інший.',
-    'cloud.err.invalid':'Невірний логін або пароль.',
+    'cloud.err.invalid':'Неправильний логін або пароль.',
     'cloud.err.network':'Немає зв\'язку з сервером — спробуй пізніше.',
     'cloud.err.offline':'Хмарні збереження зараз недоступні.',
     'cloud.linkedAs':'Залогінено як: {username}',
@@ -1581,7 +1581,7 @@ const I18N = {
     'nickcolor.bronze.name':'Бронзовий', 'nickcolor.bronze.desc':'Розблоковано за досягнення 500 рівня.', 'nickcolor.bronze.hint':'Досягни 500 рівня, щоб розблокувати',
     'nickcolor.silver.name':'Срібний', 'nickcolor.silver.desc':'Розблоковано за досягнення 2500 рівня.', 'nickcolor.silver.hint':'Досягни 2500 рівня, щоб розблокувати',
     'nickcolor.emerald.name':'Смарагдовий', 'nickcolor.emerald.desc':'Розблоковано за 50 000 вбитих монстрів за все життя.', 'nickcolor.emerald.hint':'Вбий 50 000 монстрів за все життя, щоб розблокувати',
-    'nickcolor.sapphire.name':'Сапфіровий', 'nickcolor.sapphire.desc':'Розблоковано за 5 000 000 м пробіжаної дистанції за все життя.', 'nickcolor.sapphire.hint':'Пробіжи 5 000 000 м за все життя, щоб розблокувати',
+    'nickcolor.sapphire.name':'Сапфіровий', 'nickcolor.sapphire.desc':'Розблоковано за 5 000 000 м пройденої дистанції за все життя.', 'nickcolor.sapphire.hint':'Пройди 5 000 000 м за все життя, щоб розблокувати',
     'nickcolor.amethyst.name':'Аметистовий', 'nickcolor.amethyst.desc':'Розблоковано за 300 знайдених легендарних предметів.', 'nickcolor.amethyst.hint':'Знайди 300 легендарних предметів, щоб розблокувати',
     'nickcolor.crimson.name':'Багряний', 'nickcolor.crimson.desc':'Розблоковано за 300 перемог над босами.', 'nickcolor.crimson.hint':'Перемож 300 босів, щоб розблокувати',
     'nickcolor.golden.name':'Золотий', 'nickcolor.golden.desc':'Розблоковано за повне проходження гри.', 'nickcolor.golden.hint':'Пройди гру повністю, щоб розблокувати',
@@ -1590,7 +1590,7 @@ const I18N = {
     'nickcolor.chromatic.name':'Хроматичний', 'nickcolor.chromatic.desc':'Розблоковано за повне проходження гри й зібрані всі набори спорядження.',
     'nickframe.chronicler.name':'Літописець', 'nickframe.chronicler.desc':'Розблоковано за 500 виконаних квестів.', 'nickframe.chronicler.hint':'Виконай 500 квестів, щоб розблокувати',
     'nickframe.hunter.name':'Мисливець', 'nickframe.hunter.desc':'Розблоковано за 500 000 вбитих монстрів за все життя.', 'nickframe.hunter.hint':'Вбий 500 000 монстрів за все життя, щоб розблокувати',
-    'nickframe.wanderer.name':'Мандрівник', 'nickframe.wanderer.desc':'Розблоковано за 50 000 000 м пробіжаної дистанції за все життя.', 'nickframe.wanderer.hint':'Пробіжи 50 000 000 м за все життя, щоб розблокувати',
+    'nickframe.wanderer.name':'Мандрівник', 'nickframe.wanderer.desc':'Розблоковано за 50 000 000 м пройденої дистанції за все життя.', 'nickframe.wanderer.hint':'Пройди 50 000 000 м за все життя, щоб розблокувати',
     'nickframe.smith.name':'Ковач', 'nickframe.smith.desc':'Розблоковано за 5000 прокачок заточки предметів.', 'nickframe.smith.hint':'Прокач заточку предметів 5000 разів, щоб розблокувати',
     'nickframe.shadowblade.name':'Тіньовий Клинок', 'nickframe.shadowblade.desc':'Розблоковано за 500 перемог над босами.', 'nickframe.shadowblade.hint':'Перемож 500 босів, щоб розблокувати',
     'nickframe.demonologist.name':'Демонолог', 'nickframe.demonologist.desc':'Розблоковано за 200 знайдених демонічних предметів.', 'nickframe.demonologist.hint':'Знайди 200 демонічних предметів, щоб розблокувати',
