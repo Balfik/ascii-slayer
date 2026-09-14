@@ -5,6 +5,26 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [1.00] — Character Auras, Auto Battle Fury
+
+### Added
+- **Character Aura** — a whole new cosmetic system: pick from 8
+  unlockable auras (5 stated, 3 secret) in the Character sheet, each
+  earned by a specific achievement. Visible only to you, in the game
+  itself — never on the leaderboard. Several different visual
+  effects, not just one recolored glow: rising embers, a rotating
+  ring, twinkling sparkles, and a rainbow ring for the rarest one.
+  Survives Rebirth.
+- **Auto Battle Fury**, a new Automation branch skill (10 skill
+  points) — automatically activates the Battle Fury ability the
+  moment it comes off cooldown, with its own on/off toggle.
+
+### Fixed
+- Found and fixed one more spot with the same bug as the Chromatic
+  nick color (0.99): the secret **"blank"** nick color could
+  incorrectly re-lock itself as soon as you picked up any item —
+  now stays unlocked forever once earned, like the rest.
+
 ## [0.99] — Fix Chromatic nick / Architect frame disappearing after Rebirth
 
 ### Fixed

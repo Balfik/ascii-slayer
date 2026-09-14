@@ -694,7 +694,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = '0.99';
+const GAME_VERSION = '1.00';
 
 const SUPABASE_URL = 'https://vfaveuenkublhxgatbcn.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_PkeJBe1KSw0ZWUSgcAIZFA_SuG8Ilyo';
@@ -1086,14 +1086,98 @@ const COLORS = {
   wood:'#a8703c'
 };
 
-const AURA_TIERS = [
-  {achId:'level_1000', color:'#ffd700', glow:'rgba(255,215,0,'},
-  {achId:'demonic_10',  color:'#ff2d4d', glow:'rgba(255,45,77,'},
-  {achId:'boss_20',     color:'#c77dff', glow:'rgba(199,125,255,'}
+// Аури — суто клієнтський косметичний вибір, малюється тільки в
+// геймплейному canvas (біг/місто), НІКОЛИ не синкається на сервер
+// (на відміну від кольорів/рамок ніку — ті йдуть у лідерборд, аура
+// ні) — тому нема потреби ні в білому списку на сервері, ні в
+// власній колонці players. Розблокування — за конкретні досягнення
+// (state.achievements[achId], те саме постійне поле, що ніколи не
+// скидається Переродженням, лише повним resetProgress()), effect —
+// який саме ефект малювати (drawAuraEffect нижче): 'glow' (м'яке
+// пульсуюче сяйво, як було раніше), 'ember' (іскри, що підіймаються
+// вгору, вогняний ефект), 'ring' (обертове кільце сегментів),
+// 'sparkle' (мерехтливі цятки по колу), 'rainbow' (те саме кільце,
+// але з кольором, що біжить по колу — найрідкісніший, secret).
+const AURAS = [
+  {id:'golden',     achId:'level_1000',     color:'#ffd700', effect:'glow'},
+  {id:'crimson',    achId:'demonic_10',     color:'#ff5a1f', effect:'ember'},
+  {id:'violet',     achId:'boss_20',        color:'#c77dff', effect:'ring'},
+  {id:'frost',      achId:'gauntlet_50',    color:'#7fd9ff', effect:'sparkle'},
+  {id:'verdant',    achId:'relic_all',      color:'#2ecc71', effect:'glow'},
+  {id:'eternal',    achId:'prestige_100',   color:'#ffcf5c', effect:'ember', secret:true},
+  {id:'voidwalker', achId:'boss_final',     color:'#ff2d4d', effect:'ring',  secret:true},
+  {id:'radiant',    achId:'game_completed', color:'#ffffff', effect:'rainbow', secret:true}
 ];
-function playerAuraTier(){
-  for(const a of AURA_TIERS){ if(state.achievements[a.achId]) return a; }
-  return null;
+function auraUnlocked(id){ if(id==='none') return true; const a=AURAS.find(x=>x.id===id); return !!a && !!state.achievements[a.achId]; }
+function playerActiveAura(){
+  const id = state.settings.aura || 'none';
+  if(id==='none' || !auraUnlocked(id)) return null;
+  return AURAS.find(a=>a.id===id) || null;
+}
+function selectAura(id){
+  if(!auraUnlocked(id)) return;
+  state.settings.aura = id;
+  renderCharacterSheet();
+  save();
+}
+// Малює обраний ефект аури в точці (x,y) — та сама (x,y), де раніше
+// малювалось лише пульсуюче коло, викликається і з бігу, і з міста.
+// Час НЕ зберігається в жодній змінній — все виводиться напряму з
+// Date.now(), той самий підхід, що й pulse-ефект робив раніше (і як
+// drawScrollLayer/pseudoRand у фоні дороги) — тому нічого зайвого не
+// треба чистити/скидати між кадрами чи забігами.
+function drawAuraEffect(ctx, aura, x, y){
+  if(!aura) return;
+  const t = Date.now();
+  ctx.save();
+  if(aura.effect==='ember'){
+    for(let i=0;i<6;i++){
+      const phase = ((t/700) + i/6) % 1;
+      const ang = i*1.047 + t/2200;
+      const wob = Math.sin(t/260 + i)*2.5;
+      ctx.globalAlpha = (1-phase)*0.8;
+      ctx.fillStyle = aura.color;
+      ctx.beginPath();
+      ctx.arc(x + wob + Math.cos(ang)*3, y-6-phase*15, 1.6*(1-phase*0.5), 0, Math.PI*2);
+      ctx.fill();
+    }
+  } else if(aura.effect==='sparkle'){
+    const n = 8;
+    for(let i=0;i<n;i++){
+      const ang = i*(Math.PI*2/n) + t/4000;
+      const twinkle = 0.5+0.5*Math.sin(t/220 + i*1.7);
+      ctx.globalAlpha = 0.2 + twinkle*0.6;
+      ctx.fillStyle = aura.color;
+      ctx.beginPath();
+      ctx.arc(x + Math.cos(ang)*11, y-8+Math.sin(ang)*6.5, 1.4, 0, Math.PI*2);
+      ctx.fill();
+    }
+  } else if(aura.effect==='ring' || aura.effect==='rainbow'){
+    const segs = 8;
+    const rot = (t/(aura.effect==='rainbow'?1500:2000)) % (Math.PI*2);
+    ctx.lineWidth = 2;
+    for(let i=0;i<segs;i++){
+      const a0 = rot + i*(Math.PI*2/segs);
+      ctx.strokeStyle = aura.effect==='rainbow' ? `hsl(${Math.round((t/8 + i*45)%360)},90%,65%)` : aura.color;
+      ctx.globalAlpha = 0.75;
+      ctx.beginPath();
+      ctx.arc(x, y-8, 14, a0, a0+0.35);
+      ctx.stroke();
+    }
+  } else {
+    const pulse = 0.5 + 0.5*Math.sin(t/300);
+    ctx.globalAlpha = 0.22 + pulse*0.22;
+    ctx.fillStyle = hexToRgba(aura.color, 0.9);
+    ctx.beginPath();
+    ctx.arc(x, y-8, 13+pulse*3, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+function hexToRgba(hex, alpha){
+  const h = hex.replace('#','');
+  const r = parseInt(h.substring(0,2),16), g = parseInt(h.substring(2,4),16), b = parseInt(h.substring(4,6),16);
+  return `rgba(${r},${g},${b},${alpha})`;
 }
 
 const COMPANION_TYPES = [
@@ -1352,6 +1436,7 @@ const I18N = {
     'auto.upgradeLabel':'Автопрокачка за золото', 'auto.upgradeDesc':'Автоматично прокачує силу атаки/швидкість бігу/швидкість атаки, поки вистачає золота (удача за кристали — не автоматично)',
     'auto.skillSpendLabel':'Автостратег', 'auto.skillSpendDesc':'Вільні очки навичок автоматично йдуть у прокачку дерева навичок по порядку гілок, згори вниз',
     'auto.jumpLabel':'Автострибок', 'auto.jumpDesc':'Персонаж стрибає сам, наче затиснутий пробіл',
+    'auto.furyLabel':'Автобойова Лють', 'auto.furyDesc':'"Бойова Лють" активується сама, щойно звільняється з кулдауну',
     'boss.attackBtn':'⚔ Атакувати',
     'boss.retreatBtn':'🏳 Відступити',
     'gauntlet.retreatBtn':'🏳 Завершити', 'gauntlet.continueBtn':'🏘 У місто',
@@ -1584,6 +1669,8 @@ const I18N = {
     'char.nickColorsHeader':'КОЛЬОРИ НІКУ', 'char.nickFramesHeader':'РАМКИ НІКУ',
     'char.nickCosmeticExplain':'Показуються в лідерборді (і в топ-50, і в твоїй позиції нижче) — ніколи в стрічці подій. Розблоковуються довгими/важкими досягненнями, частина — секретні.',
     'char.nickNone':'Немає', 'char.secretUndiscovered':'Секретне досягнення — умова не розкривається заздалегідь.',
+    'char.auraHeader':'АУРА ПЕРСОНАЖА',
+    'char.auraExplain':'Видно тільки тобі, прямо в грі (біг і місто) — на відміну від кольорів/рамок ніку, ніколи не показується в лідерборді. Розблоковується конкретними досягненнями, частина — секретні. Переродження не скидає.',
     'nickcolor.bronze.name':'Бронзовий', 'nickcolor.bronze.desc':'Розблоковано за досягнення 500 рівня.', 'nickcolor.bronze.hint':'Досягни 500 рівня, щоб розблокувати',
     'nickcolor.silver.name':'Срібний', 'nickcolor.silver.desc':'Розблоковано за досягнення 2500 рівня.', 'nickcolor.silver.hint':'Досягни 2500 рівня, щоб розблокувати',
     'nickcolor.emerald.name':'Смарагдовий', 'nickcolor.emerald.desc':'Розблоковано за 50 000 вбитих монстрів за все життя.', 'nickcolor.emerald.hint':'Вбий 50 000 монстрів за все життя, щоб розблокувати',
@@ -1604,6 +1691,14 @@ const I18N = {
     'nickframe.architect.name':'Архітектор', 'nickframe.architect.desc':'Розблоковано за проходження гри, жодного разу не купивши навичку «Автоковаль».',
     'nickframe.phantom.name':'Привид', 'nickframe.phantom.desc':'Розблоковано за 300 хвиль, пройдених у Гаунтлеті.',
     'nickframe.ultimate.name':'Довершений', 'nickframe.ultimate.desc':'Розблоковано за 100% проходження: гра завершена, всі реліквії, замок збудований і всі досягнення здобуті.',
+    'aura.golden.name':'Золоте Сяйво', 'aura.golden.desc':'Розблоковано за досягнення 1000 рівня.', 'aura.golden.hint':'Досягни 1000 рівня, щоб розблокувати',
+    'aura.crimson.name':'Пломінь Пекла', 'aura.crimson.desc':'Розблоковано за 10 здобутих демонічних предметів.', 'aura.crimson.hint':'Здобудь 10 демонічних предметів, щоб розблокувати',
+    'aura.violet.name':'Печать Переможця', 'aura.violet.desc':'Розблоковано за перемогу над 20 босами.', 'aura.violet.hint':'Перемоги 20 босів, щоб розблокувати',
+    'aura.frost.name':'Крижаний Вихор', 'aura.frost.desc':'Розблоковано за 50 хвиль, зачищених за один Гаунтлет.', 'aura.frost.hint':'Зачисти 50 хвиль за один Гаунтлет, щоб розблокувати',
+    'aura.verdant.name':'Подих Реліквій', 'aura.verdant.desc':'Розблоковано за здобуття всіх реліквій.', 'aura.verdant.hint':'Здобудь усі реліквії, щоб розблокувати',
+    'aura.eternal.name':'Незгасне Полум\'я', 'aura.eternal.desc':'Розблоковано за 100 здійснених Перероджень.',
+    'aura.voidwalker.name':'Порожнеча Кінця', 'aura.voidwalker.desc':'Розблоковано за перемогу над Володарем Кінця.',
+    'aura.radiant.name':'Сяйво Легенди', 'aura.radiant.desc':'Розблоковано за повне проходження гри: замок на максимумі, всі реліквії зібрано, Страж Вічності повержений.',
     'theme.default.name':'Термінал', 'theme.default.desc':'Класична зелена палітра — завжди доступна.',
     'theme.blood.name':'Кривава', 'theme.blood.desc':'Розблоковано за перемогу над Стражем Вічності.',
     'theme.blood.hint':'Здолай Стража Вічності, щоб розблокувати',
@@ -1703,6 +1798,7 @@ const I18N = {
     'auto.upgradeLabel':'Auto-upgrade with gold', 'auto.upgradeDesc':'Automatically upgrades attack/run speed/attack speed as long as there\'s gold for it (luck costs crystals — not automatic)',
     'auto.skillSpendLabel':'Auto-Strategist', 'auto.skillSpendDesc':'Free skill points automatically go into the skill tree, branch by branch, top to bottom',
     'auto.jumpLabel':'Auto-Jump', 'auto.jumpDesc':'The character keeps jumping on its own, as if Space were held down',
+    'auto.furyLabel':'Auto Battle Fury', 'auto.furyDesc':'"Battle Fury" activates itself the moment it comes off cooldown',
     'boss.attackBtn':'⚔ Attack',
     'boss.retreatBtn':'🏳 Retreat',
     'gauntlet.retreatBtn':'🏳 End Run', 'gauntlet.continueBtn':'🏘 To town',
@@ -1935,6 +2031,8 @@ const I18N = {
     'char.nickColorsHeader':'NICKNAME COLORS', 'char.nickFramesHeader':'NICKNAME FRAMES',
     'char.nickCosmeticExplain':'Shown on the leaderboard (both the top 50 and your own rank below) — never in the activity feed. Unlocked by long or difficult achievements; some are secret.',
     'char.nickNone':'None', 'char.secretUndiscovered':"Secret achievement — the condition isn't revealed in advance.",
+    'char.auraHeader':'CHARACTER AURA',
+    'char.auraExplain':"Visible only to you, right in the game (run and town) — unlike nickname colors/frames, it never shows on the leaderboard. Unlocked by specific achievements; some are secret. Not reset by Rebirth.",
     'nickcolor.bronze.name':'Bronze', 'nickcolor.bronze.desc':'Unlocked by reaching level 500.', 'nickcolor.bronze.hint':'Reach level 500 to unlock',
     'nickcolor.silver.name':'Silver', 'nickcolor.silver.desc':'Unlocked by reaching level 2500.', 'nickcolor.silver.hint':'Reach level 2500 to unlock',
     'nickcolor.emerald.name':'Emerald', 'nickcolor.emerald.desc':'Unlocked by 50,000 lifetime monster kills.', 'nickcolor.emerald.hint':'Get 50,000 lifetime monster kills to unlock',
@@ -1955,6 +2053,14 @@ const I18N = {
     'nickframe.architect.name':'Architect', 'nickframe.architect.desc':'Unlocked by completing the game without ever buying Auto-Smith.',
     'nickframe.phantom.name':'Phantom', 'nickframe.phantom.desc':'Unlocked by clearing 300 waves in the Gauntlet.',
     'nickframe.ultimate.name':'Ultimate', 'nickframe.ultimate.desc':'Unlocked by 100% completion: the game finished, every relic, a fully built Castle, and every achievement earned.',
+    'aura.golden.name':'Golden Radiance', 'aura.golden.desc':'Unlocked by reaching level 1000.', 'aura.golden.hint':'Reach level 1000 to unlock',
+    'aura.crimson.name':'Hellfire', 'aura.crimson.desc':'Unlocked by obtaining 10 demonic items.', 'aura.crimson.hint':'Obtain 10 demonic items to unlock',
+    'aura.violet.name':"Victor's Seal", 'aura.violet.desc':'Unlocked by defeating 20 bosses.', 'aura.violet.hint':'Defeat 20 bosses to unlock',
+    'aura.frost.name':'Frost Whirl', 'aura.frost.desc':'Unlocked by clearing 50 waves in one Gauntlet run.', 'aura.frost.hint':'Clear 50 waves in one Gauntlet run to unlock',
+    'aura.verdant.name':"Relic's Breath", 'aura.verdant.desc':'Unlocked by obtaining every relic.', 'aura.verdant.hint':'Obtain every relic to unlock',
+    'aura.eternal.name':'Undying Flame', 'aura.eternal.desc':'Unlocked by Rebirthing 100 times.',
+    'aura.voidwalker.name':'Void of the End', 'aura.voidwalker.desc':'Unlocked by defeating the Lord of the End.',
+    'aura.radiant.name':"Legend's Radiance", 'aura.radiant.desc':'Unlocked by fully completing the game: Castle maxed, every relic collected, the Guardian of Eternity defeated.',
     'theme.default.name':'Terminal', 'theme.default.desc':'The classic green palette — always available.',
     'theme.blood.name':'Blood', 'theme.blood.desc':'Unlocked by defeating the Guardian of Eternity.',
     'theme.blood.hint':'Defeat the Guardian of Eternity to unlock',
@@ -2673,6 +2779,7 @@ const SKILL_TREE = {
       {id:'a4', name:'Автотренер', name_en:'Auto-Trainer', desc:'Дозволяє увімкнути автопрокачку сили атаки/швидкості бігу/швидкості атаки — лише за золото (не за кристали, удача не автопрокачується), окремий перемикач у панелі "Прокачка"', desc_en:'Unlocks auto-upgrading attack/run speed/attack speed — gold only (never crystals, luck is not auto-upgraded), separate on/off switch in the Upgrades panel', baseCost:50, costStep:0, maxLevel:1, effect:{autoUpgradeGold:1}},
       {id:'a5', name:'Автостратег', name_en:'Auto-Strategist', desc:'Дозволяє увімкнути автоматичний розподіл вільних очок навичок по всьому дереву (по порядку гілок, згори вниз) — окремий перемикач у Дереві навичок', desc_en:'Unlocks automatically spending free skill points across the whole tree (branch by branch, top to bottom) — separate on/off switch in the Skill Tree', baseCost:100, costStep:0, maxLevel:1, effect:{autoSkillSpend:1}},
       {id:'a6', name:'Автострибок', name_en:'Auto-Jump', desc:'Дозволяє увімкнути безперервний автострибок (наче затиснутий пробіл) — ловить золоті символи й уникає ям без твоєї участі, але й бої з монстрами під час стрибка пропускаються — окремий перемикач у Дереві навичок (ефект навички зникає при Переродженні, як і всі звичайні навички)', desc_en:'Unlocks a continuous auto-jump (as if Space were held down) — catches golden glyphs and avoids pits without you, but fights with monsters are skipped while jumping too — separate on/off switch in the Skill Tree (effect ends on Prestige, like all regular skills)', baseCost:10, costStep:0, maxLevel:1, effect:{autoJump:1}},
+      {id:'a7', name:'Автобойова Лють', name_en:'Auto Battle Fury', desc:'Дозволяє увімкнути автоматичну активацію здібності "Бойова Лють", щойно вона знову готова по кулдауну — окремий перемикач у Дереві навичок (ефект навички зникає при Переродженні, як і всі звичайні навички)', desc_en:'Unlocks automatically activating the "Battle Fury" ability the moment it comes off cooldown — separate on/off switch in the Skill Tree (effect ends on Prestige, like all regular skills)', baseCost:10, costStep:0, maxLevel:1, effect:{autoFury:1}},
 
       {id:'s5', name:'Політ над прірвою', name_en:'Flight over the Abyss', desc:'Ігноруй ями — персонаж завжди пролітає їх, без стрибка', desc_en:'Ignore pits — the character always flies over them, no jump needed', baseCost:10, costStep:0, maxLevel:1, effect:{ignorePits:1}, requiresPrestige:true}
     ]
@@ -3477,6 +3584,11 @@ function autoManageSkillSpend(dt){
 function autoManageAutoJump(){
   if(!stats.autoJump || !state.settings.autoJumpEnabled) return;
   tryJump();
+}
+function autoManageBattleFury(){
+  if(!stats.autoFury || !state.settings.autoFuryEnabled) return;
+  if(mode==='town') return;
+  if(abilityReady()) activateAbility();
 }
 function autoManagePrestige(dt){
   if(prestigeSkillLevel('p6')<=0 || !state.settings.autoPrestigeEnabled) return;
@@ -4484,9 +4596,9 @@ const state = {
 
   companions:{level:{}, active:null},
 
-  settings:{ autoRetreatBoss:false, logFilters:{combat:true, loot:true, achievements:true, quests:true, bosses:true, other:true}, theme:'default',
+  settings:{ autoRetreatBoss:false, logFilters:{combat:true, loot:true, achievements:true, quests:true, bosses:true, other:true}, theme:'default', aura:'none',
              autoEnchantEnabled:false, autoUpgradeEnabled:false, autoSkillSpendEnabled:false, autoPrestigeEnabled:false,
-             autoPrestigeTreeSpendEnabled:false, autoAutomationBranchEnabled:false, autoJumpEnabled:false },
+             autoPrestigeTreeSpendEnabled:false, autoAutomationBranchEnabled:false, autoJumpEnabled:false, autoFuryEnabled:false },
   relics:{},
   prestigeSkills:{},
   milestonesClaimed:{},
@@ -4499,13 +4611,13 @@ const state = {
              skillLevelsBought:0, itemsEnchanted:0, demonicFound:0,
              monsterKills:{}, bossKills:{}, loginStreak:0, lastLoginDate:null, loginDates:{},
              totalWoodCollected:0, totalStoneCollected:0, totalIronCollected:0,
-             bestGauntletWaves:0, setsCompleted:{}, a3EverBought:false }
+             bestGauntletWaves:0, setsCompleted:{}, a3EverBought:false, blankUnlocked:false }
 };
 const stats = {
   attack:BASE_ATTACK, speed:BASE_SPEED, atkSpeed:BASE_ATKSPEED, goldMult:1, dropChance:0.08,
   jumpDuration:JUMP_DURATION_BASE, critChance:0, pickupReach:0, crystalBonus:0, ignorePits:false,
   castleResourceMult:1, soulMult:1, bonusXpMult:1, autoQuest:false, noJumpQuests:false,
-  autoEnchantGold:false, autoUpgradeGold:false, autoSkillSpend:false, autoJump:false,
+  autoEnchantGold:false, autoUpgradeGold:false, autoSkillSpend:false, autoJump:false, autoFury:false,
   abilityDurationMult:1, abilityCooldownMult:1
 };
 
@@ -4616,7 +4728,7 @@ function weekendCooldownMult(){ return isWeekendBonus() ? WEEKEND_COOLDOWN_MULT 
 function goldMultEff(){ return stats.goldMult * (1+comboMultBonus()) * dayNightGoldMult() * goldRushMult() * weekendMult(); }
 
 function computeSkillBonuses(){
-  const b = {atkPct:0, atkSpeedFlat:0, spdPct:0, jumpPct:0, dropPct:0, goldPct:0, critChance:0, magnetReach:0, crystalBonus:0, ignorePits:0, farmGoldPct:0, farmXpPct:0, farmDropPct:0, autoQuest:0, noJumpQuests:0, autoEnchantGold:0, autoUpgradeGold:0, autoSkillSpend:0, autoJump:0, abilityDurationPct:0, abilityCooldownPct:0};
+  const b = {atkPct:0, atkSpeedFlat:0, spdPct:0, jumpPct:0, dropPct:0, goldPct:0, critChance:0, magnetReach:0, crystalBonus:0, ignorePits:0, farmGoldPct:0, farmXpPct:0, farmDropPct:0, autoQuest:0, noJumpQuests:0, autoEnchantGold:0, autoUpgradeGold:0, autoSkillSpend:0, autoJump:0, autoFury:0, abilityDurationPct:0, abilityCooldownPct:0};
   for(const branchKey in SKILL_TREE){
     for(const node of SKILL_TREE[branchKey].nodes){
       const lvl = state.skills[node.id] || 0;
@@ -4641,6 +4753,7 @@ function computeSkillBonuses(){
       if(e.autoUpgradeGold) b.autoUpgradeGold += e.autoUpgradeGold*lvl;
       if(e.autoSkillSpend) b.autoSkillSpend += e.autoSkillSpend*lvl;
       if(e.autoJump) b.autoJump += e.autoJump*lvl;
+      if(e.autoFury) b.autoFury += e.autoFury*lvl;
       if(e.abilityDurationPct) b.abilityDurationPct += e.abilityDurationPct*lvl;
       if(e.abilityCooldownPct) b.abilityCooldownPct += e.abilityCooldownPct*lvl;
     }
@@ -4731,11 +4844,15 @@ function recomputeStats(){
   stats.autoUpgradeGold = skillB.autoUpgradeGold > 0;
   stats.autoSkillSpend = skillB.autoSkillSpend > 0;
   stats.autoJump = skillB.autoJump > 0;
+  stats.autoFury = skillB.autoFury > 0;
   // Постійний прапор (переживає Переродження, на відміну від
   // state.skills, яке обнулюється щоразу) — потрібен рамці ніку
   // 'architect', яка перевіряє "за все життя жодного разу не купив
   // Автоковаль", а не лише "не куплений ЗАРАЗ у поточному забігу".
   if(state.skills && state.skills['a3']) state.lifetime.a3EverBought = true;
+  // Той самий принцип для кольору ніку 'blank' — колись цей факт
+  // хоч раз стався, назавжди лишається true.
+  if(state.castleLevel>=CASTLE_MAX_LEVEL && state.inventory.length===0) state.lifetime.blankUnlocked = true;
 
   stats.abilityDurationMult = 1 + skillB.abilityDurationPct/100;
   stats.abilityCooldownMult = 1 - Math.min(70, skillB.abilityCooldownPct)/100;
@@ -5326,16 +5443,9 @@ function renderRun(){
   }
 
   const prow = isJumping ? ROW_AIR : ROW_GROUND;
-  const aura = playerAuraTier();
+  const aura = playerActiveAura();
   if(aura && !isFighting && !isStumbling){
-    const pulse = 0.5 + 0.5*Math.sin(Date.now()/300);
-    ctx.save();
-    ctx.globalAlpha = 0.22 + pulse*0.22;
-    ctx.fillStyle = aura.glow + (0.9)+')';
-    ctx.beginPath();
-    ctx.arc(xForCol(PLAYER_COL)+4, yForRow(prow)-8, 13+pulse*3, 0, Math.PI*2);
-    ctx.fill();
-    ctx.restore();
+    drawAuraEffect(ctx, aura, xForCol(PLAYER_COL)+4, yForRow(prow));
   }
   ctx.fillStyle = isFighting ? COLORS.playerFight : (isStumbling ? COLORS.heavy : (aura ? aura.color : COLORS.player));
   ctx.fillText('@', xForCol(PLAYER_COL), yForRow(prow));
@@ -5550,17 +5660,8 @@ function renderTown(){
   renderTownTorches();
   renderCastleInTown();
   renderTownFireworks();
-  const townAura = playerAuraTier();
-  if(townAura){
-    const pulse = 0.5 + 0.5*Math.sin(Date.now()/300);
-    ctx.save();
-    ctx.globalAlpha = 0.22 + pulse*0.22;
-    ctx.fillStyle = townAura.glow + (0.9)+')';
-    ctx.beginPath();
-    ctx.arc(townXForCol(townPos.x), townYForRow(townPos.y)-8, 13+pulse*3, 0, Math.PI*2);
-    ctx.fill();
-    ctx.restore();
-  }
+  const townAura = playerActiveAura();
+  if(townAura) drawAuraEffect(ctx, townAura, townXForCol(townPos.x), townYForRow(townPos.y));
   ctx.fillStyle = townAura ? townAura.color : COLORS.player;
   ctx.fillText('@', townXForCol(townPos.x)-4, townYForRow(townPos.y));
   const townCompanion = activeCompanion();
@@ -6046,6 +6147,13 @@ function renderSkillTree(){
       <button class="buy-max${autoJumpOn?' active':''}" data-action="toggleAutoJump">${autoJumpOn?t('boss.autoRetreatOn'):t('boss.autoRetreatOff')}</button>
     </div>`;
   }
+  if(stats.autoFury){
+    const autoFuryOn = !!state.settings.autoFuryEnabled;
+    html += `<div class="mrow" style="margin-bottom:8px;">
+      <div class="up-name">${t('auto.furyLabel')}<small>${t('auto.furyDesc')}</small></div>
+      <button class="buy-max${autoFuryOn?' active':''}" data-action="toggleAutoFury">${autoFuryOn?t('boss.autoRetreatOn'):t('boss.autoRetreatOff')}</button>
+    </div>`;
+  }
   for(const key in SKILL_TREE){
     const branch = SKILL_TREE[key];
     html += `<div style="margin:12px 0 4px;color:var(--purple);font-size:12px;letter-spacing:1px;">${L(branch,'label')}</div>`;
@@ -6356,7 +6464,12 @@ const NICK_COLORS = [
   {id:'obsidian',  swatch:'#6a6a78', color:'#6a6a78', secret:true,
     unlockCheck:()=>state.lifetime.prestigeCount>=250 && state.castleLevel>=CASTLE_MAX_LEVEL},
   {id:'blank',     swatch:'#f0f0f0', color:'#f0f0f0', secret:true,
-    unlockCheck:()=>state.castleLevel>=CASTLE_MAX_LEVEL && state.inventory.length===0},
+    // Той самий клас бага, що chromatic вище: раніше перевірялось
+    // ПОТОЧНЕ state.inventory.length===0 — щойно гравець підбирає
+    // бодай один предмет (неминуче при звичайній грі), розблокування
+    // зникало само. Постійний прапор — state.lifetime.blankUnlocked
+    // (виставляється в recomputeStats(), раз true — назавжди true).
+    unlockCheck:()=>!!state.lifetime.blankUnlocked},
   {id:'chromatic', swatch:'#ff4d4d', rainbow:true, secret:true,
     // ВАЖЛИВО: перевіряти саме state.lifetime.setsCompleted (постійний
     // прапор "коли-небудь завершив"), а НЕ ownedSetRarities() (поточний
@@ -6533,17 +6646,27 @@ function renderCharacterSheet(){
     return renderNickCosmeticRow(f, 'nickFrame', unlocked, name, desc);
   }).join('');
 
+  html += `<div style="margin:14px 0 4px;color:var(--purple);font-size:12px;letter-spacing:1px;">${t('char.auraHeader')}</div>`;
+  html += `<div style="margin:0 0 8px;color:var(--dim);font-size:11.5px;line-height:1.5;">${t('char.auraExplain')}</div>`;
+  html += renderNickCosmeticRow({id:'none', swatch:'transparent'}, 'aura', true, t('char.nickNone'), '');
+  html += AURAS.map(a=>{
+    const unlocked = auraUnlocked(a.id);
+    const name = unlocked ? t('aura.'+a.id+'.name') : '???';
+    const desc = unlocked ? t('aura.'+a.id+'.desc') : (a.secret ? t('char.secretUndiscovered') : t('aura.'+a.id+'.hint'));
+    return renderNickCosmeticRow({id:a.id, swatch:a.color}, 'aura', unlocked, name, desc);
+  }).join('');
+
   modalBody.innerHTML = html;
 }
 // Спільний рендер одного рядка вибору кольору/рамки ніку — дзеркалить
 // вигляд секції тем вище, лише з додатковим прев'ю через
 // styledNickHtml(), щоб гравець одразу бачив, як це виглядатиме.
 function renderNickCosmeticRow(item, kind, unlocked, name, desc){
-  const active = (kind==='nickColor' ? (state.settings.nickColor||'none') : (state.settings.nickFrame||'none')) === item.id;
-  const preview = unlocked
+  const active = (kind==='nickColor' ? (state.settings.nickColor||'none') : kind==='nickFrame' ? (state.settings.nickFrame||'none') : (state.settings.aura||'none')) === item.id;
+  const preview = (unlocked && kind!=='aura')
     ? styledNickHtml(state.nickname, kind==='nickColor' ? item.id : (state.settings.nickColor||'none'), kind==='nickFrame' ? item.id : (state.settings.nickFrame||'none'))
     : '';
-  const action = kind==='nickColor' ? 'selectNickColor' : 'selectNickFrame';
+  const action = kind==='nickColor' ? 'selectNickColor' : kind==='nickFrame' ? 'selectNickFrame' : 'selectAura';
   return `<div class="mrow" style="${unlocked?'':'opacity:.5;'}">
     <div class="up-name">${item.swatch!=='transparent'?`<span style="display:inline-block;width:11px;height:11px;border-radius:3px;background:${item.swatch};vertical-align:middle;margin-right:7px;"></span>`:''}${name}
       <small>${desc}${preview?` · ${preview}`:''}</small>
@@ -7086,6 +7209,7 @@ modalBody.addEventListener('click', (e)=>{
   else if(btn.dataset.action==='toggleAutoEnchant'){ state.settings.autoEnchantEnabled = !state.settings.autoEnchantEnabled; renderModalBody(); save(); }
   else if(btn.dataset.action==='toggleAutoSkillSpend'){ state.settings.autoSkillSpendEnabled = !state.settings.autoSkillSpendEnabled; renderSkillTree(); save(); }
   else if(btn.dataset.action==='toggleAutoJump'){ state.settings.autoJumpEnabled = !state.settings.autoJumpEnabled; renderSkillTree(); save(); }
+  else if(btn.dataset.action==='toggleAutoFury'){ state.settings.autoFuryEnabled = !state.settings.autoFuryEnabled; renderSkillTree(); save(); }
   else if(btn.dataset.action==='closeModal') closeModal();
   else if(btn.dataset.action==='bossAttack') attemptBoss(btn.dataset.id);
   else if(btn.dataset.action==='attemptGauntlet') attemptGauntlet();
@@ -7099,6 +7223,7 @@ modalBody.addEventListener('click', (e)=>{
   else if(btn.dataset.action==='selectTheme') selectTheme(btn.dataset.theme);
   else if(btn.dataset.action==='selectNickColor') selectNickColor(btn.dataset.id);
   else if(btn.dataset.action==='selectNickFrame') selectNickFrame(btn.dataset.id);
+  else if(btn.dataset.action==='selectAura') selectAura(btn.dataset.id);
   else if(btn.dataset.action==='cloudRegister') handleCloudRegisterClick();
   else if(btn.dataset.action==='cloudLogin') handleCloudLoginClick();
   else if(btn.dataset.action==='cloudSaveNow') handleCloudSaveNowClick();
@@ -7543,7 +7668,8 @@ function applyLoadedData(d){
     setsCompleted: (dl.setsCompleted && typeof dl.setsCompleted==='object') ? dl.setsCompleted : {},
 
     gameCompleted: !!dl.gameCompleted,
-    a3EverBought: !!dl.a3EverBought
+    a3EverBought: !!dl.a3EverBought,
+    blankUnlocked: !!dl.blankUnlocked
   };
   state.castleLevel = typeof d.castleLevel==='number' ? d.castleLevel : 0;
   const dcr = (d.castleResources && typeof d.castleResources==='object') ? d.castleResources : {};
@@ -7578,6 +7704,16 @@ function applyLoadedData(d){
     theme: themeUnlocked(ds.theme) ? ds.theme : 'default',
     nickColor: nickColorUnlocked(ds.nickColor) ? ds.nickColor : 'none',
     nickFrame: nickFrameUnlocked(ds.nickFrame) ? ds.nickFrame : 'none',
+    // Старі сейви (до цього поля) не мають ds.aura взагалі — раніше
+    // аура показувалась АВТОМАТИЧНО (перша розблокована з 3 старих
+    // tier, у тому самому порядку, що й перші 3 записи AURAS). Щоб
+    // гравець не побачив "зникле" сяйво так само, як щойно було з
+    // хроматичним ніком, — на такому сейві підбираємо перший
+    // розблокований варіант самі; якщо ж ds.aura є (нове збереження,
+    // чи свідомо 'none') — довіряємо йому.
+    aura: (typeof ds.aura==='string')
+      ? (auraUnlocked(ds.aura) ? ds.aura : 'none')
+      : (function(){ const first=AURAS.find(a=>auraUnlocked(a.id)); return first ? first.id : 'none'; })(),
 
     autoEnchantEnabled: !!ds.autoEnchantEnabled,
     autoUpgradeEnabled: !!ds.autoUpgradeEnabled,
@@ -7585,7 +7721,8 @@ function applyLoadedData(d){
     autoPrestigeEnabled: !!ds.autoPrestigeEnabled,
     autoPrestigeTreeSpendEnabled: !!ds.autoPrestigeTreeSpendEnabled,
     autoAutomationBranchEnabled: !!ds.autoAutomationBranchEnabled,
-    autoJumpEnabled: !!ds.autoJumpEnabled
+    autoJumpEnabled: !!ds.autoJumpEnabled,
+    autoFuryEnabled: !!ds.autoFuryEnabled
   };
   const dcomp = (d.companions && typeof d.companions==='object') ? d.companions : {};
   state.companions = {
@@ -7852,7 +7989,7 @@ function resetProgress(){
                      skillLevelsBought:0, itemsEnchanted:0, demonicFound:0,
                      monsterKills:{}, bossKills:{}, loginStreak:0, lastLoginDate:null, loginDates:{},
                      totalWoodCollected:0, totalStoneCollected:0, totalIronCollected:0,
-                     bestGauntletWaves:0, setsCompleted:{}, gameCompleted:false, a3EverBought:false};
+                     bestGauntletWaves:0, setsCompleted:{}, gameCompleted:false, a3EverBought:false, blankUnlocked:false};
   distanceCols = 0;
   zoneTier = null;
   mode = 'run';
@@ -8014,6 +8151,7 @@ function update(dt){
   autoManagePrestigeTreeSpend(dt);
   autoManageAutomationBranchSpend(dt);
   autoManageAutoJump();
+  autoManageBattleFury();
   const __t5c = performance.now();
   updateTimedBuffs(dt);
   if(mode==='town'){
