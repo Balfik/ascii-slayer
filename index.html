@@ -694,7 +694,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = '0.95';
+const GAME_VERSION = '0.96';
 
 const SUPABASE_URL = 'https://vfaveuenkublhxgatbcn.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_PkeJBe1KSw0ZWUSgcAIZFA_SuG8Ilyo';
@@ -1412,6 +1412,8 @@ const I18N = {
     'log.autoEnchanted':'🔨 Автоковаль: +{count} рівнів заточки за золото',
     'log.autoUpgraded':'💪 Автотренер: {count} прокачок за золото',
     'log.autoSkillSpend':'🧠 Автостратег: {count} рівнів навичок автоматично',
+    'log.autoPrestigeTreeSpend':'♻️ Незгасний Розум: {count} рівнів Дерева Переродження автоматично',
+    'log.autoAutomationBranchSpend':'🤖 Механічний Спадок: {count} рівнів гілки Автоматизації автоматично',
     'log.enchantedMax':'Кузня: «{name}» прокачано на {count} рівнів (до +{level})',
     'log.skillLeveledMax':'🌳 «{name}» прокачано на {count} рівнів (до Lv.{level})',
     'log.soldAll':'Продано {count} предметів за {price} золота',
@@ -1760,6 +1762,8 @@ const I18N = {
     'log.autoEnchanted':'🔨 Auto-Smith: +{count} enchant levels with gold',
     'log.autoUpgraded':'💪 Auto-Trainer: {count} upgrades with gold',
     'log.autoSkillSpend':'🧠 Auto-Strategist: {count} skill levels automatically',
+    'log.autoPrestigeTreeSpend':'♻️ Undying Mind: {count} Rebirth Tree levels automatically',
+    'log.autoAutomationBranchSpend':'🤖 Mechanical Legacy: {count} Automation branch levels automatically',
     'log.enchantedMax':'Forge: «{name}» upgraded by {count} levels (to +{level})',
     'log.skillLeveledMax':'🌳 «{name}» upgraded by {count} levels (to Lv.{level})',
     'log.soldAll':'Sold {count} items for {price} gold',
@@ -2420,7 +2424,8 @@ const PRESTIGE_TREE = [
   {id:'p4', name:'Благословення Долі',       name_en:'Fortune\'s Blessing',    desc:'+0.3% шанс криту за рівень (назавжди)', desc_en:'+0.3% crit chance per level (permanent)', baseCost:2, costStep:1, maxLevel:MAX_PRESTIGE_SKILL_LEVEL, effect:{critChance:0.3}},
   {id:'p5', name:'Пришвидшене Відродження',  name_en:'Swift Rebirth',         desc:'-3% часу кулдауну босів за рівень (назавжди, максимум 60%)', desc_en:'-3% boss cooldown time per level (permanent, capped at 60%)', baseCost:2, costStep:1, maxLevel:MAX_PRESTIGE_SKILL_LEVEL, effect:{bossCooldownPct:3}},
   {id:'p6', name:'Вічний Цикл',              name_en:'Eternal Cycle',          desc:'Автоматично здійснює Переродження, щойно пройдено потрібну дистанцію (перемикач з\'явиться тут же, назавжди, Переродження не скидає)', desc_en:'Automatically Prestiges the moment the required distance is reached (a toggle appears here once bought — permanent, survives Prestige)', currency:'souls', cost:PRESTIGE_AUTOMATION_SOUL_COST, maxLevel:1, unlockPrestigeCount:PRESTIGE_AUTOMATION_UNLOCK_COUNT, toggleKey:'autoPrestigeEnabled', effect:{}},
-  {id:'p7', name:'Незгасний Розум',          name_en:'Undying Mind',           desc:'Автоматично розподіляє очки навичок по Дереву Навичок після кожного Переродження, без потреби купувати «Автостратег» щоразу заново (назавжди, Переродження не скидає)', desc_en:'Automatically spends skill points across the Skill Tree after every Prestige, without rebuying Auto-Strategist each run (permanent, survives Prestige)', currency:'souls', cost:PRESTIGE_AUTOMATION_SOUL_COST, maxLevel:1, unlockPrestigeCount:PRESTIGE_AUTOMATION_UNLOCK_COUNT, toggleKey:'autoSkillSpendEnabled', effect:{}}
+  {id:'p7', name:'Незгасний Розум',          name_en:'Undying Mind',           desc:'Автоматично вкладає Очки Перековки у це саме Дерево Переродження (вузли вище), щойно вони з\'являються — не має жодного стосунку до звичайного Дерева Навичок чи «Автостратега» (назавжди, Переродження не скидає)', desc_en:'Automatically invests Rebirth Points into this Rebirth Tree itself (the nodes above) the moment you earn them — unrelated to the regular Skill Tree or Auto-Strategist (permanent, survives Prestige)', currency:'souls', cost:PRESTIGE_AUTOMATION_SOUL_COST, maxLevel:1, unlockPrestigeCount:PRESTIGE_AUTOMATION_UNLOCK_COUNT, toggleKey:'autoPrestigeTreeSpendEnabled', effect:{}},
+  {id:'p8', name:'Механічний Спадок',        name_en:'Mechanical Legacy',      desc:'Автоматично прокачує звичайними очками навичок ЛИШЕ вузли гілки «🤖 Автоматизація» в Дереві Навичок (назавжди, Переродження не скидає)', desc_en:'Automatically spends regular skill points ONLY on the "🤖 Automation" branch nodes in the Skill Tree (permanent, survives Prestige)', currency:'souls', cost:PRESTIGE_AUTOMATION_SOUL_COST, maxLevel:1, unlockPrestigeCount:PRESTIGE_AUTOMATION_UNLOCK_COUNT, toggleKey:'autoAutomationBranchEnabled', effect:{}}
 ];
 function prestigeSkillLevel(id){ return state.prestigeSkills[id] || 0; }
 function prestigeSkillCost(node){ return node.currency==='souls' ? node.cost : Math.max(1, Math.round(node.baseCost + prestigeSkillLevel(node.id)*node.costStep)); }
@@ -2979,6 +2984,10 @@ function renderSkillTreeIfOpen(){
   if(modalPointerDown){ pendingSkillTreeRender = true; return; }
   renderSkillTree();
 }
+function renderPrestigeModalIfOpen(){
+  if(modalKind!=='prestige') return;
+  renderPrestigeModal();
+}
 
 const DAILY_QUEST_TARGET_MULT = 3;
 const DAILY_QUEST_REWARD_MULT = 4;
@@ -3409,7 +3418,7 @@ function autoManageUpgrade(dt){
 let autoSkillSpendTimer = 0;
 const AUTO_SKILL_SPEND_CHECK_INTERVAL = 1;
 function autoManageSkillSpend(dt){
-  if((!stats.autoSkillSpend && prestigeSkillLevel('p7')<=0) || !state.settings.autoSkillSpendEnabled) return;
+  if(!stats.autoSkillSpend || !state.settings.autoSkillSpendEnabled) return;
   autoSkillSpendTimer += dt;
   if(autoSkillSpendTimer < AUTO_SKILL_SPEND_CHECK_INTERVAL) return;
   autoSkillSpendTimer = 0;
@@ -3447,6 +3456,70 @@ function autoManagePrestige(dt){
   if(mode!=='run') return;
   if(distanceCols < prestigeMinDistance()) return;
   doPrestige();
+}
+let autoPrestigeTreeSpendTimer = 0;
+function autoManagePrestigeTreeSpend(dt){
+  if(prestigeSkillLevel('p7')<=0 || !state.settings.autoPrestigeTreeSpendEnabled) return;
+  autoPrestigeTreeSpendTimer += dt;
+  if(autoPrestigeTreeSpendTimer < AUTO_SKILL_SPEND_CHECK_INTERVAL) return;
+  autoPrestigeTreeSpendTimer = 0;
+  if((state.lifetime.prestigeSkillPoints||0)<=0) return;
+  let totalCount = 0;
+  for(const node of PRESTIGE_TREE){
+    if(node.currency==='souls') continue;
+    if((state.lifetime.prestigeSkillPoints||0)<=0) break;
+    const cap = 1000000;
+    let count = 0;
+    while(count < cap){
+      const lvl = prestigeSkillLevel(node.id);
+      if(lvl >= node.maxLevel) break;
+      const cost = prestigeSkillCost(node);
+      if((state.lifetime.prestigeSkillPoints||0) < cost) break;
+      state.lifetime.prestigeSkillPoints -= cost;
+      state.prestigeSkills[node.id] = lvl+1;
+      count++;
+    }
+    totalCount += count;
+  }
+  if(totalCount===0) return;
+  recomputeStats();
+  addLog('log.autoPrestigeTreeSpend', 'upgrade', {count:totalCount});
+  renderPrestigeModalIfOpen();
+  updateHud();
+  save();
+}
+let autoAutomationBranchTimer = 0;
+function autoManageAutomationBranchSpend(dt){
+  if(prestigeSkillLevel('p8')<=0 || !state.settings.autoAutomationBranchEnabled) return;
+  autoAutomationBranchTimer += dt;
+  if(autoAutomationBranchTimer < AUTO_SKILL_SPEND_CHECK_INTERVAL) return;
+  autoAutomationBranchTimer = 0;
+  if(state.skillPoints<=0) return;
+  let totalCount = 0;
+  for(const node of SKILL_TREE.automation.nodes){
+    if(state.skillPoints<=0) break;
+    if(skillLockInfo(node).locked) continue;
+    const cap = 1000000;
+    let count = 0;
+    while(count < cap){
+      const lvl = skillLevel(node.id);
+      if(lvl >= node.maxLevel) break;
+      const cost = skillCost(node);
+      if(state.skillPoints < cost) break;
+      state.skillPoints -= cost;
+      state.skills[node.id] = lvl+1;
+      count++;
+    }
+    totalCount += count;
+  }
+  if(totalCount===0) return;
+  state.lifetime.skillLevelsBought = (state.lifetime.skillLevelsBought||0)+totalCount;
+  recomputeStats();
+  if(stats.noJumpQuests) purgeJumpQuestOffers();
+  addLog('log.autoAutomationBranchSpend', 'upgrade', {count:totalCount});
+  renderSkillTreeIfOpen();
+  updateHud();
+  save();
 }
 function asciiBar(ratio, width){
   const filled = Math.max(0, Math.min(width, Math.round(ratio*width)));
@@ -4385,7 +4458,8 @@ const state = {
   companions:{level:{}, active:null},
 
   settings:{ autoRetreatBoss:false, logFilters:{combat:true, loot:true, achievements:true, quests:true, bosses:true, other:true}, theme:'default',
-             autoEnchantEnabled:false, autoUpgradeEnabled:false, autoSkillSpendEnabled:false, autoPrestigeEnabled:false },
+             autoEnchantEnabled:false, autoUpgradeEnabled:false, autoSkillSpendEnabled:false, autoPrestigeEnabled:false,
+             autoPrestigeTreeSpendEnabled:false, autoAutomationBranchEnabled:false },
   relics:{},
   prestigeSkills:{},
   milestonesClaimed:{},
@@ -5924,7 +5998,7 @@ function skillLockInfo(node){
 }
 function renderSkillTree(){
   let html = `<div id="skillPointsLine" style="margin-bottom:10px;color:var(--dim);font-size:12px;">${t('skills.pointsLine',{pts:state.skillPoints})}</div>`;
-  if(stats.autoSkillSpend || prestigeSkillLevel('p7')>0){
+  if(stats.autoSkillSpend){
     const autoSkillOn = !!state.settings.autoSkillSpendEnabled;
     html += `<div class="mrow" style="margin-bottom:8px;">
       <div class="up-name">${t('auto.skillSpendLabel')}<small>${t('auto.skillSpendDesc')}</small></div>
@@ -6161,7 +6235,9 @@ function doPrestige(){
   state.upgrades = {attack:0, speed:0, atkSpeed:0, luck:0};
   state.inventory = state.inventory.filter(it=>it.rarity==='demonic');
   distanceCols = 0;
-  zoneTier = null;
+  // zoneTier навмисно НЕ скидається тут (на відміну від resetProgress()) —
+  // запінена зона фарму з Карти Світу має пережити Переродження, а не
+  // відкидати гравця назад на "сиру" (найлегшу) складність.
   mode = 'run';
   resetWorldAfterLoad();
   recomputeStats();
@@ -7452,7 +7528,9 @@ function applyLoadedData(d){
     autoEnchantEnabled: !!ds.autoEnchantEnabled,
     autoUpgradeEnabled: !!ds.autoUpgradeEnabled,
     autoSkillSpendEnabled: !!ds.autoSkillSpendEnabled,
-    autoPrestigeEnabled: !!ds.autoPrestigeEnabled
+    autoPrestigeEnabled: !!ds.autoPrestigeEnabled,
+    autoPrestigeTreeSpendEnabled: !!ds.autoPrestigeTreeSpendEnabled,
+    autoAutomationBranchEnabled: !!ds.autoAutomationBranchEnabled
   };
   const dcomp = (d.companions && typeof d.companions==='object') ? d.companions : {};
   state.companions = {
@@ -7878,6 +7956,9 @@ function update(dt){
   const __t5 = performance.now();
   autoManagePrestige(dt);
   const __t5b = performance.now();
+  autoManagePrestigeTreeSpend(dt);
+  autoManageAutomationBranchSpend(dt);
+  const __t5c = performance.now();
   updateTimedBuffs(dt);
   if(mode==='town'){
     updateTown(dt);
@@ -7901,7 +7982,8 @@ function update(dt){
       autoManageUpgrade: (__t4-__t3).toFixed(1)+'мс',
       autoManageSkillSpend: (__t5-__t4).toFixed(1)+'мс',
       autoManagePrestige: (__t5b-__t5).toFixed(1)+'мс',
-      modeUpdate: (__t6-__t5b).toFixed(1)+'мс',
+      autoManagePrestigeTreeAndAutomationSpend: (__t5c-__t5b).toFixed(1)+'мс',
+      modeUpdate: (__t6-__t5c).toFixed(1)+'мс',
       updateHud: (__t7-__t6).toFixed(1)+'мс',
       entitiesCount: (typeof entities!=='undefined') ? entities.length : 'n/a'
     });

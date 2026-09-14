@@ -5,6 +5,23 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.96] — Full rebirth automation, farm zone survives Rebirth
+
+### Added
+- A third permanent Rebirth Tree node, **Mechanical Legacy** (400
+  Demon Souls, unlocked after your 10th Rebirth, on/off toggle) —
+  automatically levels up only the "🤖 Automation" branch of the
+  Skill Tree, so every quality-of-life auto-toggle in the game stays
+  active from the moment you Rebirth.
+
+### Changed
+- **Undying Mind** now does what it was always meant to: it invests
+  Rebirth Points into the Rebirth Tree itself, and has nothing to do
+  with the regular Skill Tree or Auto-Strategist (a mix-up in 0.95,
+  now fixed).
+- Your pinned farm zone (from the World Map) now survives Rebirth
+  instead of resetting to the easiest difficulty.
+
 ## [0.95] — Rebirth automation, growing rebirth threshold
 
 ### Added
