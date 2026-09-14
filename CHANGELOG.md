@@ -5,6 +5,16 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.97] — Auto-Jump, more Bestiary milestones
+
+### Added
+- **Auto-Jump**, a new Automation branch skill (10 skill points) —
+  the character keeps jumping on its own, catching golden glyphs and
+  avoiding pits without you (resets on Rebirth, like the rest of the
+  regular Skill Tree).
+- 10 more Bestiary milestone tiers each for Quests Completed and
+  Total Gold Earned, extending both tracks much further.
+
 ## [0.96] — Full rebirth automation, farm zone survives Rebirth
 
 ### Added
