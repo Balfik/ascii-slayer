@@ -5,6 +5,12 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [1.01] — Minor fixes
+
+### Fixed
+- Your aura no longer disappears while fighting a monster (or in any
+  other character state).
+
 ## [1.00] — Character Auras, Auto Battle Fury
 
 ### Added

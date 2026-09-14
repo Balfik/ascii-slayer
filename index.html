@@ -694,7 +694,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = '1.00';
+const GAME_VERSION = '1.01';
 
 const SUPABASE_URL = 'https://vfaveuenkublhxgatbcn.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_PkeJBe1KSw0ZWUSgcAIZFA_SuG8Ilyo';
@@ -5444,7 +5444,7 @@ function renderRun(){
 
   const prow = isJumping ? ROW_AIR : ROW_GROUND;
   const aura = playerActiveAura();
-  if(aura && !isFighting && !isStumbling){
+  if(aura){
     drawAuraEffect(ctx, aura, xForCol(PLAYER_COL)+4, yForRow(prow));
   }
   ctx.fillStyle = isFighting ? COLORS.playerFight : (isStumbling ? COLORS.heavy : (aura ? aura.color : COLORS.player));
