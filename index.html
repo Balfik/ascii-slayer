@@ -694,7 +694,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = '0.98';
+const GAME_VERSION = '0.99';
 
 const SUPABASE_URL = 'https://vfaveuenkublhxgatbcn.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_PkeJBe1KSw0ZWUSgcAIZFA_SuG8Ilyo';
@@ -4499,7 +4499,7 @@ const state = {
              skillLevelsBought:0, itemsEnchanted:0, demonicFound:0,
              monsterKills:{}, bossKills:{}, loginStreak:0, lastLoginDate:null, loginDates:{},
              totalWoodCollected:0, totalStoneCollected:0, totalIronCollected:0,
-             bestGauntletWaves:0, setsCompleted:{} }
+             bestGauntletWaves:0, setsCompleted:{}, a3EverBought:false }
 };
 const stats = {
   attack:BASE_ATTACK, speed:BASE_SPEED, atkSpeed:BASE_ATKSPEED, goldMult:1, dropChance:0.08,
@@ -4731,6 +4731,11 @@ function recomputeStats(){
   stats.autoUpgradeGold = skillB.autoUpgradeGold > 0;
   stats.autoSkillSpend = skillB.autoSkillSpend > 0;
   stats.autoJump = skillB.autoJump > 0;
+  // Постійний прапор (переживає Переродження, на відміну від
+  // state.skills, яке обнулюється щоразу) — потрібен рамці ніку
+  // 'architect', яка перевіряє "за все життя жодного разу не купив
+  // Автоковаль", а не лише "не куплений ЗАРАЗ у поточному забігу".
+  if(state.skills && state.skills['a3']) state.lifetime.a3EverBought = true;
 
   stats.abilityDurationMult = 1 + skillB.abilityDurationPct/100;
   stats.abilityCooldownMult = 1 - Math.min(70, skillB.abilityCooldownPct)/100;
@@ -6353,7 +6358,15 @@ const NICK_COLORS = [
   {id:'blank',     swatch:'#f0f0f0', color:'#f0f0f0', secret:true,
     unlockCheck:()=>state.castleLevel>=CASTLE_MAX_LEVEL && state.inventory.length===0},
   {id:'chromatic', swatch:'#ff4d4d', rainbow:true, secret:true,
-    unlockCheck:()=>{ const sets=ownedSetRarities(); return !!state.lifetime.gameCompleted && sets.length>0 && sets.every(s=>s.complete); }}
+    // ВАЖЛИВО: перевіряти саме state.lifetime.setsCompleted (постійний
+    // прапор "коли-небудь завершив"), а НЕ ownedSetRarities() (поточний
+    // інвентар) — інакше нік стає знову заблокованим після кожного
+    // Переродження, яке чистить звичайне спорядження з інвентаря.
+    unlockCheck:()=>{
+      const totalSets = RARITY_ORDER.filter(r=>RARITY_SET_NAMES[r] && RARITY_SET_NAMES[r].length>1).length;
+      const doneSets = Object.keys(state.lifetime.setsCompleted||{}).length;
+      return !!state.lifetime.gameCompleted && totalSets>0 && doneSets>=totalSets;
+    }}
 ];
 const NICK_FRAMES = [
   {id:'chronicler',    swatch:'#8a7a4a', color:'#8a7a4a', tier:'plain', unlockCheck:()=>state.lifetime.questsCompleted>=500},
@@ -6364,7 +6377,10 @@ const NICK_FRAMES = [
   {id:'demonologist',  swatch:'#ff2d4d', color:'#ff2d4d', tier:'glow',  unlockCheck:()=>state.lifetime.demonicFound>=200},
   {id:'eternal',       swatch:'#e0c040', color:'#e0c040', tier:'glow',  unlockCheck:()=>state.lifetime.prestigeCount>=500},
   {id:'architect',     swatch:'#5ad1c8', color:'#5ad1c8', tier:'plain', secret:true,
-    unlockCheck:()=>!!state.lifetime.gameCompleted && !(state.skills && state.skills['a3'])},
+    // state.skills скидається щоразу Переродженням — перевірка мала б
+    // сенс лише "не куплено ЗАРАЗ", а не "за все життя". Тому окремий
+    // постійний прапор state.lifetime.a3EverBought (recomputeStats()).
+    unlockCheck:()=>!!state.lifetime.gameCompleted && !state.lifetime.a3EverBought},
   {id:'phantom',       swatch:'#c8c8ff', color:'#c8c8ff', tier:'glow', secret:true,
     unlockCheck:()=>state.lifetime.bestGauntletWaves>=300},
   {id:'ultimate',      swatch:'#ffffff', tier:'ultra', secret:true,
@@ -7526,7 +7542,8 @@ function applyLoadedData(d){
     bestGauntletWaves: dl.bestGauntletWaves||0,
     setsCompleted: (dl.setsCompleted && typeof dl.setsCompleted==='object') ? dl.setsCompleted : {},
 
-    gameCompleted: !!dl.gameCompleted
+    gameCompleted: !!dl.gameCompleted,
+    a3EverBought: !!dl.a3EverBought
   };
   state.castleLevel = typeof d.castleLevel==='number' ? d.castleLevel : 0;
   const dcr = (d.castleResources && typeof d.castleResources==='object') ? d.castleResources : {};
@@ -7835,7 +7852,7 @@ function resetProgress(){
                      skillLevelsBought:0, itemsEnchanted:0, demonicFound:0,
                      monsterKills:{}, bossKills:{}, loginStreak:0, lastLoginDate:null, loginDates:{},
                      totalWoodCollected:0, totalStoneCollected:0, totalIronCollected:0,
-                     bestGauntletWaves:0, setsCompleted:{}, gameCompleted:false};
+                     bestGauntletWaves:0, setsCompleted:{}, gameCompleted:false, a3EverBought:false};
   distanceCols = 0;
   zoneTier = null;
   mode = 'run';

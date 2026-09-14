@@ -5,6 +5,14 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.99] — Fix Chromatic nick / Architect frame disappearing after Rebirth
+
+### Fixed
+- The **Chromatic** nick color (and the secret **Architect** nick
+  frame) could incorrectly re-lock themselves after a Rebirth, even
+  if you'd genuinely earned them — both now correctly stay unlocked
+  forever once earned, exactly like every other nick color/frame.
+
 ## [0.98] — Minor fixes
 
 ### Fixed
