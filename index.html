@@ -694,7 +694,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = '0.94';
+const GAME_VERSION = '0.95';
 
 const SUPABASE_URL = 'https://vfaveuenkublhxgatbcn.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_PkeJBe1KSw0ZWUSgcAIZFA_SuG8Ilyo';
@@ -1533,6 +1533,7 @@ const I18N = {
     'skills.lockedSuffix':' · спершу вивчи попередню навичку в гілці',
     'skills.lockedPrestigeSuffix':' · потрібне хоча б одне Переродження',
     'log.skillRequiresPrestige':'Спочатку здійсни хоча б одне Переродження',
+    'log.skillRequiresPrestigeCount':'Спочатку здійсни {n} перероджень',
     'skills.costBtn':'{cost} оч.',
     'ach.claimed':'Отримано: {claimed}/{total} — разові нагороди за довгострокові показники (переживають Переродження)',
     'ach.tier.common':'ЗВИЧАЙНІ', 'ach.tier.rare':'РІДКІСНІ', 'ach.tier.epic':'ЕПІЧНІ', 'ach.tier.legendary':'ЛЕГЕНДАРНІ',
@@ -1548,6 +1549,8 @@ const I18N = {
     'prestige.treePointsLine':'Очки Перековки: {pts}',
     'prestige.costBtn':'{cost} оч.',
     'prestige.doBtn':'✨ Переродитися', 'prestige.needMore':'Потрібно ще {n} м',
+    'prestige.distGrowthNote':'Потрібна дистанція росте на +{pct}% з кожним Переродженням',
+    'prestige.lockedCountSuffix':' · 🔒 після {n}-го Переродження', 'prestige.ownedTag':'✅ Куплено',
     'welcome.body':'Поки тебе не було ({time}), персонаж сам біг і бився далі.',
     'welcome.gold':'Золото', 'welcome.xp':'Досвід', 'welcome.dist':'Дистанція', 'welcome.level':'Рівень',
     'welcome.continueBtn':'Продовжити забіг',
@@ -1878,6 +1881,7 @@ const I18N = {
     'skills.lockedSuffix':' · learn the previous skill in this branch first',
     'skills.lockedPrestigeSuffix':' · requires at least one Rebirth',
     'log.skillRequiresPrestige':'Complete at least one Rebirth first',
+    'log.skillRequiresPrestigeCount':'Complete {n} Rebirths first',
     'skills.costBtn':'{cost} pt',
     'ach.claimed':'Claimed: {claimed}/{total} — one-time rewards for long-term milestones (survive Rebirth)',
     'ach.tier.common':'COMMON', 'ach.tier.rare':'RARE', 'ach.tier.epic':'EPIC', 'ach.tier.legendary':'LEGENDARY',
@@ -1893,6 +1897,8 @@ const I18N = {
     'prestige.treePointsLine':'Rebirth Points: {pts}',
     'prestige.costBtn':'{cost} pt',
     'prestige.doBtn':'✨ Rebirth', 'prestige.needMore':'Need {n} more m',
+    'prestige.distGrowthNote':'The required distance grows by +{pct}% with every Rebirth',
+    'prestige.lockedCountSuffix':' · 🔒 after Rebirth #{n}', 'prestige.ownedTag':'✅ Owned',
     'welcome.body':'While you were away ({time}), your character kept running and fighting.',
     'welcome.gold':'Gold', 'welcome.xp':'XP', 'welcome.dist':'Distance', 'welcome.level':'Level',
     'welcome.continueBtn':'Continue the run',
@@ -2398,20 +2404,30 @@ const PRESTIGE_MIN_DISTANCE = 1000;
 const PRESTIGE_DIST_PER_POINT = 200;
 const PRESTIGE_GOLD_PCT = 2;
 const PRESTIGE_ATK_PCT = 1;
+const PRESTIGE_DIST_GROWTH = 0.15;
 function prestigePointsEarned(dist){ return Math.floor(dist/PRESTIGE_DIST_PER_POINT); }
+function prestigeMinDistance(){ return Math.round(PRESTIGE_MIN_DISTANCE * Math.pow(1+PRESTIGE_DIST_GROWTH, state.lifetime.prestigeCount||0)); }
 
 const MAX_SKILL_LEVEL = 9999;
 
 const MAX_PRESTIGE_SKILL_LEVEL = 20;
+const PRESTIGE_AUTOMATION_SOUL_COST = 400;
+const PRESTIGE_AUTOMATION_UNLOCK_COUNT = 10;
 const PRESTIGE_TREE = [
   {id:'p1', name:'Відлуння Сили',            name_en:'Echo of Power',          desc:'+2% сили атаки за рівень (назавжди, Переродження не скидає)', desc_en:'+2% attack power per level (permanent, survives Prestige)', baseCost:1, costStep:1, maxLevel:MAX_PRESTIGE_SKILL_LEVEL, effect:{atkPct:2}},
   {id:'p2', name:'Відлуння Багатства',       name_en:'Echo of Wealth',         desc:'+2% золота за рівень (назавжди)', desc_en:'+2% gold per level (permanent)', baseCost:1, costStep:1, maxLevel:MAX_PRESTIGE_SKILL_LEVEL, effect:{goldPct:2}},
   {id:'p3', name:'Спадок Досвіду',           name_en:'Legacy of Experience',   desc:'+2% досвіду за рівень (назавжди)', desc_en:'+2% xp per level (permanent)', baseCost:1, costStep:1, maxLevel:MAX_PRESTIGE_SKILL_LEVEL, effect:{xpPct:2}},
   {id:'p4', name:'Благословення Долі',       name_en:'Fortune\'s Blessing',    desc:'+0.3% шанс криту за рівень (назавжди)', desc_en:'+0.3% crit chance per level (permanent)', baseCost:2, costStep:1, maxLevel:MAX_PRESTIGE_SKILL_LEVEL, effect:{critChance:0.3}},
-  {id:'p5', name:'Пришвидшене Відродження',  name_en:'Swift Rebirth',         desc:'-3% часу кулдауну босів за рівень (назавжди, максимум 60%)', desc_en:'-3% boss cooldown time per level (permanent, capped at 60%)', baseCost:2, costStep:1, maxLevel:MAX_PRESTIGE_SKILL_LEVEL, effect:{bossCooldownPct:3}}
+  {id:'p5', name:'Пришвидшене Відродження',  name_en:'Swift Rebirth',         desc:'-3% часу кулдауну босів за рівень (назавжди, максимум 60%)', desc_en:'-3% boss cooldown time per level (permanent, capped at 60%)', baseCost:2, costStep:1, maxLevel:MAX_PRESTIGE_SKILL_LEVEL, effect:{bossCooldownPct:3}},
+  {id:'p6', name:'Вічний Цикл',              name_en:'Eternal Cycle',          desc:'Автоматично здійснює Переродження, щойно пройдено потрібну дистанцію (перемикач з\'явиться тут же, назавжди, Переродження не скидає)', desc_en:'Automatically Prestiges the moment the required distance is reached (a toggle appears here once bought — permanent, survives Prestige)', currency:'souls', cost:PRESTIGE_AUTOMATION_SOUL_COST, maxLevel:1, unlockPrestigeCount:PRESTIGE_AUTOMATION_UNLOCK_COUNT, toggleKey:'autoPrestigeEnabled', effect:{}},
+  {id:'p7', name:'Незгасний Розум',          name_en:'Undying Mind',           desc:'Автоматично розподіляє очки навичок по Дереву Навичок після кожного Переродження, без потреби купувати «Автостратег» щоразу заново (назавжди, Переродження не скидає)', desc_en:'Automatically spends skill points across the Skill Tree after every Prestige, without rebuying Auto-Strategist each run (permanent, survives Prestige)', currency:'souls', cost:PRESTIGE_AUTOMATION_SOUL_COST, maxLevel:1, unlockPrestigeCount:PRESTIGE_AUTOMATION_UNLOCK_COUNT, toggleKey:'autoSkillSpendEnabled', effect:{}}
 ];
 function prestigeSkillLevel(id){ return state.prestigeSkills[id] || 0; }
-function prestigeSkillCost(node){ return Math.max(1, Math.round(node.baseCost + prestigeSkillLevel(node.id)*node.costStep)); }
+function prestigeSkillCost(node){ return node.currency==='souls' ? node.cost : Math.max(1, Math.round(node.baseCost + prestigeSkillLevel(node.id)*node.costStep)); }
+function prestigeSkillLockInfo(node){
+  if(node.unlockPrestigeCount && state.lifetime.prestigeCount < node.unlockPrestigeCount) return {locked:true, need:node.unlockPrestigeCount};
+  return {locked:false, need:0};
+}
 function computePrestigeTreeBonuses(){
   const b = {atkPct:0, goldPct:0, xpPct:0, critChance:0, bossCooldownPct:0};
   for(const node of PRESTIGE_TREE){
@@ -2431,9 +2447,15 @@ function buyPrestigeSkill(id){
   if(!node) return;
   const lvl = prestigeSkillLevel(id);
   if(lvl >= node.maxLevel){ addLog('log.skillMaxed', 'warn'); return; }
+  if(prestigeSkillLockInfo(node).locked){ addLog('log.skillRequiresPrestigeCount', 'warn', {n:node.unlockPrestigeCount}); return; }
   const cost = prestigeSkillCost(node);
-  if(state.lifetime.prestigeSkillPoints < cost){ addLog('log.notEnoughPrestigeSkillPoints', 'warn'); return; }
-  state.lifetime.prestigeSkillPoints -= cost;
+  if(node.currency==='souls'){
+    if(state.souls < cost){ addLog('log.notEnoughSouls', 'warn'); return; }
+    state.souls -= cost;
+  } else {
+    if(state.lifetime.prestigeSkillPoints < cost){ addLog('log.notEnoughPrestigeSkillPoints', 'warn'); return; }
+    state.lifetime.prestigeSkillPoints -= cost;
+  }
   state.prestigeSkills[id] = lvl+1;
   recomputeStats();
   addLog('log.skillLeveled', 'upgrade', {name:L(node,'name'), level:state.prestigeSkills[id]});
@@ -2445,17 +2467,23 @@ function buyPrestigeSkill(id){
 function buyPrestigeSkillMax(id){
   const node = PRESTIGE_TREE.find(n=>n.id===id);
   if(!node) return;
+  if(prestigeSkillLockInfo(node).locked){ addLog('log.skillRequiresPrestigeCount', 'warn', {n:node.unlockPrestigeCount}); return; }
   let count = 0;
   while(true){
     const lvl = prestigeSkillLevel(id);
     if(lvl >= node.maxLevel) break;
     const cost = prestigeSkillCost(node);
-    if(state.lifetime.prestigeSkillPoints < cost) break;
-    state.lifetime.prestigeSkillPoints -= cost;
+    if(node.currency==='souls'){
+      if(state.souls < cost) break;
+      state.souls -= cost;
+    } else {
+      if(state.lifetime.prestigeSkillPoints < cost) break;
+      state.lifetime.prestigeSkillPoints -= cost;
+    }
     state.prestigeSkills[id] = lvl+1;
     count++;
   }
-  if(count===0){ addLog('log.notEnoughPrestigeSkillPoints', 'warn'); return; }
+  if(count===0){ addLog(node.currency==='souls' ? 'log.notEnoughSouls' : 'log.notEnoughPrestigeSkillPoints', 'warn'); return; }
   recomputeStats();
   addLog('log.skillLeveledMax', 'upgrade', {name:L(node,'name'), count, level:state.prestigeSkills[id]});
   sfxEnchant();
@@ -3381,7 +3409,7 @@ function autoManageUpgrade(dt){
 let autoSkillSpendTimer = 0;
 const AUTO_SKILL_SPEND_CHECK_INTERVAL = 1;
 function autoManageSkillSpend(dt){
-  if(!stats.autoSkillSpend || !state.settings.autoSkillSpendEnabled) return;
+  if((!stats.autoSkillSpend && prestigeSkillLevel('p7')<=0) || !state.settings.autoSkillSpendEnabled) return;
   autoSkillSpendTimer += dt;
   if(autoSkillSpendTimer < AUTO_SKILL_SPEND_CHECK_INTERVAL) return;
   autoSkillSpendTimer = 0;
@@ -3413,6 +3441,12 @@ function autoManageSkillSpend(dt){
   addLog('log.autoSkillSpend', 'upgrade', {count:totalCount});
   renderSkillTreeIfOpen();
 
+}
+function autoManagePrestige(dt){
+  if(prestigeSkillLevel('p6')<=0 || !state.settings.autoPrestigeEnabled) return;
+  if(mode!=='run') return;
+  if(distanceCols < prestigeMinDistance()) return;
+  doPrestige();
 }
 function asciiBar(ratio, width){
   const filled = Math.max(0, Math.min(width, Math.round(ratio*width)));
@@ -4351,7 +4385,7 @@ const state = {
   companions:{level:{}, active:null},
 
   settings:{ autoRetreatBoss:false, logFilters:{combat:true, loot:true, achievements:true, quests:true, bosses:true, other:true}, theme:'default',
-             autoEnchantEnabled:false, autoUpgradeEnabled:false, autoSkillSpendEnabled:false },
+             autoEnchantEnabled:false, autoUpgradeEnabled:false, autoSkillSpendEnabled:false, autoPrestigeEnabled:false },
   relics:{},
   prestigeSkills:{},
   milestonesClaimed:{},
@@ -5890,7 +5924,7 @@ function skillLockInfo(node){
 }
 function renderSkillTree(){
   let html = `<div id="skillPointsLine" style="margin-bottom:10px;color:var(--dim);font-size:12px;">${t('skills.pointsLine',{pts:state.skillPoints})}</div>`;
-  if(stats.autoSkillSpend){
+  if(stats.autoSkillSpend || prestigeSkillLevel('p7')>0){
     const autoSkillOn = !!state.settings.autoSkillSpendEnabled;
     html += `<div class="mrow" style="margin-bottom:8px;">
       <div class="up-name">${t('auto.skillSpendLabel')}<small>${t('auto.skillSpendDesc')}</small></div>
@@ -6033,7 +6067,8 @@ function renderPrestigeModal(){
     return;
   }
   const pts = prestigePointsEarned(distanceCols);
-  const canDo = distanceCols >= PRESTIGE_MIN_DISTANCE;
+  const minDist = prestigeMinDistance();
+  const canDo = distanceCols >= minDist;
   const pp = state.lifetime.prestigePoints;
   const bonus = achievementBonuses();
   const demonicCount = state.inventory.filter(it=>it.rarity==='demonic').length;
@@ -6048,15 +6083,16 @@ function renderPrestigeModal(){
       <span class="lvl" style="font-size:16px;">${state.lifetime.prestigeCount}</span>
     </div>
     <div class="mrow">
-      <div class="up-name">${t('prestige.willGetLabel')}<small>${t('prestige.willGetSmall',{dist:Math.floor(distanceCols), min:PRESTIGE_MIN_DISTANCE, per:PRESTIGE_DIST_PER_POINT})}</small></div>
+      <div class="up-name">${t('prestige.willGetLabel')}<small>${t('prestige.willGetSmall',{dist:Math.floor(distanceCols), min:minDist, per:PRESTIGE_DIST_PER_POINT})}</small></div>
       <span class="lvl" style="font-size:16px;color:${canDo?'var(--accent)':'var(--dim)'}">+${pts}</span>
     </div>
     <div class="mrow">
       <div class="up-name">${t('prestige.keepsLabel')}<small>${t('prestige.keepsSmall',{souls:state.souls, count:demonicCount})}</small></div>
       <span class="lvl" style="font-size:14px;color:var(--demonic);">${formatNum(bonus.gold)}$ ${formatNum(bonus.crystals)}◆</span>
     </div>
+    ${(state.lifetime.prestigeCount||0)>0 ? `<div style="margin-top:2px;color:var(--dim);font-size:11px;">${t('prestige.distGrowthNote',{pct:Math.round(PRESTIGE_DIST_GROWTH*100)})}</div>` : ''}
     <button class="buy" data-action="prestige" style="width:100%;margin-top:10px;padding:10px;font-size:13px;" ${canDo?'':'disabled'}>
-      ${canDo ? t('prestige.doBtn') : t('prestige.needMore',{n:Math.ceil(PRESTIGE_MIN_DISTANCE-distanceCols)})}
+      ${canDo ? t('prestige.doBtn') : t('prestige.needMore',{n:Math.ceil(minDist-distanceCols)})}
     </button>`;
   modalBody.innerHTML = html;
 }
@@ -6081,6 +6117,22 @@ function renderPrestigeTreeHtml(){
   for(const node of PRESTIGE_TREE){
     const lvl = prestigeSkillLevel(node.id);
     const maxed = lvl >= node.maxLevel;
+    const lock = prestigeSkillLockInfo(node);
+    const lockedSuffix = lock.locked ? t('prestige.lockedCountSuffix',{n:lock.need}) : '';
+    if(node.toggleKey){
+      const cost = prestigeSkillCost(node);
+      const canBuy = !maxed && !lock.locked && state.souls >= cost;
+      const on = !!state.settings[node.toggleKey];
+      html += `<div class="mrow stack">
+        <div class="up-name">${L(node,'name')}${maxed?` ${t('prestige.ownedTag')}`:''}
+          <small>${L(node,'desc')}${lockedSuffix}</small>
+        </div>
+        ${maxed
+          ? `<button class="buy-max${on?' active':''}" data-action="togglePrestigeSkill" data-id="${node.id}">${on?t('boss.autoRetreatOn'):t('boss.autoRetreatOff')}</button>`
+          : `<button class="buy" data-action="prestigeSkill" data-id="${node.id}" ${canBuy?'':'disabled'}>👹 ${formatNum(cost)}</button>`}
+      </div>`;
+      continue;
+    }
     const cost = prestigeSkillCost(node);
     const canBuy = !maxed && (state.lifetime.prestigeSkillPoints||0) >= cost;
     html += `<div class="mrow stack">
@@ -6096,7 +6148,7 @@ function renderPrestigeTreeHtml(){
   return html;
 }
 function doPrestige(){
-  if(distanceCols < PRESTIGE_MIN_DISTANCE) return;
+  if(distanceCols < prestigeMinDistance()) return;
   const pts = prestigePointsEarned(distanceCols);
   state.lifetime.prestigePoints += pts;
   state.lifetime.prestigeCount++;
@@ -6898,6 +6950,10 @@ modalBody.addEventListener('click', (e)=>{
   else if(btn.dataset.action==='prestigeModalTab'){ prestigeModalTab = btn.dataset.tab; renderPrestigeModal(); }
   else if(btn.dataset.action==='prestigeSkill') buyPrestigeSkill(btn.dataset.id);
   else if(btn.dataset.action==='prestigeSkillMax') buyPrestigeSkillMax(btn.dataset.id);
+  else if(btn.dataset.action==='togglePrestigeSkill'){
+    const node = PRESTIGE_TREE.find(n=>n.id===btn.dataset.id);
+    if(node && node.toggleKey){ state.settings[node.toggleKey] = !state.settings[node.toggleKey]; renderPrestigeModal(); save(); }
+  }
   else if(btn.dataset.action==='toggleAutoRetreat'){ state.settings.autoRetreatBoss = !state.settings.autoRetreatBoss; renderBossPortal(); save(); }
   else if(btn.dataset.action==='toggleAutoEnchant'){ state.settings.autoEnchantEnabled = !state.settings.autoEnchantEnabled; renderModalBody(); save(); }
   else if(btn.dataset.action==='toggleAutoSkillSpend'){ state.settings.autoSkillSpendEnabled = !state.settings.autoSkillSpendEnabled; renderSkillTree(); save(); }
@@ -7395,7 +7451,8 @@ function applyLoadedData(d){
 
     autoEnchantEnabled: !!ds.autoEnchantEnabled,
     autoUpgradeEnabled: !!ds.autoUpgradeEnabled,
-    autoSkillSpendEnabled: !!ds.autoSkillSpendEnabled
+    autoSkillSpendEnabled: !!ds.autoSkillSpendEnabled,
+    autoPrestigeEnabled: !!ds.autoPrestigeEnabled
   };
   const dcomp = (d.companions && typeof d.companions==='object') ? d.companions : {};
   state.companions = {
@@ -7819,6 +7876,8 @@ function update(dt){
   const __t4 = performance.now();
   autoManageSkillSpend(dt);
   const __t5 = performance.now();
+  autoManagePrestige(dt);
+  const __t5b = performance.now();
   updateTimedBuffs(dt);
   if(mode==='town'){
     updateTown(dt);
@@ -7841,7 +7900,8 @@ function update(dt){
       autoManageEnchant: (__t3-__t2).toFixed(1)+'мс',
       autoManageUpgrade: (__t4-__t3).toFixed(1)+'мс',
       autoManageSkillSpend: (__t5-__t4).toFixed(1)+'мс',
-      modeUpdate: (__t6-__t5).toFixed(1)+'мс',
+      autoManagePrestige: (__t5b-__t5).toFixed(1)+'мс',
+      modeUpdate: (__t6-__t5b).toFixed(1)+'мс',
       updateHud: (__t7-__t6).toFixed(1)+'мс',
       entitiesCount: (typeof entities!=='undefined') ? entities.length : 'n/a'
     });

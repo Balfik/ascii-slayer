@@ -5,6 +5,22 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.95] — Rebirth automation, growing rebirth threshold
+
+### Added
+- Two new permanent nodes in the Rebirth Tree, unlocked after your
+  10th Rebirth, one-time purchase for 400 Demon Souls each, with an
+  on/off toggle right in the tree — survive every future Rebirth:
+  - **Eternal Cycle** — automatically Rebirths the moment you reach
+    the required distance.
+  - **Undying Mind** — automatically spends skill points across the
+    Skill Tree after every Rebirth, so you never need to rebuy
+    Auto-Strategist again.
+
+### Changed
+- The distance required to Rebirth now grows by +15% with every
+  Rebirth you've already done (was a flat 1000m every time).
+
 ## [0.94] — Minor fixes
 
 ### Fixed
