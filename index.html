@@ -694,7 +694,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = '0.97';
+const GAME_VERSION = '0.98';
 
 const SUPABASE_URL = 'https://vfaveuenkublhxgatbcn.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_PkeJBe1KSw0ZWUSgcAIZFA_SuG8Ilyo';
@@ -1351,6 +1351,7 @@ const I18N = {
     'auto.enchantLabel':'Автозаточка за золото', 'auto.enchantDesc':'Автоматично заточує предмети в Кузні, поки вистачає золота (душі демонів не витрачаються)',
     'auto.upgradeLabel':'Автопрокачка за золото', 'auto.upgradeDesc':'Автоматично прокачує силу атаки/швидкість бігу/швидкість атаки, поки вистачає золота (удача за кристали — не автоматично)',
     'auto.skillSpendLabel':'Автостратег', 'auto.skillSpendDesc':'Вільні очки навичок автоматично йдуть у прокачку дерева навичок по порядку гілок, згори вниз',
+    'auto.jumpLabel':'Автострибок', 'auto.jumpDesc':'Персонаж стрибає сам, наче затиснутий пробіл',
     'boss.attackBtn':'⚔ Атакувати',
     'boss.retreatBtn':'🏳 Відступити',
     'gauntlet.retreatBtn':'🏳 Завершити', 'gauntlet.continueBtn':'🏘 У місто',
@@ -1701,6 +1702,7 @@ const I18N = {
     'auto.enchantLabel':'Auto-enchant with gold', 'auto.enchantDesc':'Automatically enchants items at the Forge as long as there\'s gold for it (never spends demonic souls)',
     'auto.upgradeLabel':'Auto-upgrade with gold', 'auto.upgradeDesc':'Automatically upgrades attack/run speed/attack speed as long as there\'s gold for it (luck costs crystals — not automatic)',
     'auto.skillSpendLabel':'Auto-Strategist', 'auto.skillSpendDesc':'Free skill points automatically go into the skill tree, branch by branch, top to bottom',
+    'auto.jumpLabel':'Auto-Jump', 'auto.jumpDesc':'The character keeps jumping on its own, as if Space were held down',
     'boss.attackBtn':'⚔ Attack',
     'boss.retreatBtn':'🏳 Retreat',
     'gauntlet.retreatBtn':'🏳 End Run', 'gauntlet.continueBtn':'🏘 To town',
@@ -2670,7 +2672,7 @@ const SKILL_TREE = {
       {id:'a3', name:'Автоковаль', name_en:'Auto-Smith', desc:'Дозволяє увімкнути автозаточку предметів у Кузні — лише за золото (не за душі демонів), окремий перемикач у Кузні', desc_en:'Unlocks auto-enchanting items at the Forge — gold only (never demonic souls), separate on/off switch in the Forge', baseCost:50, costStep:0, maxLevel:1, effect:{autoEnchantGold:1}},
       {id:'a4', name:'Автотренер', name_en:'Auto-Trainer', desc:'Дозволяє увімкнути автопрокачку сили атаки/швидкості бігу/швидкості атаки — лише за золото (не за кристали, удача не автопрокачується), окремий перемикач у панелі "Прокачка"', desc_en:'Unlocks auto-upgrading attack/run speed/attack speed — gold only (never crystals, luck is not auto-upgraded), separate on/off switch in the Upgrades panel', baseCost:50, costStep:0, maxLevel:1, effect:{autoUpgradeGold:1}},
       {id:'a5', name:'Автостратег', name_en:'Auto-Strategist', desc:'Дозволяє увімкнути автоматичний розподіл вільних очок навичок по всьому дереву (по порядку гілок, згори вниз) — окремий перемикач у Дереві навичок', desc_en:'Unlocks automatically spending free skill points across the whole tree (branch by branch, top to bottom) — separate on/off switch in the Skill Tree', baseCost:100, costStep:0, maxLevel:1, effect:{autoSkillSpend:1}},
-      {id:'a6', name:'Автострибок', name_en:'Auto-Jump', desc:'Персонаж сам стрибає безперервно, наче затиснутий пробіл — ловить золоті символи й уникає ям без твоєї участі, але й бої з монстрами під час стрибка пропускаються (ефект зникає при Переродженні, як і всі звичайні навички)', desc_en:'The character keeps jumping on its own, as if Space were held down — catches golden glyphs and avoids pits without you, but fights with monsters are skipped while jumping too (effect ends on Prestige, like all regular skills)', baseCost:10, costStep:0, maxLevel:1, effect:{autoJump:1}},
+      {id:'a6', name:'Автострибок', name_en:'Auto-Jump', desc:'Дозволяє увімкнути безперервний автострибок (наче затиснутий пробіл) — ловить золоті символи й уникає ям без твоєї участі, але й бої з монстрами під час стрибка пропускаються — окремий перемикач у Дереві навичок (ефект навички зникає при Переродженні, як і всі звичайні навички)', desc_en:'Unlocks a continuous auto-jump (as if Space were held down) — catches golden glyphs and avoids pits without you, but fights with monsters are skipped while jumping too — separate on/off switch in the Skill Tree (effect ends on Prestige, like all regular skills)', baseCost:10, costStep:0, maxLevel:1, effect:{autoJump:1}},
 
       {id:'s5', name:'Політ над прірвою', name_en:'Flight over the Abyss', desc:'Ігноруй ями — персонаж завжди пролітає їх, без стрибка', desc_en:'Ignore pits — the character always flies over them, no jump needed', baseCost:10, costStep:0, maxLevel:1, effect:{ignorePits:1}, requiresPrestige:true}
     ]
@@ -2875,16 +2877,16 @@ const MILESTONE_TRACKS = [
     {threshold:5000, reward:{gold:220000,  crystals:5000,  souls:150}},
     {threshold:10000,reward:{gold:480000,  crystals:11000, souls:320}},
     {threshold:25000,reward:{gold:1200000, crystals:28000, souls:800}},
-    {threshold:50000, reward:{gold:2800000, crystals:66000, souls:1900}},
-    {threshold:100000, reward:{gold:6600000, crystals:160000, souls:4500}},
-    {threshold:250000, reward:{gold:16000000, crystals:380000, souls:11000}},
-    {threshold:500000, reward:{gold:38000000, crystals:890000, souls:26000}},
-    {threshold:1000000, reward:{gold:89000000, crystals:2100000, souls:61000}},
-    {threshold:2500000, reward:{gold:210000000, crystals:4900000, souls:140000}},
-    {threshold:5000000, reward:{gold:490000000, crystals:12000000, souls:330000}},
-    {threshold:10000000, reward:{gold:1200000000, crystals:28000000, souls:780000}},
-    {threshold:25000000, reward:{gold:2800000000, crystals:66000000, souls:1800000}},
-    {threshold:50000000, reward:{gold:6600000000, crystals:160000000, souls:4200000}}
+    {threshold:50000, reward:{gold:2800000, crystals:66000, souls:95}},
+    {threshold:100000, reward:{gold:6600000, crystals:160000, souls:225}},
+    {threshold:250000, reward:{gold:16000000, crystals:380000, souls:550}},
+    {threshold:500000, reward:{gold:38000000, crystals:890000, souls:1300}},
+    {threshold:1000000, reward:{gold:89000000, crystals:2100000, souls:3050}},
+    {threshold:2500000, reward:{gold:210000000, crystals:4900000, souls:7000}},
+    {threshold:5000000, reward:{gold:490000000, crystals:12000000, souls:16500}},
+    {threshold:10000000, reward:{gold:1200000000, crystals:28000000, souls:39000}},
+    {threshold:25000000, reward:{gold:2800000000, crystals:66000000, souls:90000}},
+    {threshold:50000000, reward:{gold:6600000000, crystals:160000000, souls:210000}}
   ]},
   {stat:'totalGoldEarned', icon:'💰', name:'Золото зароблено', name_en:'Gold Earned', unit:'$', tiers:[
     {threshold:1000000,   reward:{crystals:200}},
@@ -2893,16 +2895,16 @@ const MILESTONE_TRACKS = [
     {threshold:1000000000,   reward:{crystals:5000,  souls:60}},
     {threshold:10000000000,  reward:{crystals:14000, souls:180}},
     {threshold:100000000000, reward:{crystals:40000, souls:500}},
-    {threshold:1000000000000, reward:{crystals:110000, souls:1400}},
-    {threshold:10000000000000, reward:{crystals:310000, souls:4000}},
-    {threshold:100000000000000, reward:{crystals:880000, souls:11000}},
-    {threshold:1000000000000000, reward:{crystals:2500000, souls:31000}},
-    {threshold:10000000000000000, reward:{crystals:7100000, souls:88000}},
-    {threshold:100000000000000000, reward:{crystals:20000000, souls:250000}},
-    {threshold:1000000000000000000, reward:{crystals:57000000, souls:710000}},
-    {threshold:10000000000000000000, reward:{crystals:160000000, souls:2000000}},
-    {threshold:100000000000000000000, reward:{crystals:460000000, souls:5700000}},
-    {threshold:1000000000000000000000, reward:{crystals:1300000000, souls:16000000}}
+    {threshold:1000000000000, reward:{crystals:110000, souls:70}},
+    {threshold:10000000000000, reward:{crystals:310000, souls:200}},
+    {threshold:100000000000000, reward:{crystals:880000, souls:550}},
+    {threshold:1000000000000000, reward:{crystals:2500000, souls:1550}},
+    {threshold:10000000000000000, reward:{crystals:7100000, souls:4400}},
+    {threshold:100000000000000000, reward:{crystals:20000000, souls:12500}},
+    {threshold:1000000000000000000, reward:{crystals:57000000, souls:35500}},
+    {threshold:10000000000000000000, reward:{crystals:160000000, souls:100000}},
+    {threshold:100000000000000000000, reward:{crystals:460000000, souls:285000}},
+    {threshold:1000000000000000000000, reward:{crystals:1300000000, souls:800000}}
   ]}
 ];
 function milestoneKey(stat, threshold){ return stat+'_'+threshold; }
@@ -3473,7 +3475,7 @@ function autoManageSkillSpend(dt){
 
 }
 function autoManageAutoJump(){
-  if(!stats.autoJump) return;
+  if(!stats.autoJump || !state.settings.autoJumpEnabled) return;
   tryJump();
 }
 function autoManagePrestige(dt){
@@ -4484,7 +4486,7 @@ const state = {
 
   settings:{ autoRetreatBoss:false, logFilters:{combat:true, loot:true, achievements:true, quests:true, bosses:true, other:true}, theme:'default',
              autoEnchantEnabled:false, autoUpgradeEnabled:false, autoSkillSpendEnabled:false, autoPrestigeEnabled:false,
-             autoPrestigeTreeSpendEnabled:false, autoAutomationBranchEnabled:false },
+             autoPrestigeTreeSpendEnabled:false, autoAutomationBranchEnabled:false, autoJumpEnabled:false },
   relics:{},
   prestigeSkills:{},
   milestonesClaimed:{},
@@ -6032,6 +6034,13 @@ function renderSkillTree(){
       <button class="buy-max${autoSkillOn?' active':''}" data-action="toggleAutoSkillSpend">${autoSkillOn?t('boss.autoRetreatOn'):t('boss.autoRetreatOff')}</button>
     </div>`;
   }
+  if(stats.autoJump){
+    const autoJumpOn = !!state.settings.autoJumpEnabled;
+    html += `<div class="mrow" style="margin-bottom:8px;">
+      <div class="up-name">${t('auto.jumpLabel')}<small>${t('auto.jumpDesc')}</small></div>
+      <button class="buy-max${autoJumpOn?' active':''}" data-action="toggleAutoJump">${autoJumpOn?t('boss.autoRetreatOn'):t('boss.autoRetreatOff')}</button>
+    </div>`;
+  }
   for(const key in SKILL_TREE){
     const branch = SKILL_TREE[key];
     html += `<div style="margin:12px 0 4px;color:var(--purple);font-size:12px;letter-spacing:1px;">${L(branch,'label')}</div>`;
@@ -7060,6 +7069,7 @@ modalBody.addEventListener('click', (e)=>{
   else if(btn.dataset.action==='toggleAutoRetreat'){ state.settings.autoRetreatBoss = !state.settings.autoRetreatBoss; renderBossPortal(); save(); }
   else if(btn.dataset.action==='toggleAutoEnchant'){ state.settings.autoEnchantEnabled = !state.settings.autoEnchantEnabled; renderModalBody(); save(); }
   else if(btn.dataset.action==='toggleAutoSkillSpend'){ state.settings.autoSkillSpendEnabled = !state.settings.autoSkillSpendEnabled; renderSkillTree(); save(); }
+  else if(btn.dataset.action==='toggleAutoJump'){ state.settings.autoJumpEnabled = !state.settings.autoJumpEnabled; renderSkillTree(); save(); }
   else if(btn.dataset.action==='closeModal') closeModal();
   else if(btn.dataset.action==='bossAttack') attemptBoss(btn.dataset.id);
   else if(btn.dataset.action==='attemptGauntlet') attemptGauntlet();
@@ -7557,7 +7567,8 @@ function applyLoadedData(d){
     autoSkillSpendEnabled: !!ds.autoSkillSpendEnabled,
     autoPrestigeEnabled: !!ds.autoPrestigeEnabled,
     autoPrestigeTreeSpendEnabled: !!ds.autoPrestigeTreeSpendEnabled,
-    autoAutomationBranchEnabled: !!ds.autoAutomationBranchEnabled
+    autoAutomationBranchEnabled: !!ds.autoAutomationBranchEnabled,
+    autoJumpEnabled: !!ds.autoJumpEnabled
   };
   const dcomp = (d.companions && typeof d.companions==='object') ? d.companions : {};
   state.companions = {

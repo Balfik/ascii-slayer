@@ -5,6 +5,15 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [0.98] — Minor fixes
+
+### Fixed
+- Rebalanced the Demon Soul rewards on the newest Bestiary milestone
+  tiers (Quests/Gold Earned added in 0.97) — down to a more
+  reasonable amount.
+- Auto-Jump now has its own on/off toggle in the Skill Tree, instead
+  of always running once bought.
+
 ## [0.97] — Auto-Jump, more Bestiary milestones
 
 ### Added
