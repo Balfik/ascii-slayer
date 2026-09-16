@@ -1,0 +1,62 @@
+name: Daily digest to Telegram
+
+# Раз на добу (09:00 UTC) — короткий пульс: скільки нових гравців за
+# добу, скільки зараз онлайн, скільки забанено за добу, і найпомітніша
+# подія дня (найбільший demonic/legendary дроп). Той самий запит, що
+# й команда /stats у боті — просто сама прилітає раз на день, без
+# потреби питати вручну.
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build and send daily digest
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          set -uo pipefail
+          SINCE=$(date -u -d 'today 00:00:00' +%Y-%m-%dT%H:%M:%S)
+          ONLINE_SINCE=$(date -u -d '2 minutes ago' +%Y-%m-%dT%H:%M:%S)
+
+          NEW_TODAY=$(curl -sf -o /dev/null -w '%header{content-range}' \
+            "https://vfaveuenkublhxgatbcn.supabase.co/rest/v1/players?select=id&created_at=gte.${SINCE}&nickname=not.ilike.ZZTest*" \
+            -H "apikey: ${SUPABASE_KEY}" -H "Prefer: count=exact" -H "Range: 0-0" | cut -d'/' -f2)
+
+          ONLINE=$(curl -sf -o /dev/null -w '%header{content-range}' \
+            "https://vfaveuenkublhxgatbcn.supabase.co/rest/v1/players?select=id&updated_at=gte.${ONLINE_SINCE}&nickname=not.ilike.ZZTest*&is_banned=eq.false" \
+            -H "apikey: ${SUPABASE_KEY}" -H "Prefer: count=exact" -H "Range: 0-0" | cut -d'/' -f2)
+
+          BANNED_TODAY=$(curl -sf -o /dev/null -w '%header{content-range}' \
+            "https://vfaveuenkublhxgatbcn.supabase.co/rest/v1/players?select=id&banned_at=gte.${SINCE}" \
+            -H "apikey: ${SUPABASE_KEY}" -H "Prefer: count=exact" -H "Range: 0-0" | cut -d'/' -f2)
+
+          TOP_EVENT=$(curl -sf \
+            "https://vfaveuenkublhxgatbcn.supabase.co/rest/v1/events?select=nickname,target_name,target_rarity,value&created_at=gte.${SINCE}&target_rarity=in.(legendary,demonic)&order=value.desc.nullslast&limit=1" \
+            -H "apikey: ${SUPABASE_KEY}") || TOP_EVENT="[]"
+
+          MSG="📊 Щоденний пульс:"$'\n\n'"🆕 Нових: ${NEW_TODAY:-?}"$'\n'"🟢 Онлайн зараз: ${ONLINE:-?}"$'\n'"🚫 Забанено сьогодні: ${BANNED_TODAY:-?}"
+
+          EVENT_LINE=$(echo "$TOP_EVENT" | jq -r '
+            if length > 0 then
+              .[0] as $e |
+              "\($e.nickname) — \($e.target_name // "?") (\($e.target_rarity)" +
+              (if $e.value != null then ", +\($e.value)" else "" end) + ")"
+            else empty end
+          ')
+          if [ -n "$EVENT_LINE" ]; then
+            MSG="${MSG}"$'\n\n'"✨ Найпомітніша подія дня: ${EVENT_LINE}"
+          fi
+
+          IFS=',' read -ra CHATS <<< "$TELEGRAM_CHAT_ID"
+          for CHAT in "${CHATS[@]}"; do
+            curl -sf -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              --data-urlencode "chat_id=${CHAT}" \
+              --data-urlencode "text=${MSG}" > /dev/null \
+              || echo "Failed to notify chat ${CHAT}"
+          done
