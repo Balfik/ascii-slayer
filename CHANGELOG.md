@@ -5,6 +5,21 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [1.02] — English by default, translated nicknames
+
+### Changed
+- The game now starts in **English by default** for new visitors
+  (it used to default to Ukrainian until you'd changed it once).
+- The language button is now more visible, both in the in-game HUD
+  and — new — right on the title screen, so you can switch before
+  you even start a run.
+
+### Fixed
+- Other players' nicknames on the leaderboard and activity feed now
+  display translated into your selected language, instead of always
+  showing in whichever language that player picked. Your own
+  nickname on the title screen is translated too.
+
 ## [1.01] — Minor fixes
 
 ### Fixed

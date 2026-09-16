@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="uk">
+<html lang="en">
 <head>
 <meta charset="utf-8" />
 
@@ -125,9 +125,15 @@
   .zone-tag-fixed{color:var(--gold);background:#2a230f;border:1px solid var(--gold);}
   .zone-tag-frontier{color:var(--accent);background:#0f2a1f;border:1px solid var(--accent);}
   #langBtn{
-    background:#122417;border:1px solid var(--border);color:var(--text);
+    background:#122417;border:1px solid var(--accent);color:var(--accent);font-weight:bold;
     font-family:inherit;font-size:11px;padding:3px 8px;border-radius:4px;cursor:pointer;
   }
+  .title-lang-btn{
+    position:absolute;top:10px;right:12px;
+    font-family:inherit;font-size:12px;padding:6px 12px;border-radius:6px;cursor:pointer;
+    background:#122417;border:1px solid var(--accent);color:var(--accent);letter-spacing:1px;font-weight:bold;
+  }
+  .title-lang-btn:hover{background:#1b3a22;}
 
   #fightBar{
     text-align:center;color:var(--danger);font-size:13px;margin-bottom:6px;
@@ -524,6 +530,7 @@
 <div id="titleScreen">
   <canvas id="titleCanvas"></canvas>
   <div class="title-content">
+    <button id="titleLangBtn" class="title-lang-btn" type="button" title="UA / EN">🌐 EN</button>
     <h1 class="title-logo">ASCII SLAYER</h1>
     <p class="title-tagline" data-i18n="title.tagline">ASCII-раннер: біжи, бий, качайся, стань легендою</p>
     <div class="title-nickname">
@@ -694,7 +701,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = '1.01';
+const GAME_VERSION = '1.02';
 
 const SUPABASE_URL = 'https://vfaveuenkublhxgatbcn.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_PkeJBe1KSw0ZWUSgcAIZFA_SuG8Ilyo';
@@ -878,7 +885,7 @@ function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 const LEADERBOARD_NICK_COLOR = 'var(--accent)';
-function nickSpan(nick){ return `<span style="color:${LEADERBOARD_NICK_COLOR}">${escapeHtml(nick)}</span>`; }
+function nickSpan(nick){ return `<span style="color:${LEADERBOARD_NICK_COLOR}">${escapeHtml(localizeNickname(nick, lang))}</span>`; }
 function renderEventLine(e){
   const nick = nickSpan(e.nickname);
 
@@ -1001,6 +1008,23 @@ function generateNickname(){
   const adjs = lang==='en' ? NICKNAME_ADJ_EN : NICKNAME_ADJ_UK;
   const nouns = lang==='en' ? NICKNAME_NOUN_EN : NICKNAME_NOUN_UK;
   return adjs[Math.floor(Math.random()*adjs.length)] + ' ' + nouns[Math.floor(Math.random()*nouns.length)];
+}
+// Перекладає нік (свій чи чужий) під ПОТОЧНУ мову перегляду — чисто
+// косметично, ніколи не пише назад у стан/базу. Працює для БУДЬ-ЯКОГО
+// валідного ніку, бо кожен генерується з одного з двох ІДЕАЛЬНО
+// паралельних словників (той самий індекс = той самий переклад) —
+// той самий принцип, що вже є для монстрів/предметів через L(). Якщо
+// нік не розпізнається (ZZTest, чи щось нестандартне) — повертає як є.
+function localizeNickname(nick, targetLang){
+  if(typeof nick!=='string') return nick;
+  const parts = nick.split(' ');
+  if(parts.length!==2) return nick;
+  const [adj, noun] = parts;
+  let ai = NICKNAME_ADJ_UK.indexOf(adj), ni = NICKNAME_NOUN_UK.indexOf(noun);
+  if(ai>=0 && ni>=0) return targetLang==='en' ? (NICKNAME_ADJ_EN[ai]+' '+NICKNAME_NOUN_EN[ni]) : nick;
+  ai = NICKNAME_ADJ_EN.indexOf(adj); ni = NICKNAME_NOUN_EN.indexOf(noun);
+  if(ai>=0 && ni>=0) return targetLang==='uk' ? (NICKNAME_ADJ_UK[ai]+' '+NICKNAME_NOUN_UK[ni]) : nick;
+  return nick;
 }
 
 const GRID_COLS = 60;
@@ -1362,7 +1386,7 @@ const BIOME_FLOOR = ['#1c3a22','#173318','#2a3a1a','#3a2e1a','#1a3a2e','#3a1a1a'
 
 let mode = 'run';
 
-let lang = 'uk';
+let lang = 'en';
 const I18N = {
   uk: {
     'rarity.common':'звичайний', 'rarity.uncommon':'незвичайний', 'rarity.rare':'рідкісний',
@@ -2140,6 +2164,8 @@ function applyI18n(){
   document.querySelectorAll('[data-i18n-title]').forEach(el=>{ el.title = t(el.dataset.i18nTitle); });
   const lb = document.getElementById('langBtn');
   if(lb) lb.textContent = lang==='uk' ? '🌐 UA' : '🌐 EN';
+  const tlb = document.getElementById('titleLangBtn');
+  if(tlb) tlb.textContent = lang==='uk' ? '🌐 UA' : '🌐 EN';
 }
 function setLang(newLang){
   lang = newLang;
@@ -6519,7 +6545,7 @@ function selectNickFrame(id){
 // використовувати в стрічці подій — там і далі лишається простий
 // nickSpan() без жодного стилю.
 function styledNickHtml(nick, colorId, frameId){
-  const safe = escapeHtml(nick);
+  const safe = escapeHtml(localizeNickname(nick, lang));
   const color = NICK_COLORS.find(c=>c.id===colorId);
   let colorClass = '';
   let colorStyle = `color:${LEADERBOARD_NICK_COLOR}`;
@@ -8414,7 +8440,7 @@ function showTitleScreen(){
   refreshAudioUi();
   continueBtn.hidden = !hasExistingSave();
   if(!state.nickname) state.nickname = generateNickname();
-  document.getElementById('titleNickname').textContent = state.nickname;
+  document.getElementById('titleNickname').textContent = localizeNickname(state.nickname, lang);
   titleScreen.hidden = false;
 
   document.body.style.overflow = 'hidden';
@@ -8433,6 +8459,16 @@ document.getElementById('rerollNicknameBtn').addEventListener('click', ()=>{
 
   state.nickname = generateNickname();
   document.getElementById('titleNickname').textContent = state.nickname;
+});
+document.getElementById('titleLangBtn').addEventListener('click', ()=>{
+  // Той самий setLang(), що й основна кнопка в грі (той самий save()
+  // одразу зберігає вибір) — лише додатково оновлює текст ще й у
+  // стартовому екрані, бо той елемент setLang() не знає. Сам нік НЕ
+  // перегенеровується — лише перекладається на екрані (localizeNickname),
+  // щоб повертний гравець не побачив "новий" нік просто від перемикання
+  // мови.
+  setLang(lang==='uk'?'en':'uk');
+  document.getElementById('titleNickname').textContent = localizeNickname(state.nickname, lang);
 });
 continueBtn.addEventListener('click', ()=>{ hideTitleScreen(); init(); });
 function startNewGame(){
