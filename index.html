@@ -701,7 +701,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = '1.02';
+const GAME_VERSION = '1.03';
 
 const SUPABASE_URL = 'https://vfaveuenkublhxgatbcn.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_PkeJBe1KSw0ZWUSgcAIZFA_SuG8Ilyo';
@@ -8460,15 +8460,28 @@ document.getElementById('rerollNicknameBtn').addEventListener('click', ()=>{
   state.nickname = generateNickname();
   document.getElementById('titleNickname').textContent = state.nickname;
 });
-document.getElementById('titleLangBtn').addEventListener('click', ()=>{
-  // Той самий setLang(), що й основна кнопка в грі (той самий save()
-  // одразу зберігає вибір) — лише додатково оновлює текст ще й у
-  // стартовому екрані, бо той елемент setLang() не знає. Сам нік НЕ
-  // перегенеровується — лише перекладається на екрані (localizeNickname),
-  // щоб повертний гравець не побачив "новий" нік просто від перемикання
-  // мови.
-  setLang(lang==='uk'?'en':'uk');
+function setTitleScreenLang(newLang){
+  // НЕ setLang()! На стартовому екрані state ще НЕ завантажений сейв
+  // (loadLocal() запускається лише всередині init(), при Continue/New
+  // Game) — це дефолтний порожній state. setLang() в кінці викликає
+  // save(), яка серіалізує ПОТОЧНИЙ state у SAVE_KEY, тобто затерла б
+  // реальний сейв гравця порожнім прогресом. Тут — лише міняємо lang
+  // в пам'яті й, якщо сейв уже існує, точково підмінюємо ТІЛЬКИ поле
+  // lang у вже існуючому JSON, не чіпаючи решту полів.
+  lang = newLang;
+  try{
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(raw){
+      const d = JSON.parse(raw);
+      d.lang = newLang;
+      localStorage.setItem(SAVE_KEY, JSON.stringify(d));
+    }
+  }catch(e){}
+  applyI18n();
   document.getElementById('titleNickname').textContent = localizeNickname(state.nickname, lang);
+}
+document.getElementById('titleLangBtn').addEventListener('click', ()=>{
+  setTitleScreenLang(lang==='uk'?'en':'uk');
 });
 continueBtn.addEventListener('click', ()=>{ hideTitleScreen(); init(); });
 function startNewGame(){

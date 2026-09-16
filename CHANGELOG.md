@@ -5,6 +5,16 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [1.03] — Hotfix: title-screen language button could wipe your save
+
+### Fixed
+- **Critical bug from 1.02**: switching languages from the new
+  title-screen button, before pressing Continue, could overwrite your
+  save with a blank one. If this happened to you and you don't have
+  a cloud save, sorry — there wasn't a way to recover it. Switching
+  languages from the in-game button (after Continue) was never
+  affected.
+
 ## [1.02] — English by default, translated nicknames
 
 ### Changed
