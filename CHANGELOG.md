@@ -5,6 +5,25 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [1.04] — Trophy Hunter, scaling quest slots, platform links
+
+### Added
+- **Trophy Hunter**, a new Rebirth Tree node (400 souls, unlocks after
+  your 10th Rebirth): automatically enters a boss or the gauntlet the
+  moment its cooldown clears, and automatically returns you to the
+  road once none are left — nothing to click.
+- The number of active quest slots now grows with your Rebirth count:
+  +1 slot for every 5 Rebirths, permanently (3 base → 5 at your 10th
+  Rebirth, and so on) — the Quest Board now shows a small hint
+  explaining this next to the slot count.
+- Links to the game's itch.io and IndieDB pages in the footer,
+  alongside the existing GitHub link.
+
+### Fixed
+- The title-screen language button (added in 1.02) could overlap the
+  "ASCII SLAYER" title, especially on mobile — moved it fully outside
+  the title card so it can no longer collide with anything.
+
 ## [1.03] — Hotfix: title-screen language button could wipe your save
 
 ### Fixed

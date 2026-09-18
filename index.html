@@ -129,11 +129,14 @@
     font-family:inherit;font-size:11px;padding:3px 8px;border-radius:4px;cursor:pointer;
   }
   .title-lang-btn{
-    position:absolute;top:10px;right:12px;
+    position:absolute;top:16px;right:16px;z-index:2;
     font-family:inherit;font-size:12px;padding:6px 12px;border-radius:6px;cursor:pointer;
     background:#122417;border:1px solid var(--accent);color:var(--accent);letter-spacing:1px;font-weight:bold;
   }
   .title-lang-btn:hover{background:#1b3a22;}
+  @media (max-width:520px){
+    .title-lang-btn{top:10px;right:10px;font-size:11px;padding:5px 9px;}
+  }
 
   #fightBar{
     text-align:center;color:var(--danger);font-size:13px;margin-bottom:6px;
@@ -384,6 +387,14 @@
   footer .flinks{display:flex;flex-direction:column;gap:3px;}
   footer .flinks a{color:var(--dim);text-decoration:none;}
   footer .flinks a:hover{color:var(--accent);}
+  .platform-badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px;}
+  .platform-badges a{
+    display:inline-flex;align-items:center;gap:5px;
+    padding:4px 10px;border:1px solid var(--border);border-radius:5px;
+    background:#0d150d;color:var(--text);text-decoration:none;font-size:11px;
+  }
+  .platform-badges a:hover{border-color:var(--accent);color:var(--accent);background:#152615;}
+  .platform-badges svg{width:13px;height:13px;fill:currentColor;flex-shrink:0;}
   #visitorCountLine b{color:var(--accent);}
 
   .modal-backdrop{
@@ -479,10 +490,6 @@
   }
   .title-nickname button:hover{background:#1a1a1a;}
 
-  /* Рамки й кольори ніку в лідерборді (НЕ у стрічці подій — там
-     завжди звичайний nickSpan()). Три рівні: звичайна кольорова рамка
-     (.nick-frame), м'яка блимаюча (.nick-frame-glow), і одна
-     надрідкісна з переливом кольору й іскрами (.nick-frame-ultra). */
   .nick-frame{
     display:inline-block; padding:1px 10px; border-radius:15px;
     border:2px solid var(--frame-color, transparent); line-height:1.6;
@@ -529,8 +536,8 @@
 <div id="hcaptchaContainer" style="position:absolute;width:0;height:0;overflow:hidden;"></div>
 <div id="titleScreen">
   <canvas id="titleCanvas"></canvas>
+  <button id="titleLangBtn" class="title-lang-btn" type="button" title="UA / EN">🌐 EN</button>
   <div class="title-content">
-    <button id="titleLangBtn" class="title-lang-btn" type="button" title="UA / EN">🌐 EN</button>
     <h1 class="title-logo">ASCII SLAYER</h1>
     <p class="title-tagline" data-i18n="title.tagline">ASCII-раннер: біжи, бий, качайся, стань легендою</p>
     <div class="title-nickname">
@@ -672,7 +679,11 @@
   <footer>
     <span class="flinks">
       <span data-i18n="footer.autosave">Прогрес зберігається автоматично (localStorage) у цьому браузері.</span>
-      <a href="https://github.com/Balfik" target="_blank" rel="noopener noreferrer">🔗 github.com/Balfik</a>
+      <span class="platform-badges">
+        <a href="https://github.com/Balfik" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
+        <a href="https://balfik.itch.io/ascii-slayer" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 16 16"><path d="M2 6a2 2 0 012-2h8a2 2 0 012 2v5a2 2 0 01-2 2h-1.2l-.7-1.4a.9.9 0 00-.8-.6H6.7a.9.9 0 00-.8.6L5.2 13H4a2 2 0 01-2-2V6zm3.5 1a1 1 0 100 2 1 1 0 000-2zm-1.2.8a1 1 0 11-2 0 1 1 0 012 0zM10.5 7a1 1 0 100 2 1 1 0 000-2zm2.2.8a1 1 0 11-2 0 1 1 0 012 0z"/></svg>itch.io</a>
+        <a href="https://www.indiedb.com/games/ascii-slayer" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 16 16"><circle cx="8" cy="9.2" r="4.8"/><circle cx="8" cy="3.6" r="1.8"/><path d="M2.5 6L1 5M2.5 9H1M2.5 12l-1.5 1M13.5 6L15 5M13.5 9H15M13.5 12l1.5 1" stroke="currentColor" stroke-width="1" fill="none" stroke-linecap="round"/></svg>IndieDB</a>
+      </span>
       <span id="visitorCountLine" data-i18n-title="footer.visitorCountTitle">👥 <b id="visitorCount">—</b></span>
       <span id="versionLine">v<span id="versionNum"></span></span>
     </span>
@@ -701,7 +712,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = '1.03';
+const GAME_VERSION = '1.04';
 
 const SUPABASE_URL = 'https://vfaveuenkublhxgatbcn.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_PkeJBe1KSw0ZWUSgcAIZFA_SuG8Ilyo';
@@ -715,14 +726,6 @@ function initSupabase(){
   }catch(e){ sbClient = null; }
 }
 
-// hCaptcha на анонімний вхід — лише для СПРАВЖНЬОГО створення нового
-// акаунта (гілка !session нижче), не для щораз повернення існуючого
-// гравця. Invisible-режим: жодного чекбоксу, гравець нічого не бачить,
-// якщо hCaptcha не вирішить, що потрібен виклик. Якщо скрипт
-// заблокований (adblock/мережа) — просто йдемо без токена; Supabase
-// тоді відхилить сам sign-in, ensureSupabaseSession() і так це ловить
-// у try/catch — гра лишається повністю грабельною локально, просто
-// без хмари/лідерборду для цього конкретного відвідування.
 const HCAPTCHA_SITE_KEY = '5d9a5b72-35c4-424c-9fae-33566590de72';
 let hcaptchaWidgetId = null;
 function ensureHcaptchaWidget(){
@@ -928,14 +931,6 @@ function checkEnchantMilestoneEvent(it, enchantBefore){
   if(it.rarity!=='legendary' && it.rarity!=='demonic') return;
   const after = it.enchant||0;
   if(after<=enchantBefore) return;
-  // Вище +10 — кожен окремий рівень (+11, +12, ...), а не лише кожні
-  // 10. Але ЛИШЕ для демонічних (червоних) — легендарки (жовтогарячі)
-  // лишаються на старій логіці "кожні 10". Це один виклик на дію
-  // (клік/макс-клік/один тик автозаточки), а не по циклу на кожен
-  // рівень — навіть якщо автозаточка підняла предмет одразу на тисячі
-  // рівнів за один тик, це все одно рівно один reportEvent(), як і
-  // раніше (черга нижче додатково не дає цьому забити чергу
-  // застарілими значеннями).
   if(it.rarity==='demonic' && after>10){
     reportEvent('enchant_milestone', {targetName:L(it,'name'), targetRarity:it.rarity, value:after});
     return;
@@ -959,14 +954,6 @@ let eventQueueTimer = null;
 let lastEventSentAt = 0;
 function reportEvent(kind, extra){
   if(!sbReady || !sbClient || !sbPlayerId) return;
-  // Дедуп у черзі за kind+targetName: якщо для того самого предмета
-  // вже лежить непроminнута подія того самого типу — замінюємо її
-  // новим значенням замість додавання ще однієї. Без цього
-  // автозаточка (тикає раз/сек, checkEnchantMilestoneEvent тепер
-  // репортить кожен рівень вище +10) могла б наповнювати чергу
-  // швидше, ніж вона встигає зливатись (1 подія/5.5с) — черга росла
-  // б необмежено за довгу сесію, і назовні зрештою просочувались би
-  // застарілі проміжні значення. Тепер у черзі завжди лише останнє.
   const targetName = extra && extra.targetName;
   if(targetName!=null){
     const dupIdx = eventQueue.findIndex(e=>e.kind===kind && e.extra && e.extra.targetName===targetName);
@@ -1009,12 +996,6 @@ function generateNickname(){
   const nouns = lang==='en' ? NICKNAME_NOUN_EN : NICKNAME_NOUN_UK;
   return adjs[Math.floor(Math.random()*adjs.length)] + ' ' + nouns[Math.floor(Math.random()*nouns.length)];
 }
-// Перекладає нік (свій чи чужий) під ПОТОЧНУ мову перегляду — чисто
-// косметично, ніколи не пише назад у стан/базу. Працює для БУДЬ-ЯКОГО
-// валідного ніку, бо кожен генерується з одного з двох ІДЕАЛЬНО
-// паралельних словників (той самий індекс = той самий переклад) —
-// той самий принцип, що вже є для монстрів/предметів через L(). Якщо
-// нік не розпізнається (ZZTest, чи щось нестандартне) — повертає як є.
 function localizeNickname(nick, targetLang){
   if(typeof nick!=='string') return nick;
   const parts = nick.split(' ');
@@ -1110,18 +1091,6 @@ const COLORS = {
   wood:'#a8703c'
 };
 
-// Аури — суто клієнтський косметичний вибір, малюється тільки в
-// геймплейному canvas (біг/місто), НІКОЛИ не синкається на сервер
-// (на відміну від кольорів/рамок ніку — ті йдуть у лідерборд, аура
-// ні) — тому нема потреби ні в білому списку на сервері, ні в
-// власній колонці players. Розблокування — за конкретні досягнення
-// (state.achievements[achId], те саме постійне поле, що ніколи не
-// скидається Переродженням, лише повним resetProgress()), effect —
-// який саме ефект малювати (drawAuraEffect нижче): 'glow' (м'яке
-// пульсуюче сяйво, як було раніше), 'ember' (іскри, що підіймаються
-// вгору, вогняний ефект), 'ring' (обертове кільце сегментів),
-// 'sparkle' (мерехтливі цятки по колу), 'rainbow' (те саме кільце,
-// але з кольором, що біжить по колу — найрідкісніший, secret).
 const AURAS = [
   {id:'golden',     achId:'level_1000',     color:'#ffd700', effect:'glow'},
   {id:'crimson',    achId:'demonic_10',     color:'#ff5a1f', effect:'ember'},
@@ -1144,12 +1113,6 @@ function selectAura(id){
   renderCharacterSheet();
   save();
 }
-// Малює обраний ефект аури в точці (x,y) — та сама (x,y), де раніше
-// малювалось лише пульсуюче коло, викликається і з бігу, і з міста.
-// Час НЕ зберігається в жодній змінній — все виводиться напряму з
-// Date.now(), той самий підхід, що й pulse-ефект робив раніше (і як
-// drawScrollLayer/pseudoRand у фоні дороги) — тому нічого зайвого не
-// треба чистити/скидати між кадрами чи забігами.
 function drawAuraEffect(ctx, aura, x, y){
   if(!aura) return;
   const t = Date.now();
@@ -1248,8 +1211,6 @@ function companionCost(id){
     crystals: Math.round(COMPANION_CRYSTAL_BASE + over*COMPANION_CRYSTAL_STEP),
     souls: 0
   };
-  // 200-300: та сама формула золота/кристалів продовжується без
-  // розриву (over рахується від тих самих 100), плюс тепер душі босів.
   if(lvl >= COMPANION_LATE2_LEVEL){
     const over2 = lvl - COMPANION_LATE2_LEVEL;
     cost.souls = Math.round(COMPANION_SOUL_BASE + over2*COMPANION_SOUL_STEP);
@@ -1674,6 +1635,7 @@ const I18N = {
     'quests.acceptBtn':'Прийняти', 'quests.turnInBtn':'Забрати нагороду',
     'quests.rewardLine':'Нагорода: +{gold}$ +{crystals}◆ +{xp} досвіду',
     'quests.slots':'Активні: {n}/{max}',
+    'quests.slotsHint':'+1 слот за кожні 5 переродженнь (назавжди)',
     'quests.historyHeader':'Історія виконаних квестів', 'quests.historyEmpty':'Ще жодного квесту не виконано.',
     'quests.historyCount':'Виконано квестів: {n} · подивись історію на дошці оголошень',
     'time.justNow':'щойно', 'time.minutesAgo':'{n} хв тому', 'time.hoursAgo':'{n} год тому', 'time.daysAgo':'{n} дн тому',
@@ -2036,6 +1998,7 @@ const I18N = {
     'quests.acceptBtn':'Accept', 'quests.turnInBtn':'Claim reward',
     'quests.rewardLine':'Reward: +{gold}$ +{crystals}◆ +{xp} XP',
     'quests.slots':'Active: {n}/{max}',
+    'quests.slotsHint':'+1 slot for every 5 Rebirths (permanent)',
     'quests.historyHeader':'Completed quest history', 'quests.historyEmpty':'No quests completed yet.',
     'quests.historyCount':'Quests completed: {n} · see history at the board',
     'time.justNow':'just now', 'time.minutesAgo':'{n}m ago', 'time.hoursAgo':'{n}h ago', 'time.daysAgo':'{n}d ago',
@@ -2559,7 +2522,8 @@ const PRESTIGE_TREE = [
   {id:'p5', name:'Пришвидшене Відродження',  name_en:'Swift Rebirth',         desc:'-3% часу кулдауну босів за рівень (назавжди, максимум 60%)', desc_en:'-3% boss cooldown time per level (permanent, capped at 60%)', baseCost:2, costStep:1, maxLevel:MAX_PRESTIGE_SKILL_LEVEL, effect:{bossCooldownPct:3}},
   {id:'p6', name:'Вічний Цикл',              name_en:'Eternal Cycle',          desc:'Автоматично здійснює Переродження, щойно пройдено потрібну дистанцію (перемикач з\'явиться тут же, назавжди, Переродження не скидає)', desc_en:'Automatically Prestiges the moment the required distance is reached (a toggle appears here once bought — permanent, survives Prestige)', currency:'souls', cost:PRESTIGE_AUTOMATION_SOUL_COST, maxLevel:1, unlockPrestigeCount:PRESTIGE_AUTOMATION_UNLOCK_COUNT, toggleKey:'autoPrestigeEnabled', effect:{}},
   {id:'p7', name:'Незгасний Розум',          name_en:'Undying Mind',           desc:'Автоматично вкладає Очки Перековки у це саме Дерево Переродження (вузли вище), щойно вони з\'являються — не має жодного стосунку до звичайного Дерева Навичок чи «Автостратега» (назавжди, Переродження не скидає)', desc_en:'Automatically invests Rebirth Points into this Rebirth Tree itself (the nodes above) the moment you earn them — unrelated to the regular Skill Tree or Auto-Strategist (permanent, survives Prestige)', currency:'souls', cost:PRESTIGE_AUTOMATION_SOUL_COST, maxLevel:1, unlockPrestigeCount:PRESTIGE_AUTOMATION_UNLOCK_COUNT, toggleKey:'autoPrestigeTreeSpendEnabled', effect:{}},
-  {id:'p8', name:'Механічний Спадок',        name_en:'Mechanical Legacy',      desc:'Автоматично прокачує звичайними очками навичок ЛИШЕ вузли гілки «🤖 Автоматизація» в Дереві Навичок (назавжди, Переродження не скидає)', desc_en:'Automatically spends regular skill points ONLY on the "🤖 Automation" branch nodes in the Skill Tree (permanent, survives Prestige)', currency:'souls', cost:PRESTIGE_AUTOMATION_SOUL_COST, maxLevel:1, unlockPrestigeCount:PRESTIGE_AUTOMATION_UNLOCK_COUNT, toggleKey:'autoAutomationBranchEnabled', effect:{}}
+  {id:'p8', name:'Механічний Спадок',        name_en:'Mechanical Legacy',      desc:'Автоматично прокачує звичайними очками навичок ЛИШЕ вузли гілки «🤖 Автоматизація» в Дереві Навичок (назавжди, Переродження не скидає)', desc_en:'Automatically spends regular skill points ONLY on the "🤖 Automation" branch nodes in the Skill Tree (permanent, survives Prestige)', currency:'souls', cost:PRESTIGE_AUTOMATION_SOUL_COST, maxLevel:1, unlockPrestigeCount:PRESTIGE_AUTOMATION_UNLOCK_COUNT, toggleKey:'autoAutomationBranchEnabled', effect:{}},
+  {id:'p9', name:'Мисливець за Трофеями',    name_en:'Trophy Hunter',          desc:'Автоматично заходить у боса чи гаунтлет, щойно кулдаун збігає, і повертається на дорогу, коли вільних більше немає (перемикач з\'явиться тут же, назавжди, Переродження не скидає)', desc_en:'Automatically enters a boss or the gauntlet the moment its cooldown clears, and returns to the road once none are left (a toggle appears here once bought — permanent, survives Prestige)', currency:'souls', cost:PRESTIGE_AUTOMATION_SOUL_COST, maxLevel:1, unlockPrestigeCount:PRESTIGE_AUTOMATION_UNLOCK_COUNT, toggleKey:'autoBossGauntletEnabled', effect:{}}
 ];
 function prestigeSkillLevel(id){ return state.prestigeSkills[id] || 0; }
 function prestigeSkillCost(node){ return node.currency==='souls' ? node.cost : Math.max(1, Math.round(node.baseCost + prestigeSkillLevel(node.id)*node.costStep)); }
@@ -3074,7 +3038,8 @@ function checkLevelUnlocks(){
   if(advanced){ sfxLevelUp(); save(); }
 }
 
-const MAX_ACTIVE_QUESTS = 3;
+const MAX_ACTIVE_QUESTS_BASE = 3;
+function maxActiveQuests(){ return MAX_ACTIVE_QUESTS_BASE + Math.floor((state.lifetime.prestigeCount||0)/5); }
 const QUEST_TYPES = [
   {id:'kill',     icon:'⚔', name:'Полювання',     name_en:'Hunt',        desc:(n)=>`Вбити ${n} монстрів`,        desc_en:(n)=>`Kill ${n} monsters`},
   {id:'gold',     icon:'💰', name:'Заробітчанин',  name_en:'Breadwinner', desc:(n)=>`Заробити ${n} золота`,       desc_en:(n)=>`Earn ${n} gold`},
@@ -3114,7 +3079,7 @@ function generateQuestOffer(){
   };
 }
 function ensureQuestOffers(){
-  while(state.quests.offers.length < MAX_ACTIVE_QUESTS){
+  while(state.quests.offers.length < maxActiveQuests()){
     state.quests.offers.push(generateQuestOffer());
   }
 }
@@ -3446,8 +3411,8 @@ function updateQuestProgress(typeId, amount){
   }
 }
 function acceptQuest(uid, auto){
-  if(state.quests.active.length >= MAX_ACTIVE_QUESTS){
-    addLog('log.questFull', 'warn', {max:MAX_ACTIVE_QUESTS});
+  if(state.quests.active.length >= maxActiveQuests()){
+    addLog('log.questFull', 'warn', {max:maxActiveQuests()});
     return;
   }
   const idx = state.quests.offers.findIndex(q=>q.uid===uid);
@@ -3503,7 +3468,7 @@ function autoManageQuests(dt){
     turnInDailyQuest(true);
   }
   ensureQuestOffers();
-  while(state.quests.active.length < MAX_ACTIVE_QUESTS){
+  while(state.quests.active.length < maxActiveQuests()){
     const idx = state.quests.offers.findIndex(o=>o.typeId!=='jump');
     if(idx<0) break;
     acceptQuest(state.quests.offers[idx].uid, true);
@@ -3686,6 +3651,21 @@ function autoManageAutomationBranchSpend(dt){
   updateHud();
   save();
 }
+function autoManageBossGauntlet(dt){
+  if(prestigeSkillLevel('p9')<=0 || !state.settings.autoBossGauntletEnabled) return;
+  if(mode==='boss'){ if(bossResult) returnFromBoss(); return; }
+  if(mode==='gauntlet'){ if(gauntletResult) returnFromGauntlet(); return; }
+  if(mode!=='run' && mode!=='town') return;
+  const now = Date.now();
+  if(state.level>=GAUNTLET_MIN_LEVEL && !gauntletOnCooldown()){ attemptGauntlet(); return; }
+  for(const boss of BOSS_TIERS){
+    if(!bossFullyUnlocked(boss)) continue;
+    if((state.bossCooldowns[boss.id]||0) > now) continue;
+    attemptBoss(boss.id);
+    return;
+  }
+  if(mode==='town') exitTown();
+}
 function asciiBar(ratio, width){
   const filled = Math.max(0, Math.min(width, Math.round(ratio*width)));
   return '['+'#'.repeat(filled)+'-'.repeat(width-filled)+']';
@@ -3743,7 +3723,8 @@ function renderQuestBoard(){
       ${dqActionHtml}
     </div>
   </div>`;
-  html += `<div style="margin-bottom:8px;color:var(--dim);font-size:12px;">${t('quests.slots',{n:state.quests.active.length, max:MAX_ACTIVE_QUESTS})}</div>`;
+  html += `<div style="margin-bottom:2px;color:var(--dim);font-size:12px;">${t('quests.slots',{n:state.quests.active.length, max:maxActiveQuests()})}</div>`;
+  html += `<div style="margin-bottom:8px;color:var(--dim);font-size:10.5px;opacity:.75;">${t('quests.slotsHint')}</div>`;
   const refreshTimerHtml = state.quests.refreshesLeft<=0
     ? `<span class="empty-msg" style="white-space:nowrap;">⏳ ${formatDuration(msUntilQuestRefreshReset())}</span>`
     : '';
@@ -4163,12 +4144,6 @@ function renderBossCompanionsRow(targetX, targetY){
   drawHitParticles();
 }
 
-// Player's own beam during boss fights and the Gauntlet: one straight
-// white core plus two colored strands winding around it in a double-
-// helix (opposite sine phase), tapered to a point at both ends so they
-// meet exactly at the player and the target. Runs continuously for the
-// whole fight (driven by bgTime, not the attack-tick flash) and just
-// gets a brief amplitude/width boost on each actual hit.
 function drawPlayerBeam(fromX, fromY, toX, toY, time, intense){
   const dx = toX-fromX, dy = toY-fromY;
   const len = Math.hypot(dx, dy) || 1;
@@ -4624,7 +4599,8 @@ const state = {
 
   settings:{ autoRetreatBoss:false, logFilters:{combat:true, loot:true, achievements:true, quests:true, bosses:true, other:true}, theme:'default', aura:'none',
              autoEnchantEnabled:false, autoUpgradeEnabled:false, autoSkillSpendEnabled:false, autoPrestigeEnabled:false,
-             autoPrestigeTreeSpendEnabled:false, autoAutomationBranchEnabled:false, autoJumpEnabled:false, autoFuryEnabled:false },
+             autoPrestigeTreeSpendEnabled:false, autoAutomationBranchEnabled:false, autoJumpEnabled:false, autoFuryEnabled:false,
+             autoBossGauntletEnabled:false },
   relics:{},
   prestigeSkills:{},
   milestonesClaimed:{},
@@ -4657,8 +4633,6 @@ let isJumping = false, jumpTimer = 0;
 let isFighting = false, fightTarget = null, fightAttackTimer = 0;
 let isStumbling = false, stumbleTimer = 0;
 let floatingTexts = [];
-// Small reusable spark-particle pool for hit/impact feedback (combat
-// beam hits, road-combat strikes). Not for anything gameplay-affecting.
 let hitParticles = [];
 function spawnHitParticles(x, y, color, count){
   for(let i=0;i<(count||6);i++){
@@ -4871,13 +4845,7 @@ function recomputeStats(){
   stats.autoSkillSpend = skillB.autoSkillSpend > 0;
   stats.autoJump = skillB.autoJump > 0;
   stats.autoFury = skillB.autoFury > 0;
-  // Постійний прапор (переживає Переродження, на відміну від
-  // state.skills, яке обнулюється щоразу) — потрібен рамці ніку
-  // 'architect', яка перевіряє "за все життя жодного разу не купив
-  // Автоковаль", а не лише "не куплений ЗАРАЗ у поточному забігу".
   if(state.skills && state.skills['a3']) state.lifetime.a3EverBought = true;
-  // Той самий принцип для кольору ніку 'blank' — колись цей факт
-  // хоч раз стався, назавжди лишається true.
   if(state.castleLevel>=CASTLE_MAX_LEVEL && state.inventory.length===0) state.lifetime.blankUnlocked = true;
 
   stats.abilityDurationMult = 1 + skillB.abilityDurationPct/100;
@@ -5937,11 +5905,6 @@ async function renderLeaderboard(){
     const amRanked = myLevel >= 100;
     const wantNearby = sbReady && sbPlayerId && amRanked;
 
-    // events не має власного is_banned/рівня — фільтруємо за player_id
-    // (не за ніком: ніки не гарантовано унікальні, різний акаунт міг
-    // згенерувати той самий рандомний нік). Виключаємо і забанених, і
-    // тих, хто ще не дійшов до 100 рівня — той самий поріг, що й у
-    // самому лідерборді.
     let excludedIds = [];
     try{
       const { data: excludedRows } = await sbClient.from('players').select('id').or('is_banned.eq.true,best_level.lt.100');
@@ -6410,9 +6373,6 @@ function doPrestige(){
   state.upgrades = {attack:0, speed:0, atkSpeed:0, luck:0};
   state.inventory = state.inventory.filter(it=>it.rarity==='demonic');
   distanceCols = 0;
-  // zoneTier навмисно НЕ скидається тут (на відміну від resetProgress()) —
-  // запінена зона фарму з Карти Світу має пережити Переродження, а не
-  // відкидати гравця назад на "сиру" (найлегшу) складність.
   mode = 'run';
   resetWorldAfterLoad();
   recomputeStats();
@@ -6467,18 +6427,6 @@ const THEMES = [
     vars:{'--bg':'#050a10','--panel':'#081018','--border':'#1f3a4a','--text':'#d4f0ff','--dim':'#6f8fa0','--accent':'#4dd2ff','--crystal':'#8ff0ff','--purple':'#7db8ff'}}
 ];
 
-// Кольори й рамки ніку — показуються в лідерборді (топ-50 і "твоя
-// позиція"), НІКОЛИ в стрічці подій (там nickSpan() без стилю, як і
-// раніше). Кожен розблоковується довгою/важкою умовою; secret:true —
-// умова не пишеться прямо гравцю (в UI показується "???", той самий
-// підхід, що вже є для реліквій). Вибір лише клієнтський (яка умова
-// виконана — рахує клієнт), але САМЕ значення (яке kind обрано) іде
-// на сервер і звіряється з білим списком валідних id у
-// validate_player_write() — це не дає підробити довільний рядок, але
-// не перевіряє повторно, чи гравець ДІЙСНО виконав умову (для цього
-// довелось би синкати всю статистику в players, що явно
-// непропорційно для суто косметики) — той самий клас прийнятого
-// ризику, що вже є для локальних сейвів.
 const NICK_COLORS = [
   {id:'bronze',    swatch:'#cd7f32', color:'#cd7f32', unlockCheck:()=>state.lifetime.bestLevel>=500},
   {id:'silver',    swatch:'#c0c0c0', color:'#c0c0c0', unlockCheck:()=>state.lifetime.bestLevel>=2500},
@@ -6490,17 +6438,8 @@ const NICK_COLORS = [
   {id:'obsidian',  swatch:'#6a6a78', color:'#6a6a78', secret:true,
     unlockCheck:()=>state.lifetime.prestigeCount>=250 && state.castleLevel>=CASTLE_MAX_LEVEL},
   {id:'blank',     swatch:'#f0f0f0', color:'#f0f0f0', secret:true,
-    // Той самий клас бага, що chromatic вище: раніше перевірялось
-    // ПОТОЧНЕ state.inventory.length===0 — щойно гравець підбирає
-    // бодай один предмет (неминуче при звичайній грі), розблокування
-    // зникало само. Постійний прапор — state.lifetime.blankUnlocked
-    // (виставляється в recomputeStats(), раз true — назавжди true).
     unlockCheck:()=>!!state.lifetime.blankUnlocked},
   {id:'chromatic', swatch:'#ff4d4d', rainbow:true, secret:true,
-    // ВАЖЛИВО: перевіряти саме state.lifetime.setsCompleted (постійний
-    // прапор "коли-небудь завершив"), а НЕ ownedSetRarities() (поточний
-    // інвентар) — інакше нік стає знову заблокованим після кожного
-    // Переродження, яке чистить звичайне спорядження з інвентаря.
     unlockCheck:()=>{
       const totalSets = RARITY_ORDER.filter(r=>RARITY_SET_NAMES[r] && RARITY_SET_NAMES[r].length>1).length;
       const doneSets = Object.keys(state.lifetime.setsCompleted||{}).length;
@@ -6516,9 +6455,6 @@ const NICK_FRAMES = [
   {id:'demonologist',  swatch:'#ff2d4d', color:'#ff2d4d', tier:'glow',  unlockCheck:()=>state.lifetime.demonicFound>=200},
   {id:'eternal',       swatch:'#e0c040', color:'#e0c040', tier:'glow',  unlockCheck:()=>state.lifetime.prestigeCount>=500},
   {id:'architect',     swatch:'#5ad1c8', color:'#5ad1c8', tier:'plain', secret:true,
-    // state.skills скидається щоразу Переродженням — перевірка мала б
-    // сенс лише "не куплено ЗАРАЗ", а не "за все життя". Тому окремий
-    // постійний прапор state.lifetime.a3EverBought (recomputeStats()).
     unlockCheck:()=>!!state.lifetime.gameCompleted && !state.lifetime.a3EverBought},
   {id:'phantom',       swatch:'#c8c8ff', color:'#c8c8ff', tier:'glow', secret:true,
     unlockCheck:()=>state.lifetime.bestGauntletWaves>=300},
@@ -6541,9 +6477,6 @@ function selectNickFrame(id){
   save();
   syncLeaderboard();
 }
-// nick/colorId/frameId -> готовий HTML-фрагмент для лідерборду. НЕ
-// використовувати в стрічці подій — там і далі лишається простий
-// nickSpan() без жодного стилю.
 function styledNickHtml(nick, colorId, frameId){
   const safe = escapeHtml(localizeNickname(nick, lang));
   const color = NICK_COLORS.find(c=>c.id===colorId);
@@ -6684,9 +6617,6 @@ function renderCharacterSheet(){
 
   modalBody.innerHTML = html;
 }
-// Спільний рендер одного рядка вибору кольору/рамки ніку — дзеркалить
-// вигляд секції тем вище, лише з додатковим прев'ю через
-// styledNickHtml(), щоб гравець одразу бачив, як це виглядатиме.
 function renderNickCosmeticRow(item, kind, unlocked, name, desc){
   const active = (kind==='nickColor' ? (state.settings.nickColor||'none') : kind==='nickFrame' ? (state.settings.nickFrame||'none') : (state.settings.aura||'none')) === item.id;
   const preview = (unlocked && kind!=='aura')
@@ -7711,11 +7641,6 @@ function applyLoadedData(d){
   };
   state.bossCooldowns = (d.bossCooldowns && typeof d.bossCooldowns==='object') ? d.bossCooldowns : {};
   state.gauntletCooldown = typeof d.gauntletCooldown==='number' ? d.gauntletCooldown : 0;
-  // state.relics МАЄ бути виставлений ДО блоку settings нижче —
-  // nickFrameUnlocked() для секретної рамки 'ultimate' викликає
-  // ownedRelicsCount(), яка читає саме це поле; якщо лишити
-  // призначення після settings (як було раніше), перевірка на
-  // завантаженні бачила б ще стару/порожню state.relics.
   state.relics = (d.relics && typeof d.relics==='object') ? d.relics : {};
   const ds = (d.settings && typeof d.settings==='object') ? d.settings : {};
 
@@ -7730,13 +7655,6 @@ function applyLoadedData(d){
     theme: themeUnlocked(ds.theme) ? ds.theme : 'default',
     nickColor: nickColorUnlocked(ds.nickColor) ? ds.nickColor : 'none',
     nickFrame: nickFrameUnlocked(ds.nickFrame) ? ds.nickFrame : 'none',
-    // Старі сейви (до цього поля) не мають ds.aura взагалі — раніше
-    // аура показувалась АВТОМАТИЧНО (перша розблокована з 3 старих
-    // tier, у тому самому порядку, що й перші 3 записи AURAS). Щоб
-    // гравець не побачив "зникле" сяйво так само, як щойно було з
-    // хроматичним ніком, — на такому сейві підбираємо перший
-    // розблокований варіант самі; якщо ж ds.aura є (нове збереження,
-    // чи свідомо 'none') — довіряємо йому.
     aura: (typeof ds.aura==='string')
       ? (auraUnlocked(ds.aura) ? ds.aura : 'none')
       : (function(){ const first=AURAS.find(a=>auraUnlocked(a.id)); return first ? first.id : 'none'; })(),
@@ -7748,7 +7666,8 @@ function applyLoadedData(d){
     autoPrestigeTreeSpendEnabled: !!ds.autoPrestigeTreeSpendEnabled,
     autoAutomationBranchEnabled: !!ds.autoAutomationBranchEnabled,
     autoJumpEnabled: !!ds.autoJumpEnabled,
-    autoFuryEnabled: !!ds.autoFuryEnabled
+    autoFuryEnabled: !!ds.autoFuryEnabled,
+    autoBossGauntletEnabled: !!ds.autoBossGauntletEnabled
   };
   const dcomp = (d.companions && typeof d.companions==='object') ? d.companions : {};
   state.companions = {
@@ -8178,6 +8097,7 @@ function update(dt){
   autoManageAutomationBranchSpend(dt);
   autoManageAutoJump();
   autoManageBattleFury();
+  autoManageBossGauntlet(dt);
   const __t5c = performance.now();
   updateTimedBuffs(dt);
   if(mode==='town'){
@@ -8461,13 +8381,6 @@ document.getElementById('rerollNicknameBtn').addEventListener('click', ()=>{
   document.getElementById('titleNickname').textContent = state.nickname;
 });
 function setTitleScreenLang(newLang){
-  // НЕ setLang()! На стартовому екрані state ще НЕ завантажений сейв
-  // (loadLocal() запускається лише всередині init(), при Continue/New
-  // Game) — це дефолтний порожній state. setLang() в кінці викликає
-  // save(), яка серіалізує ПОТОЧНИЙ state у SAVE_KEY, тобто затерла б
-  // реальний сейв гравця порожнім прогресом. Тут — лише міняємо lang
-  // в пам'яті й, якщо сейв уже існує, точково підмінюємо ТІЛЬКИ поле
-  // lang у вже існуючому JSON, не чіпаючи решту полів.
   lang = newLang;
   try{
     const raw = localStorage.getItem(SAVE_KEY);
