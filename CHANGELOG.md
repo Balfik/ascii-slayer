@@ -5,6 +5,13 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [1.06] — Hotfix: existing bloated quest-offer lists now get trimmed
+
+### Fixed
+- 1.05 stopped the quest-offer pool from growing further, but didn't
+  shrink one that had already grown past 3 on accounts with several
+  Rebirths — it now gets trimmed back down properly.
+
 ## [1.05] — Hotfix: available quest choices no longer scale
 
 ### Fixed
