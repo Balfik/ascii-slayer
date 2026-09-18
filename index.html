@@ -712,7 +712,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = '1.04';
+const GAME_VERSION = '1.05';
 
 const SUPABASE_URL = 'https://vfaveuenkublhxgatbcn.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_PkeJBe1KSw0ZWUSgcAIZFA_SuG8Ilyo';
@@ -3079,7 +3079,7 @@ function generateQuestOffer(){
   };
 }
 function ensureQuestOffers(){
-  while(state.quests.offers.length < maxActiveQuests()){
+  while(state.quests.offers.length < MAX_ACTIVE_QUESTS_BASE){
     state.quests.offers.push(generateQuestOffer());
   }
 }

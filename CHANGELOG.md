@@ -5,6 +5,15 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [1.05] — Hotfix: available quest choices no longer scale
+
+### Fixed
+- The 1.04 quest-slot change accidentally also grew the number of
+  quest *choices* offered on the board (was meant to only grow how
+  many you can have active at once). Available quests are back to a
+  fixed 3; your active slot count still grows with Rebirths as
+  intended.
+
 ## [1.04] — Trophy Hunter, scaling quest slots, platform links
 
 ### Added
