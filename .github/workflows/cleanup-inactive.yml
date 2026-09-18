@@ -1,58 +1,19 @@
 name: Auto-cleanup inactive characters
 
-# Триярусне автоматичне очищення бази від покинутих персонажів —
-# гравець попросив саме таку градацію (чим менше прогресу, тим
-# частіше чистимо):
-#   Ярус 1: рівень = 1 (взагалі без прогресу)           — щодня
-#   Ярус 2: рівень 2-49, БЕЗ переродження                — раз на 5 днів
-#   Ярус 3: рівень 50-99, БЕЗ переродження                — раз на тиждень
-#   Рівень 100+ — ніколи не чіпаємо автоматично.
-#
-# "Неактивний" — updated_at давніше за вікно, довше за сам інтервал
-# запуску (запас, щоб не зачепити тих, хто просто грає рідше).
-#
-# Забанених (is_banned=true) НЕ чіпаємо — це докази атак, лишаються
-# для перегляду через /banned.
-#
-# Гравців із прив'язаним хмарним акаунтом (логін+пароль) теж НЕ
-# чіпаємо, незалежно від рівня/активності — вони свідомо створили
-# постійний акаунт, видаляти його автоматично через неактивність не
-# годиться. Ознака "має хмарний акаунт" — чи існує рядок у
-# public.player_saves для цього id (створюється лише один раз, при
-# першій успішній реєстрації, registerCloudAccount() в index.html).
-#
-# Ярус events: окремо, раз на тиждень — видаляє рядки public.events
-# (стрічка подій) старші за 7 днів, незалежно від того, живий гравець
-# чи ні. events НЕ чиститься каскадом при видаленні гравця вище (FK
-# events_player_id_fkey -> players ON DELETE CASCADE вже є і прибирає
-# події видалених гравців, але для активних/рівень 100+ гравців, яких
-# ми ніколи не видаляємо, стрічка інакше росла б необмежено). Тиждень
-# — свідомий запас, щоб встигнути вирішити, чи треба щось із цих даних
-# витягнути, перш ніж вони підуть.
-#
-# DELETE вимагає SERVICE ROLE ключа — у players/events немає
-# DELETE-політики для anon/authenticated (RLS за замовчуванням
-# забороняє), тож публічний ключ фізично не може видаляти рядки. Це
-# саме той самий ключ, що вже є в Supabase Edge Function Secrets —
-# окремий GitHub secret, бо це два різні сховища.
-#
-# dry_run (лише для workflow_dispatch): рахує, скільки БУЛО Б
-# видалено, без реального DELETE — для перевірки перед першим
-# реальним запуском.
 on:
   schedule:
-    - cron: '0 3 * * *'      # щодня 03:00 UTC — ярус 1
-    - cron: '0 3 */5 * *'    # ~раз на 5 днів — ярус 2
-    - cron: '0 3 * * 0'      # щонеділі — ярус 3
-    - cron: '0 4 * * 0'      # щонеділі, окремий час — ярус events
+    - cron: '0 3 * * *'
+    - cron: '0 3 */5 * *'
+    - cron: '0 3 * * 0'
+    - cron: '0 4 * * 0'
   workflow_dispatch:
     inputs:
       tier:
-        description: 'Який ярус запустити вручну (1, 2, 3 або events)'
+        description: 'Tier to run manually (1, 2, 3, or events)'
         required: true
         default: '1'
       dry_run:
-        description: 'Сухий прогін — лише порахувати, без видалення'
+        description: 'Dry run — count only, no delete'
         type: boolean
         required: true
         default: true
@@ -83,10 +44,6 @@ jobs:
         run: |
           set -uo pipefail
 
-          # Список id з прив'язаним хмарним акаунтом — рахуємо ОДИН раз тут,
-          # під service role (RLS на player_saves не дає anon-ключу прочитати
-          # чужі рядки, лише сервісний ключ бачить усе). Порожньо для ярусу
-          # events — там це поняття не застосовне.
           CLOUD_FILTER=""
           if [ "$TIER" != "events" ]; then
             CLOUD_IDS=$(curl -sf "https://vfaveuenkublhxgatbcn.supabase.co/rest/v1/player_saves?select=id" \
@@ -101,28 +58,28 @@ jobs:
               BASE="https://vfaveuenkublhxgatbcn.supabase.co/rest/v1/players"
               SINCE=$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%S)
               FILTER="best_level=eq.1&prestige_count=eq.0&is_banned=eq.false&updated_at=lt.${SINCE}${CLOUD_FILTER}"
-              LABEL="Ярус 1 (рівень=1, без переродження, неактивні >24г)"
+              LABEL="Tier 1"
               ;;
             2)
               BASE="https://vfaveuenkublhxgatbcn.supabase.co/rest/v1/players"
               SINCE=$(date -u -d '10 days ago' +%Y-%m-%dT%H:%M:%S)
               FILTER="best_level=gt.1&best_level=lt.50&prestige_count=eq.0&is_banned=eq.false&updated_at=lt.${SINCE}${CLOUD_FILTER}"
-              LABEL="Ярус 2 (рівень 2-49, без переродження, неактивні >10д)"
+              LABEL="Tier 2"
               ;;
             3)
               BASE="https://vfaveuenkublhxgatbcn.supabase.co/rest/v1/players"
               SINCE=$(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%S)
               FILTER="best_level=gte.50&best_level=lt.100&prestige_count=eq.0&is_banned=eq.false&updated_at=lt.${SINCE}${CLOUD_FILTER}"
-              LABEL="Ярус 3 (рівень 50-99, без переродження, неактивні >14д)"
+              LABEL="Tier 3"
               ;;
             events)
               BASE="https://vfaveuenkublhxgatbcn.supabase.co/rest/v1/events"
               SINCE=$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%S)
               FILTER="created_at=lt.${SINCE}"
-              LABEL="Ярус events (стрічка подій, старші за 7д)"
+              LABEL="Events tier"
               ;;
             *)
-              echo "Невідомий ярус: $TIER"; exit 1 ;;
+              echo "Unknown tier: $TIER"; exit 1 ;;
           esac
 
           echo "=== $LABEL ==="
@@ -132,14 +89,11 @@ jobs:
               -H "apikey: ${SERVICE_KEY}" -H "Authorization: Bearer ${SERVICE_KEY}" \
               -H "Prefer: count=exact" -H "Range: 0-0" -D - -o /dev/null \
               | grep -i content-range | sed -E 's#.*/##' | tr -d '\r')
-            echo "СУХИЙ ПРОГІН: було б видалено ${COUNT:-0} рядків."
+            echo "Dry run: would delete ${COUNT:-0} rows."
           else
             RESP=$(curl -sf -X DELETE "${BASE}?${FILTER}" \
               -H "apikey: ${SERVICE_KEY}" -H "Authorization: Bearer ${SERVICE_KEY}" \
               -H "Prefer: return=representation") || { echo "DELETE failed"; exit 0; }
             COUNT=$(echo "$RESP" | jq 'length')
-            echo "Видалено рядків: ${COUNT}"
-            if [ "$TIER" != "events" ]; then
-              echo "$RESP" | jq -r '.[] | "  - \(.nickname) (Lv.\(.best_level))"'
-            fi
+            echo "Deleted rows: ${COUNT}"
           fi

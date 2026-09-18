@@ -1,12 +1,9 @@
 name: Keep Supabase project awake
 
-# Supabase's free tier pauses a project after 7 days with no API requests.
-# This ping runs daily regardless of how many people actually played that
-# day, so the leaderboard never depends on real traffic to stay up.
 on:
   schedule:
-    - cron: '17 6 * * *' # daily, off the hour to avoid GitHub's busy-minute pileup
-  workflow_dispatch: {} # allows a manual "Run workflow" click too
+    - cron: '17 6 * * *'
+  workflow_dispatch: {}
 
 jobs:
   ping:
