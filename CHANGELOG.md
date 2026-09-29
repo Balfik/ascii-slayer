@@ -5,6 +5,25 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [1.07] — Souls from bosses & the gauntlet scale with Rebirths, new Rebirth Tree node
+
+### Added
+- Boss souls now scale with your Rebirth count: +100% from the base
+  amount per Rebirth (uncapped).
+- The gauntlet now also grants souls — 1 per wave cleared, capped at
+  100 on the base amount, then scaled the same way as boss souls by
+  your Rebirth count.
+- **Accelerated Ascent**, a new Rebirth Tree node (paid with Rebirth
+  Points like the early nodes, not souls): up to 10 levels, each
+  shaving 1 percentage point off how fast the required Rebirth
+  distance grows per Rebirth — from +15%/Rebirth by default down to
+  +5%/Rebirth at max level.
+
+### Fixed
+- Login streak stopped advancing if you just left the game open in a
+  tab for several days instead of closing and reopening it — it's now
+  re-checked every minute instead of only at session start.
+
 ## [1.06] — Hotfix: existing bloated quest-offer lists now get trimmed
 
 ### Fixed

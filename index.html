@@ -712,7 +712,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = '1.06';
+const GAME_VERSION = '1.07';
 
 const SUPABASE_URL = 'https://vfaveuenkublhxgatbcn.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_PkeJBe1KSw0ZWUSgcAIZFA_SuG8Ilyo';
@@ -1433,7 +1433,7 @@ const I18N = {
     'log.gauntletLocked':'Гаунтлет відкриється на {lvl} рівні персонажа',
     'log.gauntletOnCooldown':'Гаунтлет відновлюється: {time}',
     'log.gauntletStart':'🌀 Гаунтлет розпочато!',
-    'log.gauntletEnd':'🌀 Гаунтлет завершено: {waves} хвиль, +{gold}$',
+    'log.gauntletEnd':'🌀 Гаунтлет завершено: {waves} хвиль, +{gold}$ +{souls}👹',
     'log.castleBuilt':'🏰 Замок: збудовано «{name}» (рівень {level}/20)!',
     'boss.continueBtn':'🏘 У місто',
     'boss.resultWin':'🏆 ПЕРЕМОГА!',
@@ -1796,7 +1796,7 @@ const I18N = {
     'log.gauntletLocked':'The Gauntlet unlocks at character level {lvl}',
     'log.gauntletOnCooldown':'Gauntlet recovering: {time}',
     'log.gauntletStart':'🌀 Gauntlet started!',
-    'log.gauntletEnd':'🌀 Gauntlet ended: {waves} waves, +{gold}$',
+    'log.gauntletEnd':'🌀 Gauntlet ended: {waves} waves, +{gold}$ +{souls}👹',
     'log.castleBuilt':'🏰 Castle: built "{name}" (level {level}/20)!',
     'boss.continueBtn':'🏘 To town',
     'boss.resultWin':'🏆 VICTORY!',
@@ -2507,7 +2507,10 @@ const PRESTIGE_GOLD_PCT = 2;
 const PRESTIGE_ATK_PCT = 1;
 const PRESTIGE_DIST_GROWTH = 0.15;
 function prestigePointsEarned(dist){ return Math.floor(dist/PRESTIGE_DIST_PER_POINT); }
-function prestigeMinDistance(){ return Math.round(PRESTIGE_MIN_DISTANCE * Math.pow(1+PRESTIGE_DIST_GROWTH, state.lifetime.prestigeCount||0)); }
+function prestigeMinDistance(){
+  const growth = Math.max(0, PRESTIGE_DIST_GROWTH - computePrestigeTreeBonuses().distGrowthReductionPct/100);
+  return Math.round(PRESTIGE_MIN_DISTANCE * Math.pow(1+growth, state.lifetime.prestigeCount||0));
+}
 
 const MAX_SKILL_LEVEL = 9999;
 
@@ -2523,7 +2526,8 @@ const PRESTIGE_TREE = [
   {id:'p6', name:'Вічний Цикл',              name_en:'Eternal Cycle',          desc:'Автоматично здійснює Переродження, щойно пройдено потрібну дистанцію (перемикач з\'явиться тут же, назавжди, Переродження не скидає)', desc_en:'Automatically Prestiges the moment the required distance is reached (a toggle appears here once bought — permanent, survives Prestige)', currency:'souls', cost:PRESTIGE_AUTOMATION_SOUL_COST, maxLevel:1, unlockPrestigeCount:PRESTIGE_AUTOMATION_UNLOCK_COUNT, toggleKey:'autoPrestigeEnabled', effect:{}},
   {id:'p7', name:'Незгасний Розум',          name_en:'Undying Mind',           desc:'Автоматично вкладає Очки Перековки у це саме Дерево Переродження (вузли вище), щойно вони з\'являються — не має жодного стосунку до звичайного Дерева Навичок чи «Автостратега» (назавжди, Переродження не скидає)', desc_en:'Automatically invests Rebirth Points into this Rebirth Tree itself (the nodes above) the moment you earn them — unrelated to the regular Skill Tree or Auto-Strategist (permanent, survives Prestige)', currency:'souls', cost:PRESTIGE_AUTOMATION_SOUL_COST, maxLevel:1, unlockPrestigeCount:PRESTIGE_AUTOMATION_UNLOCK_COUNT, toggleKey:'autoPrestigeTreeSpendEnabled', effect:{}},
   {id:'p8', name:'Механічний Спадок',        name_en:'Mechanical Legacy',      desc:'Автоматично прокачує звичайними очками навичок ЛИШЕ вузли гілки «🤖 Автоматизація» в Дереві Навичок (назавжди, Переродження не скидає)', desc_en:'Automatically spends regular skill points ONLY on the "🤖 Automation" branch nodes in the Skill Tree (permanent, survives Prestige)', currency:'souls', cost:PRESTIGE_AUTOMATION_SOUL_COST, maxLevel:1, unlockPrestigeCount:PRESTIGE_AUTOMATION_UNLOCK_COUNT, toggleKey:'autoAutomationBranchEnabled', effect:{}},
-  {id:'p9', name:'Мисливець за Трофеями',    name_en:'Trophy Hunter',          desc:'Автоматично заходить у боса чи гаунтлет, щойно кулдаун збігає, і повертається на дорогу, коли вільних більше немає (перемикач з\'явиться тут же, назавжди, Переродження не скидає)', desc_en:'Automatically enters a boss or the gauntlet the moment its cooldown clears, and returns to the road once none are left (a toggle appears here once bought — permanent, survives Prestige)', currency:'souls', cost:PRESTIGE_AUTOMATION_SOUL_COST, maxLevel:1, unlockPrestigeCount:PRESTIGE_AUTOMATION_UNLOCK_COUNT, toggleKey:'autoBossGauntletEnabled', effect:{}}
+  {id:'p9', name:'Мисливець за Трофеями',    name_en:'Trophy Hunter',          desc:'Автоматично заходить у боса чи гаунтлет, щойно кулдаун збігає, і повертається на дорогу, коли вільних більше немає (перемикач з\'явиться тут же, назавжди, Переродження не скидає)', desc_en:'Automatically enters a boss or the gauntlet the moment its cooldown clears, and returns to the road once none are left (a toggle appears here once bought — permanent, survives Prestige)', currency:'souls', cost:PRESTIGE_AUTOMATION_SOUL_COST, maxLevel:1, unlockPrestigeCount:PRESTIGE_AUTOMATION_UNLOCK_COUNT, toggleKey:'autoBossGauntletEnabled', effect:{}},
+  {id:'p10', name:'Прискорене Сходження',    name_en:'Accelerated Ascent',     desc:'-1 в.п. до зростання потрібної дистанції переродження за рівень (назавжди; з +15%/переродження за замовчуванням до +5%/переродження на максимумі)', desc_en:'-1 pp off the required Rebirth distance growth rate per level (permanent; from +15%/Rebirth by default down to +5%/Rebirth at max)', baseCost:2, costStep:1, maxLevel:10, effect:{distGrowthReductionPct:1}}
 ];
 function prestigeSkillLevel(id){ return state.prestigeSkills[id] || 0; }
 function prestigeSkillCost(node){ return node.currency==='souls' ? node.cost : Math.max(1, Math.round(node.baseCost + prestigeSkillLevel(node.id)*node.costStep)); }
@@ -2532,7 +2536,7 @@ function prestigeSkillLockInfo(node){
   return {locked:false, need:0};
 }
 function computePrestigeTreeBonuses(){
-  const b = {atkPct:0, goldPct:0, xpPct:0, critChance:0, bossCooldownPct:0};
+  const b = {atkPct:0, goldPct:0, xpPct:0, critChance:0, bossCooldownPct:0, distGrowthReductionPct:0};
   for(const node of PRESTIGE_TREE){
     const lvl = prestigeSkillLevel(node.id);
     if(lvl<=0) continue;
@@ -2542,6 +2546,7 @@ function computePrestigeTreeBonuses(){
     if(e.xpPct) b.xpPct += e.xpPct*lvl;
     if(e.critChance) b.critChance += e.critChance*lvl;
     if(e.bossCooldownPct) b.bossCooldownPct += e.bossCooldownPct*lvl;
+    if(e.distGrowthReductionPct) b.distGrowthReductionPct += e.distGrowthReductionPct*lvl;
   }
   return b;
 }
@@ -3786,7 +3791,7 @@ function bossEffectiveRewards(boss){
   const s = 1 + Math.max(0, state.level-boss.reqLevel)*0.025;
   return {
     goldMin: Math.round(boss.goldMin*s), goldMax: Math.round(boss.goldMax*s),
-    xp: Math.round(boss.xp*s), souls: boss.souls
+    xp: Math.round(boss.xp*s), souls: Math.round(boss.souls * (1 + (state.lifetime.prestigeCount||0)))
   };
 }
 
@@ -4325,7 +4330,8 @@ function gauntletRewards(waves){
   return {
     gold: Math.round(waves*180*scale),
     crystals: Math.round(waves*4*scale),
-    xp: Math.round(waves*90*scale)
+    xp: Math.round(waves*90*scale),
+    souls: Math.round(Math.min(waves,100) * (1 + (state.lifetime.prestigeCount||0)))
   };
 }
 function updateGauntlet(dt){
@@ -4379,6 +4385,8 @@ function endGauntlet(retreated){
   if(gold>0){ state.gold += gold; state.lifetime.totalGoldEarned += gold; }
   if(crystals>0) state.crystals += crystals;
   if(xp>0) gainXp(xp);
+  const souls = Math.round(rw.souls * stats.soulMult);
+  if(souls>0) state.souls += souls;
 
   let relicName = null;
   if(fullReward){
@@ -4396,9 +4404,9 @@ function endGauntlet(retreated){
       }
     }
   }
-  addLog('log.gauntletEnd', fullReward?'levelup':'warn', {waves:wavesCleared, gold});
+  addLog('log.gauntletEnd', fullReward?'levelup':'warn', {waves:wavesCleared, gold, souls});
   if(fullReward) sfxLevelUp();
-  gauntletResult = {wavesCleared, gold, crystals, xp, relicName, cooldownSkipped};
+  gauntletResult = {wavesCleared, gold, crystals, xp, souls, relicName, cooldownSkipped};
   gauntletFight = null;
   updateModeUiText();
   renderGauntletFight();
@@ -4431,6 +4439,7 @@ function renderGauntletResult(){
   if(r.gold>0) line(`+${formatExact(r.gold)}$`);
   if(r.crystals>0) line(`+${formatNum(r.crystals)}◆`);
   if(r.xp>0) line(`+${formatExact(r.xp)} XP`);
+  if(r.souls>0) line(`+${formatNum(r.souls)}👹`);
   if(r.relicName){
     ctx.fillStyle = '#c77dff';
     line(`◆ ${t('boss.relicFound',{name:r.relicName})} ◆`);
@@ -6305,7 +6314,7 @@ function renderPrestigeModal(){
       <div class="up-name">${t('prestige.keepsLabel')}<small>${t('prestige.keepsSmall',{souls:state.souls, count:demonicCount})}</small></div>
       <span class="lvl" style="font-size:14px;color:var(--demonic);">${formatNum(bonus.gold)}$ ${formatNum(bonus.crystals)}◆</span>
     </div>
-    ${(state.lifetime.prestigeCount||0)>0 ? `<div style="margin-top:2px;color:var(--dim);font-size:11px;">${t('prestige.distGrowthNote',{pct:Math.round(PRESTIGE_DIST_GROWTH*100)})}</div>` : ''}
+    ${(state.lifetime.prestigeCount||0)>0 ? `<div style="margin-top:2px;color:var(--dim);font-size:11px;">${t('prestige.distGrowthNote',{pct:Math.round(Math.max(0, PRESTIGE_DIST_GROWTH - computePrestigeTreeBonuses().distGrowthReductionPct/100)*100)})}</div>` : ''}
     <button class="buy" data-action="prestige" style="width:100%;margin-top:10px;padding:10px;font-size:13px;" ${canDo?'':'disabled'}>
       ${canDo ? t('prestige.doBtn') : t('prestige.needMore',{n:Math.ceil(minDist-distanceCols)})}
     </button>`;
@@ -8182,6 +8191,7 @@ function init(){
   syncLogFilterButtons();
   addLog('log.gameStart', 'kill');
   setInterval(save, 5000);
+  setInterval(checkLoginStreak, 60000);
   window.addEventListener('beforeunload', save);
   requestAnimationFrame(loop);
 
