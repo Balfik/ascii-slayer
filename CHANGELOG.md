@@ -21,8 +21,7 @@ the release marked **Latest** is always what's live on the
 
 ### Fixed
 - Login streak stopped advancing if you just left the game open in a
-  tab for several days instead of closing and reopening it — it's now
-  re-checked every minute instead of only at session start.
+  tab for several days instead of closing and reopening it.
 
 ## [1.06] — Hotfix: existing bloated quest-offer lists now get trimmed
 
