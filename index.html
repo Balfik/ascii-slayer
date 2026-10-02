@@ -599,6 +599,7 @@
       <input type="range" id="musicVolSlider" min="0" max="100" value="35">
       <button id="sfxMuteBtn" data-i18n-title="audio.sfxTitle">🔊</button>
       <input type="range" id="sfxVolSlider" min="0" max="100" value="50">
+      <button id="floatTextBtn" data-i18n-title="hud.floatTextTitle">✨</button>
       <button id="langBtn" title="UA / EN">🌐 UA</button>
     </span>
   </div>
@@ -683,6 +684,7 @@
         <a href="https://github.com/Balfik" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
         <a href="https://balfik.itch.io/ascii-slayer" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 16 16"><path d="M2 6a2 2 0 012-2h8a2 2 0 012 2v5a2 2 0 01-2 2h-1.2l-.7-1.4a.9.9 0 00-.8-.6H6.7a.9.9 0 00-.8.6L5.2 13H4a2 2 0 01-2-2V6zm3.5 1a1 1 0 100 2 1 1 0 000-2zm-1.2.8a1 1 0 11-2 0 1 1 0 012 0zM10.5 7a1 1 0 100 2 1 1 0 000-2zm2.2.8a1 1 0 11-2 0 1 1 0 012 0z"/></svg>itch.io</a>
         <a href="https://www.indiedb.com/games/ascii-slayer" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 16 16"><circle cx="8" cy="9.2" r="4.8"/><circle cx="8" cy="3.6" r="1.8"/><path d="M2.5 6L1 5M2.5 9H1M2.5 12l-1.5 1M13.5 6L15 5M13.5 9H15M13.5 12l1.5 1" stroke="currentColor" stroke-width="1" fill="none" stroke-linecap="round"/></svg>IndieDB</a>
+        <a href="https://www.moddb.com/games/ascii-slayer" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 16 16"><path d="M8 1l1.3 1.6 2-.5.6 2 2 .6-.5 2L15 8l-1.6 1.3.5 2-2 .6-.6 2-2-.5L8 15l-1.3-1.6-2 .5-.6-2-2-.6.5-2L1 8l1.6-1.3-.5-2 2-.6.6-2 2 .5L8 1zm0 4.2a2.8 2.8 0 100 5.6 2.8 2.8 0 000-5.6z" fill-rule="evenodd"/></svg>ModDB</a>
       </span>
       <span id="visitorCountLine" data-i18n-title="footer.visitorCountTitle">👥 <b id="visitorCount">—</b></span>
       <span id="versionLine">v<span id="versionNum"></span></span>
@@ -712,7 +714,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = '1.07';
+const GAME_VERSION = '1.08';
 
 const SUPABASE_URL = 'https://vfaveuenkublhxgatbcn.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_PkeJBe1KSw0ZWUSgcAIZFA_SuG8Ilyo';
@@ -1047,7 +1049,7 @@ function updateRunGeometryForViewport(){
 function runBgScale(){ return CELL_H/CELL_H_BASE; }
 const JUMP_DURATION_BASE = 0.42;
 
-const MAX_EFFECTIVE_SPEED = 2000;
+const MAX_EFFECTIVE_SPEED = 3000;
 const PIT_WIDTH = 2;
 const STUMBLE_DURATION = 0.6;
 
@@ -1170,7 +1172,8 @@ function hexToRgba(hex, alpha){
 const COMPANION_TYPES = [
   {id:'blade',   name:'Дух Клинка',     name_en:'Blade Spirit',   unlockAch:'boss_1',  glyph:'c', color:'#7dffb8', role:'dps'},
   {id:'hoarder', name:'Дух Скарбника',  name_en:'Hoarder Spirit', unlockAch:'boss_5',  glyph:'g', color:'#ffd94d', role:'support'},
-  {id:'hunter',  name:'Дух Мисливця',   name_en:'Hunter Spirit',  unlockAch:'boss_20', glyph:'h', color:'#4dd2ff', role:'utility'}
+  {id:'hunter',  name:'Дух Мисливця',   name_en:'Hunter Spirit',  unlockAch:'boss_20', glyph:'h', color:'#4dd2ff', role:'utility'},
+  {id:'wind',    name:'Дух Вітру',      name_en:'Wind Spirit',    unlockAch:'boss_50', glyph:'w', color:'#9dffea', role:'speed'}
 ];
 
 const MAX_COMPANION_LEVEL = 300;
@@ -1188,6 +1191,8 @@ const COMPANION_HOARDER_DROP_PCT_PER_LVL = 0.3;
 const COMPANION_HUNTER_XP_PCT_PER_LVL = 1;
 const COMPANION_MAGNET_BONUS = 2;
 const COMPANION_HUNTER_MAGNET_PER_LVL = 0.3;
+const COMPANION_WIND_SPEED_CAP_BONUS = 1000;
+const COMPANION_WIND_SPEED_CAP_PER_LVL = COMPANION_WIND_SPEED_CAP_BONUS / MAX_COMPANION_LEVEL;
 function companionUnlocked(id){
   const c = COMPANION_TYPES.find(x=>x.id===id);
   return !!(c && state.achievements[c.unlockAch]);
@@ -1369,6 +1374,7 @@ const I18N = {
     'companion.effectBlade':'+{pct}% сили атаки кожні {sec}с (лише в бою на дорозі)',
     'companion.effectHoarder':'+{gold}% золота, +{drop}% шанс дропу',
     'companion.effectHunter':'+{xp}% досвіду, +{magnet} радіус збору лута',
+    'companion.effectWind':'+{n} до стелі макс. швидкості (загалом до {max} на максимумі)',
     'log.companionSelected':'🐾 Тепер із тобою: {name}.',
     'btn.streak':'🔥 Стрик', 'modal.streakTitle':'СТРИК ВХОДІВ',
     'streak.currentLabel':'поточний стрик (днів поспіль)',
@@ -1502,6 +1508,8 @@ const I18N = {
     'log.enterTown':'Ти зайшов у місто.',
     'log.exitTown':'Ти повернувся на дорогу.',
     'log.skillLeveled':'🌳 «{name}» прокачано до Lv.{level}',
+    'log.skillReset':'↺ «{name}» скинуто, повернуто {refund} Очок Перековки',
+    'prestige.resetBtn':'Скинути очки з цієї навички',
     'log.skillMaxed':'Цю навичку вже прокачано до максимуму',
     'log.skillRequiresPrev':'Спочатку вивчи попередню навичку в гілці',
     'log.notEnoughSkillPoints':'Недостатньо очок навичок',
@@ -1546,6 +1554,7 @@ const I18N = {
     'btn.quests':'📜 Квести', 'btn.character':'📋 Персонаж', 'btn.bestiary':'📖 Бестіарій',
     'btn.bossPortal':'👹 Портал Босів', 'btn.worldMap':'🗺 Карта Світу', 'btn.lang':'🌐',
     'audio.musicTitle':'Увімк./вимк. музику', 'audio.sfxTitle':'Увімк./вимк. звукові ефекти',
+    'hud.floatTextTitle':'Увімк./вимк. плаваючі написи (монети, ресурси, LVL UP)',
     'audio.prevTitle':'Попередній трек', 'audio.nextTitle':'Наступний трек', 'audio.noTracks':'Немає треків',
     'term.runLabel':'світ безкінечно біжить праворуч →',
     'term.townLabel':'містечко — W A S D рух, E взаємодія',
@@ -1732,6 +1741,7 @@ const I18N = {
     'companion.effectBlade':'+{pct}% attack power every {sec}s (road combat only)',
     'companion.effectHoarder':'+{gold}% gold, +{drop}% drop chance',
     'companion.effectHunter':'+{xp}% XP, +{magnet} pickup radius',
+    'companion.effectWind':'+{n} to the max speed cap (up to {max} total at max level)',
     'log.companionSelected':'🐾 Now with you: {name}.',
     'btn.streak':'🔥 Streak', 'modal.streakTitle':'LOGIN STREAK',
     'streak.currentLabel':'current streak (days in a row)',
@@ -1865,6 +1875,8 @@ const I18N = {
     'log.enterTown':'You entered the town.',
     'log.exitTown':'You returned to the road.',
     'log.skillLeveled':'🌳 «{name}» upgraded to Lv.{level}',
+    'log.skillReset':'↺ «{name}» reset, refunded {refund} Rebirth Points',
+    'prestige.resetBtn':'Reset points spent on this skill',
     'log.skillMaxed':'This skill is already at max level',
     'log.skillRequiresPrev':'Learn the previous skill in this branch first',
     'log.notEnoughSkillPoints':'Not enough skill points',
@@ -1909,6 +1921,7 @@ const I18N = {
     'btn.quests':'📜 Quests', 'btn.character':'📋 Character', 'btn.bestiary':'📖 Bestiary',
     'btn.bossPortal':'👹 Boss Portal', 'btn.worldMap':'🗺 World Map', 'btn.lang':'🌐',
     'audio.musicTitle':'Toggle music', 'audio.sfxTitle':'Toggle sound effects',
+    'hud.floatTextTitle':'Toggle floating text (coins, resources, LVL UP)',
     'audio.prevTitle':'Previous track', 'audio.nextTitle':'Next track', 'audio.noTracks':'No tracks',
     'term.runLabel':'the world runs on forever, to the right →',
     'term.townLabel':'town — W A S D move, E interact',
@@ -2388,6 +2401,10 @@ const LIBRARY_COMPANION_LORE = {
   hunter: {
     body:'Дух Мисливця бачить дорогу так, як не бачить ніхто інший — не як пряму лінію, а як довгий список того, що варто підняти, перш ніж воно зникне позаду. Тягнеться до кожної монети трохи далі, ніж тягнешся ти сам, і якимось чином встигає навчити й тебе трохи більшого з кожного вбитого моба. Поки він твій активний компаньйон: +1% досвіду і додатковий радіус збору лута (+0.3 за рівень, понад базові +2, які просто дає наявність будь-якого компаньйона) за кожен його рівень.',
     body_en:"The Hunter Spirit sees the road like nobody else does — not as a straight line, but as a long list of things worth picking up before they scroll off the back edge. It reaches for every coin a little further than you would yourself, and somehow teaches you to squeeze a bit more experience out of every kill along the way. While it's your active companion: +1% XP and extra pickup radius (+0.3 per level, on top of the base +2 that simply having any companion already grants) per level."
+  },
+  wind: {
+    body:'Дух Вітру ніколи повністю не торкається землі — лишає по собі лише слід із пилу й пожовклого листя там, де мав би бути слід ніг. Не б\'ється і не збирає золото, натомість просто завжди біжить трохи попереду тебе, ніби показуючи, що швидше ще можливо, навіть коли здається, що нікуди вже. Поки він твій активний компаньйон: піднімає саму стелю максимальної швидкості понад звичайну межу — до +1000 понад неї на максимальному рівні прокачки.',
+    body_en:"The Wind Spirit never quite touches the ground — it leaves only a trail of dust and yellowed leaves where footsteps should be. It doesn't fight or gather gold; it just always runs a half-step ahead of you, as if to prove that faster is still possible, even when it feels like there's nowhere left to go. While it's your active companion: it raises the maximum speed cap itself beyond its usual limit — up to +1000 above it at max upgrade level."
   }
 };
 
@@ -2523,11 +2540,11 @@ const PRESTIGE_TREE = [
   {id:'p3', name:'Спадок Досвіду',           name_en:'Legacy of Experience',   desc:'+2% досвіду за рівень (назавжди)', desc_en:'+2% xp per level (permanent)', baseCost:1, costStep:1, maxLevel:MAX_PRESTIGE_SKILL_LEVEL, effect:{xpPct:2}},
   {id:'p4', name:'Благословення Долі',       name_en:'Fortune\'s Blessing',    desc:'+0.3% шанс криту за рівень (назавжди)', desc_en:'+0.3% crit chance per level (permanent)', baseCost:2, costStep:1, maxLevel:MAX_PRESTIGE_SKILL_LEVEL, effect:{critChance:0.3}},
   {id:'p5', name:'Пришвидшене Відродження',  name_en:'Swift Rebirth',         desc:'-3% часу кулдауну босів за рівень (назавжди, максимум 60%)', desc_en:'-3% boss cooldown time per level (permanent, capped at 60%)', baseCost:2, costStep:1, maxLevel:MAX_PRESTIGE_SKILL_LEVEL, effect:{bossCooldownPct:3}},
-  {id:'p6', name:'Вічний Цикл',              name_en:'Eternal Cycle',          desc:'Автоматично здійснює Переродження, щойно пройдено потрібну дистанцію (перемикач з\'явиться тут же, назавжди, Переродження не скидає)', desc_en:'Automatically Prestiges the moment the required distance is reached (a toggle appears here once bought — permanent, survives Prestige)', currency:'souls', cost:PRESTIGE_AUTOMATION_SOUL_COST, maxLevel:1, unlockPrestigeCount:PRESTIGE_AUTOMATION_UNLOCK_COUNT, toggleKey:'autoPrestigeEnabled', effect:{}},
+  {id:'p10', name:'Прискорене Сходження',    name_en:'Accelerated Ascent',     desc:'-1 в.п. до зростання потрібної дистанції переродження за рівень (назавжди; з +15%/переродження за замовчуванням до +5%/переродження на максимумі)', desc_en:'-1 pp off the required Rebirth distance growth rate per level (permanent; from +15%/Rebirth by default down to +5%/Rebirth at max)', baseCost:2, costStep:1, maxLevel:10, effect:{distGrowthReductionPct:1}},
+  {id:'p6', name:'Вічний Цикл',             name_en:'Eternal Cycle',          desc:'Автоматично здійснює Переродження, щойно пройдено потрібну дистанцію (перемикач з\'явиться тут же, назавжди, Переродження не скидає)', desc_en:'Automatically Prestiges the moment the required distance is reached (a toggle appears here once bought — permanent, survives Prestige)', currency:'souls', cost:PRESTIGE_AUTOMATION_SOUL_COST, maxLevel:1, unlockPrestigeCount:PRESTIGE_AUTOMATION_UNLOCK_COUNT, toggleKey:'autoPrestigeEnabled', effect:{}},
   {id:'p7', name:'Незгасний Розум',          name_en:'Undying Mind',           desc:'Автоматично вкладає Очки Перековки у це саме Дерево Переродження (вузли вище), щойно вони з\'являються — не має жодного стосунку до звичайного Дерева Навичок чи «Автостратега» (назавжди, Переродження не скидає)', desc_en:'Automatically invests Rebirth Points into this Rebirth Tree itself (the nodes above) the moment you earn them — unrelated to the regular Skill Tree or Auto-Strategist (permanent, survives Prestige)', currency:'souls', cost:PRESTIGE_AUTOMATION_SOUL_COST, maxLevel:1, unlockPrestigeCount:PRESTIGE_AUTOMATION_UNLOCK_COUNT, toggleKey:'autoPrestigeTreeSpendEnabled', effect:{}},
   {id:'p8', name:'Механічний Спадок',        name_en:'Mechanical Legacy',      desc:'Автоматично прокачує звичайними очками навичок ЛИШЕ вузли гілки «🤖 Автоматизація» в Дереві Навичок (назавжди, Переродження не скидає)', desc_en:'Automatically spends regular skill points ONLY on the "🤖 Automation" branch nodes in the Skill Tree (permanent, survives Prestige)', currency:'souls', cost:PRESTIGE_AUTOMATION_SOUL_COST, maxLevel:1, unlockPrestigeCount:PRESTIGE_AUTOMATION_UNLOCK_COUNT, toggleKey:'autoAutomationBranchEnabled', effect:{}},
-  {id:'p9', name:'Мисливець за Трофеями',    name_en:'Trophy Hunter',          desc:'Автоматично заходить у боса чи гаунтлет, щойно кулдаун збігає, і повертається на дорогу, коли вільних більше немає (перемикач з\'явиться тут же, назавжди, Переродження не скидає)', desc_en:'Automatically enters a boss or the gauntlet the moment its cooldown clears, and returns to the road once none are left (a toggle appears here once bought — permanent, survives Prestige)', currency:'souls', cost:PRESTIGE_AUTOMATION_SOUL_COST, maxLevel:1, unlockPrestigeCount:PRESTIGE_AUTOMATION_UNLOCK_COUNT, toggleKey:'autoBossGauntletEnabled', effect:{}},
-  {id:'p10', name:'Прискорене Сходження',    name_en:'Accelerated Ascent',     desc:'-1 в.п. до зростання потрібної дистанції переродження за рівень (назавжди; з +15%/переродження за замовчуванням до +5%/переродження на максимумі)', desc_en:'-1 pp off the required Rebirth distance growth rate per level (permanent; from +15%/Rebirth by default down to +5%/Rebirth at max)', baseCost:2, costStep:1, maxLevel:10, effect:{distGrowthReductionPct:1}}
+  {id:'p9', name:'Мисливець за Трофеями',    name_en:'Trophy Hunter',          desc:'Автоматично заходить у боса чи гаунтлет, щойно кулдаун збігає, і повертається на дорогу, коли вільних більше немає (перемикач з\'явиться тут же, назавжди, Переродження не скидає)', desc_en:'Automatically enters a boss or the gauntlet the moment its cooldown clears, and returns to the road once none are left (a toggle appears here once bought — permanent, survives Prestige)', currency:'souls', cost:PRESTIGE_AUTOMATION_SOUL_COST, maxLevel:1, unlockPrestigeCount:PRESTIGE_AUTOMATION_UNLOCK_COUNT, toggleKey:'autoBossGauntletEnabled', effect:{}}
 ];
 function prestigeSkillLevel(id){ return state.prestigeSkills[id] || 0; }
 function prestigeSkillCost(node){ return node.currency==='souls' ? node.cost : Math.max(1, Math.round(node.baseCost + prestigeSkillLevel(node.id)*node.costStep)); }
@@ -2568,6 +2585,20 @@ function buyPrestigeSkill(id){
   recomputeStats();
   addLog('log.skillLeveled', 'upgrade', {name:L(node,'name'), level:state.prestigeSkills[id]});
   sfxEnchant();
+  renderPrestigeModal();
+  updateHud();
+  save();
+}
+function resetPrestigeSkill(id){
+  const node = PRESTIGE_TREE.find(n=>n.id===id);
+  if(!node || node.currency==='souls') return;
+  const lvl = prestigeSkillLevel(id);
+  if(lvl<=0) return;
+  const refund = Math.round(lvl*node.baseCost + node.costStep*(lvl*(lvl-1))/2);
+  state.lifetime.prestigeSkillPoints = (state.lifetime.prestigeSkillPoints||0) + refund;
+  state.prestigeSkills[id] = 0;
+  recomputeStats();
+  addLog('log.skillReset', 'upgrade', {name:L(node,'name'), refund});
   renderPrestigeModal();
   updateHud();
   save();
@@ -3659,11 +3690,13 @@ function autoManageAutomationBranchSpend(dt){
   updateHud();
   save();
 }
+let autoBossGauntletJustReturned = false;
 function autoManageBossGauntlet(dt){
-  if(prestigeSkillLevel('p9')<=0 || !state.settings.autoBossGauntletEnabled) return;
-  if(mode==='boss'){ if(bossResult) returnFromBoss(); return; }
-  if(mode==='gauntlet'){ if(gauntletResult) returnFromGauntlet(); return; }
+  if(prestigeSkillLevel('p9')<=0 || !state.settings.autoBossGauntletEnabled){ autoBossGauntletJustReturned = false; return; }
+  if(mode==='boss'){ if(bossResult){ returnFromBoss(); autoBossGauntletJustReturned = true; } return; }
+  if(mode==='gauntlet'){ if(gauntletResult){ returnFromGauntlet(); autoBossGauntletJustReturned = true; } return; }
   if(mode!=='run' && mode!=='town') return;
+  if(mode==='run') autoBossGauntletJustReturned = false;
   const now = Date.now();
   if(state.level>=GAUNTLET_MIN_LEVEL && !gauntletOnCooldown()){ attemptGauntlet(); return; }
   for(const boss of BOSS_TIERS){
@@ -3672,7 +3705,10 @@ function autoManageBossGauntlet(dt){
     attemptBoss(boss.id);
     return;
   }
-  if(mode==='town') exitTown();
+  if(mode==='town' && autoBossGauntletJustReturned){
+    autoBossGauntletJustReturned = false;
+    exitTown();
+  }
 }
 function asciiBar(ratio, width){
   const filled = Math.max(0, Math.min(width, Math.round(ratio*width)));
@@ -4612,7 +4648,7 @@ const state = {
   settings:{ autoRetreatBoss:false, logFilters:{combat:true, loot:true, achievements:true, quests:true, bosses:true, other:true}, theme:'default', aura:'none',
              autoEnchantEnabled:false, autoUpgradeEnabled:false, autoSkillSpendEnabled:false, autoPrestigeEnabled:false,
              autoPrestigeTreeSpendEnabled:false, autoAutomationBranchEnabled:false, autoJumpEnabled:false, autoFuryEnabled:false,
-             autoBossGauntletEnabled:false },
+             autoBossGauntletEnabled:false, showFloatingText:true },
   relics:{},
   prestigeSkills:{},
   milestonesClaimed:{},
@@ -4833,6 +4869,11 @@ function recomputeStats(){
     companionXpPct = lvl*COMPANION_HUNTER_XP_PCT_PER_LVL;
     companionMagnet += lvl*COMPANION_HUNTER_MAGNET_PER_LVL;
   }
+  let speedCap = MAX_EFFECTIVE_SPEED;
+  if(companion && companion.role==='speed'){
+    const lvl = companionLevel('wind');
+    speedCap += Math.round(lvl*COMPANION_WIND_SPEED_CAP_PER_LVL);
+  }
 
   const streakDays = streakBonusDays();
   atk *= (1 + streakDays*STREAK_BONUS_ATK_PCT_PER_DAY/100);
@@ -4841,7 +4882,7 @@ function recomputeStats(){
 
   stats.attack = atk;
 
-  stats.speed = Math.min(spd, MAX_EFFECTIVE_SPEED);
+  stats.speed = Math.min(spd, speedCap);
   stats.atkSpeed = atkSpeed;
   stats.goldMult = goldMult;
   stats.dropChance = Math.min(0.5, 0.08 + dropBonus);
@@ -5110,7 +5151,7 @@ function collectPickup(e){
 }
 
 function spawnFloatingText(col, text, color){
-
+  if(state.settings.showFloatingText===false) return;
   const stack = floatingTexts.filter(t=>t.col===col && t.life>0.75).length;
   floatingTexts.push({
     col, text, color,
@@ -6360,6 +6401,7 @@ function renderPrestigeTreeHtml(){
     const cost = prestigeSkillCost(node);
     const canBuy = !maxed && (state.lifetime.prestigeSkillPoints||0) >= cost;
     html += `<div class="mrow stack">
+      <button class="buy-max" style="padding:4px 8px;" data-action="prestigeSkillReset" data-id="${node.id}" ${lvl>0?'':'disabled'} title="${t('prestige.resetBtn')}">↺</button>
       <div class="up-name">${L(node,'name')} <span class="lvl">Lv.${lvl}</span>
         <small>${L(node,'desc')}${prestigeTotalEffectText(node, lvl)}</small>
       </div>
@@ -6733,6 +6775,9 @@ function companionEffectText(c, lvl){
   }
   if(c.role==='support'){
     return t('companion.effectHoarder', {gold:(lvl*COMPANION_HOARDER_GOLD_PCT_PER_LVL).toFixed(1), drop:(lvl*COMPANION_HOARDER_DROP_PCT_PER_LVL).toFixed(1)});
+  }
+  if(c.role==='speed'){
+    return t('companion.effectWind', {n:Math.round(lvl*COMPANION_WIND_SPEED_CAP_PER_LVL), max:MAX_EFFECTIVE_SPEED+COMPANION_WIND_SPEED_CAP_BONUS});
   }
   return t('companion.effectHunter', {xp:(lvl*COMPANION_HUNTER_XP_PCT_PER_LVL).toFixed(1), magnet:(COMPANION_MAGNET_BONUS+lvl*COMPANION_HUNTER_MAGNET_PER_LVL).toFixed(1)});
 }
@@ -7169,6 +7214,7 @@ modalBody.addEventListener('click', (e)=>{
   else if(btn.dataset.action==='prestigeModalTab'){ prestigeModalTab = btn.dataset.tab; renderPrestigeModal(); }
   else if(btn.dataset.action==='prestigeSkill') buyPrestigeSkill(btn.dataset.id);
   else if(btn.dataset.action==='prestigeSkillMax') buyPrestigeSkillMax(btn.dataset.id);
+  else if(btn.dataset.action==='prestigeSkillReset') resetPrestigeSkill(btn.dataset.id);
   else if(btn.dataset.action==='togglePrestigeSkill'){
     const node = PRESTIGE_TREE.find(n=>n.id===btn.dataset.id);
     if(node && node.toggleKey){ state.settings[node.toggleKey] = !state.settings[node.toggleKey]; renderPrestigeModal(); save(); }
@@ -7679,7 +7725,8 @@ function applyLoadedData(d){
     autoAutomationBranchEnabled: !!ds.autoAutomationBranchEnabled,
     autoJumpEnabled: !!ds.autoJumpEnabled,
     autoFuryEnabled: !!ds.autoFuryEnabled,
-    autoBossGauntletEnabled: !!ds.autoBossGauntletEnabled
+    autoBossGauntletEnabled: !!ds.autoBossGauntletEnabled,
+    showFloatingText: ds.showFloatingText!==false
   };
   const dcomp = (d.companions && typeof d.companions==='object') ? d.companions : {};
   state.companions = {
@@ -7980,6 +8027,7 @@ const musicPrevBtn = document.getElementById('musicPrevBtn');
 const musicNextBtn = document.getElementById('musicNextBtn');
 const sfxMuteBtn = document.getElementById('sfxMuteBtn');
 const sfxVolSlider = document.getElementById('sfxVolSlider');
+const floatTextBtn = document.getElementById('floatTextBtn');
 function refreshAudioUi(){
   musicMuteBtn.textContent = musicMuted ? '🎵🚫' : '🎵';
   musicMuteBtn.classList.toggle('muted', musicMuted);
@@ -7987,6 +8035,9 @@ function refreshAudioUi(){
   sfxMuteBtn.textContent = sfxMuted ? '🔊🚫' : '🔊';
   sfxMuteBtn.classList.toggle('muted', sfxMuted);
   sfxVolSlider.value = Math.round(sfxVolume*100);
+  const ftOff = state.settings.showFloatingText===false;
+  floatTextBtn.textContent = ftOff ? '✨🚫' : '✨';
+  floatTextBtn.classList.toggle('muted', ftOff);
   refreshMusicTrackName();
 }
 musicMuteBtn.addEventListener('click', ()=>{
@@ -8013,6 +8064,11 @@ sfxMuteBtn.addEventListener('click', ()=>{
 sfxVolSlider.addEventListener('input', ()=>{
   sfxVolume = sfxVolSlider.value/100;
   if(!sfxMuted && sfxGain) sfxGain.gain.value = sfxVolume;
+  save();
+});
+floatTextBtn.addEventListener('click', ()=>{
+  state.settings.showFloatingText = !(state.settings.showFloatingText!==false);
+  refreshAudioUi();
   save();
 });
 

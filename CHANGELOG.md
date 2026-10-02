@@ -5,6 +5,21 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [1.08] — Wind Spirit, skill reset, floating-text toggle, higher speed cap
+
+### Added
+- A link to the game's ModDB page in the footer, next to the GitHub, itch.io and IndieDB ones.
+- A reset button (↺) next to each leveled Rebirth Tree node, refunding the Rebirth Points spent on it.
+- A toggle (✨) next to the audio controls to hide floating texts on the main screen (coin and resource pickups, LVL UP, etc.) — handy for performance.
+- The maximum speed cap is raised from 2000 to 3000.
+- **Wind Spirit**, a new companion (unlocks with the "Scourge of the Portal" achievement): at max level it raises the speed cap by another 1000, up to 4000. Visible in boss and gauntlet fights like the others, with its own Library page.
+
+### Changed
+- Accelerated Ascent now sits right below Swift Rebirth in the Rebirth Tree.
+
+### Fixed
+- The "To Town" button appeared not to work while Trophy Hunter was enabled.
+
 ## [1.07] — Souls from bosses & the gauntlet scale with Rebirths, new Rebirth Tree node
 
 ### Added
