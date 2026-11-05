@@ -5,6 +5,23 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [1.09] — Mobile fixes, translation fixes, no drop-chance cap, streak speed bonus
+
+### Added
+- Login streak now also grants +10 base speed per streak day.
+- The drop chance cap (50%) is gone: above 100%, every kill drops more than one item (e.g. 200% means two items).
+
+### Changed
+- Traveler's Clock now advances a random active quest every second instead of every minute.
+- The Rebirth Tree reset button now sits to the left of the upgrade button.
+- Rewrote the Wind Spirit's Library story: it follows behind you like the other spirits.
+
+### Fixed
+- Mobile: the screen could still lock while the game was active, and menu buttons sometimes needed several taps.
+- Animated nicknames and frames on the leaderboard no longer restart their animation.
+- Apostrophes in relic names showing up as code on the boss result screen.
+- Number suffixes and units (k/M/B, m, /s) and "Castle complete" were not translated to English.
+
 ## [1.08] — Wind Spirit, skill reset, floating-text toggle, higher speed cap
 
 ### Added

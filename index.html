@@ -494,13 +494,13 @@
     display:inline-block; padding:1px 10px; border-radius:15px;
     border:2px solid var(--frame-color, transparent); line-height:1.6;
   }
-  .nick-frame-glow{ animation: nickFrameGlow 2.4s ease-in-out infinite; }
+  .nick-frame-glow{ animation: nickFrameGlow 2.4s ease-in-out infinite; animation-delay:var(--d24,0s); }
   @keyframes nickFrameGlow{
     0%,100%{ box-shadow:0 0 3px 0 var(--frame-color, transparent); }
     50%{ box-shadow:0 0 10px 2px var(--frame-color, transparent); }
   }
   .nick-frame-ultra{
-    position:relative; animation: nickFrameRainbow 4s linear infinite;
+    position:relative; animation: nickFrameRainbow 4s linear infinite; animation-delay:var(--d4,0s);
   }
   @keyframes nickFrameRainbow{
     0%{ border-color:#ff4d4d; box-shadow:0 0 6px 1px #ff4d4d66; }
@@ -514,18 +514,18 @@
     content:'✦'; position:absolute; font-size:8px; color:#fff; opacity:0;
     animation: nickFrameSparkle 2.6s ease-in-out infinite; pointer-events:none;
   }
-  .nick-frame-ultra::before{ top:-7px; left:8%; animation-delay:.2s; }
-  .nick-frame-ultra::after{ bottom:-7px; right:8%; animation-delay:1.3s; }
+  .nick-frame-ultra::before{ top:-7px; left:8%; animation-delay:calc(var(--d26,0s) + .2s); }
+  .nick-frame-ultra::after{ bottom:-7px; right:8%; animation-delay:calc(var(--d26,0s) + 1.3s); }
   @keyframes nickFrameSparkle{
     0%,100%{ opacity:0; transform:scale(.4); }
     50%{ opacity:1; transform:scale(1.1); }
   }
-  .nick-color-glow{ animation: nickColorGlow 2.2s ease-in-out infinite; }
+  .nick-color-glow{ animation: nickColorGlow 2.2s ease-in-out infinite; animation-delay:var(--d22,0s); }
   @keyframes nickColorGlow{
     0%,100%{ text-shadow:0 0 2px currentColor; }
     50%{ text-shadow:0 0 8px currentColor, 0 0 14px currentColor; }
   }
-  .nick-color-rainbow{ animation: nickColorRainbow 4s linear infinite; }
+  .nick-color-rainbow{ animation: nickColorRainbow 4s linear infinite; animation-delay:var(--d4,0s); }
   @keyframes nickColorRainbow{
     0%{color:#ff4d4d;} 20%{color:#ffd94d;} 40%{color:#4dffb8;}
     60%{color:#4dd2ff;} 80%{color:#c77dff;} 100%{color:#ff4d4d;}
@@ -583,8 +583,8 @@
     <span class="hud-stat">⛏ <b id="iron" style="color:#c9a876">0</b></span>
   </div>
   <div class="hud hud-fixed">
-    <span class="hud-stat hud-stat-wide"><span data-i18n="hud.distanceLabel">Дистанція</span>: <b id="dist">0</b> м</span>
-    <span class="hud-stat hud-stat-wide">ATK <b id="statAtk">0</b> · SPD <b id="statSpd">0</b> · A.SPD <b id="statAs">0</b>/с</span>
+    <span class="hud-stat hud-stat-wide"><span data-i18n="hud.distanceLabel">Дистанція</span>: <b id="dist">0</b> <span data-i18n="unit.m">м</span></span>
+    <span class="hud-stat hud-stat-wide">ATK <b id="statAtk">0</b> · SPD <b id="statSpd">0</b> · A.SPD <b id="statAs">0</b><span data-i18n="unit.perSec">/с</span></span>
   </div>
   <div class="hud row2">
     <span><span data-i18n="hud.regionLabel">Регіон</span>: <b id="biome">-</b> <span id="zoneModeTag"></span></span>
@@ -714,7 +714,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = '1.08';
+const GAME_VERSION = '1.09';
 
 const SUPABASE_URL = 'https://vfaveuenkublhxgatbcn.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_PkeJBe1KSw0ZWUSgcAIZFA_SuG8Ilyo';
@@ -886,6 +886,9 @@ async function pullCloudSaveInfo(){
   }catch(e){ return {error:'network'}; }
 }
 
+function decodeEntities(s){
+  return String(s).replace(/&#39;/g,"'").replace(/&quot;/g,'"').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');
+}
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -1379,7 +1382,8 @@ const I18N = {
     'btn.streak':'🔥 Стрик', 'modal.streakTitle':'СТРИК ВХОДІВ',
     'streak.currentLabel':'поточний стрик (днів поспіль)',
     'streak.bonusHeader':'Постійний бонус, поки стрик діє:',
-    'streak.bonusAtk':'+{pct}% сили атаки', 'streak.bonusGold':'+{pct}% золота', 'streak.bonusDrop':'+{pct}% шансу дропу',
+    'streak.bonusAtk':'+{pct}% сили атаки', 'streak.bonusGold':'+{pct}% золота', 'streak.bonusDrop':'+{pct}% шансу дропу', 'streak.bonusSpd':'+{n} початкової швидкості',
+    'unit.m':'м', 'unit.perSec':'/с',
     'streak.noBonusYet':'Зайди в гру завтра, щоб почати стрик і здобути перший бонус.',
     'streak.atCap':'Стеля бонусу досягнута — довший стрик уже не підсилює його далі.',
     'streak.weekendActiveNow':'🎉 Вихідний! ×{mult} на золото, досвід і душі босів, а кулдаун босів і Гаунтлета вдвічі коротший — діє прямо зараз.',
@@ -1746,7 +1750,8 @@ const I18N = {
     'btn.streak':'🔥 Streak', 'modal.streakTitle':'LOGIN STREAK',
     'streak.currentLabel':'current streak (days in a row)',
     'streak.bonusHeader':'Standing bonus while the streak lasts:',
-    'streak.bonusAtk':'+{pct}% attack power', 'streak.bonusGold':'+{pct}% gold', 'streak.bonusDrop':'+{pct}% drop chance',
+    'streak.bonusAtk':'+{pct}% attack power', 'streak.bonusGold':'+{pct}% gold', 'streak.bonusDrop':'+{pct}% drop chance', 'streak.bonusSpd':'+{n} base speed',
+    'unit.m':'m', 'unit.perSec':'/s',
     'streak.noBonusYet':'Come back tomorrow to start a streak and earn your first bonus.',
     'streak.atCap':'Bonus cap reached — a longer streak no longer boosts it further.',
     'streak.weekendActiveNow':'🎉 Weekend! ×{mult} gold, XP and boss souls, plus half cooldown on bosses and the Gauntlet — active right now.',
@@ -2122,7 +2127,7 @@ function formatNum(n){
   n = Math.abs(Math.round(n));
 
   if(n >= 1e15) return sign + n.toExponential(2).replace('e+', 'e');
-  const units = [[1e12,'т'],[1e9,'млрд'],[1e6,'м'],[1e3,'к']];
+  const units = lang==='en' ? [[1e12,'T'],[1e9,'B'],[1e6,'M'],[1e3,'k']] : [[1e12,'т'],[1e9,'млрд'],[1e6,'м'],[1e3,'к']];
   for(const [v,suf] of units){
     if(n >= v){
       let str = (n/v).toFixed(1);
@@ -2309,8 +2314,8 @@ const RELIC_POOL = [
     desc:'15% шанс не витратити кулдаун Порталу Босів після бою (перемога чи ні)',
     desc_en:'15% chance to skip the Boss Portal cooldown after any fight (win or not)'},
   {id:'travelers_clock', icon:'◷', name:'Годинник Мандрівника', name_en:"Traveler's Clock",
-    desc:'Щохвилини автоматично додає +1 крок до випадкового активного квесту',
-    desc_en:'Every minute, automatically adds +1 step to a random active quest'},
+    desc:'Щосекунди автоматично додає +1 крок до випадкового активного квесту',
+    desc_en:'Every second, automatically adds +1 step to a random active quest'},
   {id:'hunter_medallion', icon:'☾', name:'Медальйон Ловця', name_en:"Hunter's Medallion",
     desc:'Подвоює шанс демонічного дропу з боса',
     desc_en:'Doubles the demonic item drop chance from bosses'},
@@ -2327,7 +2332,7 @@ const RELIC_DROP_CHANCE_GAUNTLET = 0.15;
 const RELIC_COOLDOWN_SKIP_CHANCE = 0.15;
 const RELIC_FREE_ENCHANT_CHANCE = 0.20;
 const RELIC_PIT_AVOID_CHANCE = 0.25;
-const RELIC_QUEST_TICK_SEC = 60;
+const RELIC_QUEST_TICK_SEC = 1;
 function relicById(id){ return RELIC_POOL.find(r=>r.id===id); }
 function hasRelic(id){ return !!state.relics[id]; }
 function ownedRelicsCount(){ return RELIC_POOL.filter(r=>state.relics[r.id]).length; }
@@ -2403,8 +2408,8 @@ const LIBRARY_COMPANION_LORE = {
     body_en:"The Hunter Spirit sees the road like nobody else does — not as a straight line, but as a long list of things worth picking up before they scroll off the back edge. It reaches for every coin a little further than you would yourself, and somehow teaches you to squeeze a bit more experience out of every kill along the way. While it's your active companion: +1% XP and extra pickup radius (+0.3 per level, on top of the base +2 that simply having any companion already grants) per level."
   },
   wind: {
-    body:'Дух Вітру ніколи повністю не торкається землі — лишає по собі лише слід із пилу й пожовклого листя там, де мав би бути слід ніг. Не б\'ється і не збирає золото, натомість просто завжди біжить трохи попереду тебе, ніби показуючи, що швидше ще можливо, навіть коли здається, що нікуди вже. Поки він твій активний компаньйон: піднімає саму стелю максимальної швидкості понад звичайну межу — до +1000 понад неї на максимальному рівні прокачки.',
-    body_en:"The Wind Spirit never quite touches the ground — it leaves only a trail of dust and yellowed leaves where footsteps should be. It doesn't fight or gather gold; it just always runs a half-step ahead of you, as if to prove that faster is still possible, even when it feels like there's nowhere left to go. While it's your active companion: it raises the maximum speed cap itself beyond its usual limit — up to +1000 above it at max upgrade level."
+    body:'Дух Вітру ніколи повністю не торкається землі — лишає по собі лише слід із пилу й пожовклого листя там, де мав би бути слід ніг. Не б\'ється і не збирає золото, натомість просто невтомно мчить слідом за тобою, ніби підганяючи — швидше, ще швидше, адже навіть коли здається, що швидше вже нікуди, вітер ще не сказав свого слова. Поки він твій активний компаньйон: піднімає саму стелю максимальної швидкості понад звичайну межу — до +1000 понад неї на максимальному рівні прокачки.',
+    body_en:"The Wind Spirit never quite touches the ground — it leaves only a trail of dust and yellowed leaves where footsteps should be. It doesn't fight or gather gold; it just races tirelessly along behind you, urging you on — faster, faster still, because even when it feels like there's nowhere left to go, the wind hasn't had its say yet. While it's your active companion: it raises the maximum speed cap itself beyond its usual limit — up to +1000 above it at max upgrade level."
   }
 };
 
@@ -2508,8 +2513,8 @@ const LIBRARY_ITEM_LORE = {
 const LIBRARY_RELIC_LORE = {
   patience_crystal: {body:'Кристал, який ніби сам вирішує, коли тобі вже досить чекати. Ніхто не бачив, щоб він робив щось видиме — просто раз на кілька боїв кулдаун Порталу Босів тихо зникає, ніби брама сама зглянулась. Знайдений біля боса, який, судячи з усього, чекав на щось так довго, що зрештою навчився прискорювати час навколо себе.',
     body_en:"A crystal that seems to decide on its own when you've waited long enough. Nobody's ever seen it actually do anything visible — every few fights, the Boss Portal's cooldown just quietly disappears, as if the gate itself took pity. Found near a boss that, judging by everything, had been waiting for something so long it eventually learned to speed up time around itself."},
-  travelers_clock: {body:'Годинник, що не показує часу — натомість щохвилини сам собою присувається прогрес якогось квесту, ніби хтось невидимий біжить за тебе, поки ти зайнятий іншим. Легенда каже, він належав мандрівнику, що так поспішав скрізь встигнути, що зрештою навчив сам час допомагати йому з дрібними дорученнями.',
-    body_en:"A clock that doesn't tell time — instead, once a minute, some quest's progress nudges forward on its own, like an invisible someone is running the errand for you while you're busy elsewhere. Legend says it belonged to a traveler in such a hurry to be everywhere at once that he eventually taught time itself to help out with the small chores."},
+  travelers_clock: {body:'Годинник, що не показує часу — натомість щосекунди сам собою присувається прогрес якогось квесту, ніби хтось невидимий біжить за тебе, поки ти зайнятий іншим. Легенда каже, він належав мандрівнику, що так поспішав скрізь встигнути, що зрештою навчив сам час допомагати йому з дрібними дорученнями.',
+    body_en:"A clock that doesn't tell time — instead, once a second, some quest's progress nudges forward on its own, like an invisible someone is running the errand for you while you're busy elsewhere. Legend says it belonged to a traveler in such a hurry to be everywhere at once that he eventually taught time itself to help out with the small chores."},
   hunter_medallion: {body:'Медальйон із вигравіюваним півмісяцем — знак мисливця, який колись бачив демонів наскрізь навіть у повній темряві. Носити його — все одно, що подвоїти власну удачу саме там, де вона найпотрібніша: демони раптом стають удвічі щедрішими на речі, які самі воліли б лишити собі.',
     body_en:"A medallion engraved with a crescent moon — the mark of a hunter who once saw straight through demons even in total darkness. Wearing it is like doubling your own luck exactly where it matters most: demons suddenly grow twice as generous with things they'd probably rather have kept for themselves."},
   miser_chains: {body:'Кайдани, зняті зі скнари настільки жадібного, що навіть закутий у них примудрявся економити. Одягнувши їх, час від часу помічаєш, що заточка предмета обійшлася безкоштовно — ніби сам ланцюг непомітно підмінює рахунок.',
@@ -2714,7 +2719,7 @@ const CASTLE_CONSTRUCTIONS = [
   {level:20, id:'complete',     name:'Завершений замок',       name_en:'Completed Castle',
     desc:'Королівство піднялося з порожньої ділянки.', desc_en:'The kingdom has risen from an empty plot.',
     req:{gold:50000000, stone:500, iron:500, crystals:3500, souls:330}, reward:{atkPct:2, goldPct:2},
-    art:['*** ЗАМОК ЗАВЕРШЕНО ***']}
+    art:['*** ЗАМОК ЗАВЕРШЕНО ***'], art_en:['*** CASTLE COMPLETE ***']}
 ];
 function castleConstructionFor(level){ return CASTLE_CONSTRUCTIONS.find(c=>c.level===level); }
 function computeCastleBonuses(){
@@ -2957,7 +2962,7 @@ function achievementBonuses(){
 }
 
 const MILESTONE_TRACKS = [
-  {stat:'bestDistance', icon:'🏃', name:'Дистанція', name_en:'Distance', unit:'м', tiers:[
+  {stat:'bestDistance', icon:'🏃', name:'Дистанція', name_en:'Distance', unit:'м', unit_en:'m', tiers:[
     {threshold:10000,  reward:{gold:2000,   crystals:50}},
     {threshold:25000,  reward:{gold:6000,   crystals:120}},
     {threshold:50000,  reward:{gold:15000,  crystals:250, souls:5}},
@@ -3213,6 +3218,7 @@ const STREAK_BONUS_MAX_DAYS = 60;
 const STREAK_BONUS_ATK_PCT_PER_DAY = 0.5;
 const STREAK_BONUS_GOLD_PCT_PER_DAY = 0.3;
 const STREAK_BONUS_DROP_PCT_PER_DAY = 0.15;
+const STREAK_BONUS_SPD_PER_DAY = 10;
 function streakBonusDays(){ return Math.min(STREAK_BONUS_MAX_DAYS, state.lifetime.loginStreak||0); }
 
 const LOGIN_DATES_KEEP_DAYS = 120;
@@ -3287,6 +3293,7 @@ function streakBonusLines(days){
   parts.push(t('streak.bonusAtk', {pct:(days*STREAK_BONUS_ATK_PCT_PER_DAY).toFixed(1)}));
   parts.push(t('streak.bonusGold', {pct:(days*STREAK_BONUS_GOLD_PCT_PER_DAY).toFixed(1)}));
   parts.push(t('streak.bonusDrop', {pct:(days*STREAK_BONUS_DROP_PCT_PER_DAY).toFixed(1)}));
+  parts.push(t('streak.bonusSpd', {n:days*STREAK_BONUS_SPD_PER_DAY}));
   return parts;
 }
 function renderStreakCalendar(){
@@ -4269,7 +4276,7 @@ function renderBossResult(){
   }
   if(r.relicName){
     ctx.fillStyle = '#c77dff';
-    line(`◆ ${t('boss.relicFound',{name:r.relicName})} ◆`);
+    line(`◆ ${decodeEntities(t('boss.relicFound',{name:r.relicName}))} ◆`);
   }
   if(r.cooldownSkipped){
     ctx.fillStyle = '#c9ffd4';
@@ -4478,7 +4485,7 @@ function renderGauntletResult(){
   if(r.souls>0) line(`+${formatNum(r.souls)}👹`);
   if(r.relicName){
     ctx.fillStyle = '#c77dff';
-    line(`◆ ${t('boss.relicFound',{name:r.relicName})} ◆`);
+    line(`◆ ${decodeEntities(t('boss.relicFound',{name:r.relicName}))} ◆`);
   }
   if(r.cooldownSkipped){
     ctx.fillStyle = '#c9ffd4';
@@ -4812,7 +4819,7 @@ function computeSkillBonuses(){
 function recomputeStats(){
   const skillB = computeSkillBonuses();
   let atk = BASE_ATTACK + (state.level-1)*1 + state.upgrades.attack*UPGRADE_CFG.attack.inc;
-  let spd = BASE_SPEED + state.upgrades.speed*UPGRADE_CFG.speed.inc;
+  let spd = BASE_SPEED + streakBonusDays()*STREAK_BONUS_SPD_PER_DAY + state.upgrades.speed*UPGRADE_CFG.speed.inc;
   let atkSpeed = BASE_ATKSPEED + state.upgrades.atkSpeed*UPGRADE_CFG.atkSpeed.inc;
   let goldMult = 1 + state.upgrades.luck*(UPGRADE_CFG.luck.goldPctInc/100);
   let dropBonus = state.upgrades.luck*(UPGRADE_CFG.luck.dropPctInc/100);
@@ -4885,7 +4892,7 @@ function recomputeStats(){
   stats.speed = Math.min(spd, speedCap);
   stats.atkSpeed = atkSpeed;
   stats.goldMult = goldMult;
-  stats.dropChance = Math.min(0.5, 0.08 + dropBonus);
+  stats.dropChance = 0.08 + dropBonus;
   stats.jumpDuration = JUMP_DURATION_BASE * (1 + skillB.jumpPct/100);
   stats.critChance = skillB.critChance/100 + prestigeB.critChance/100 + castleB.critChance/100;
   stats.pickupReach = skillB.magnetReach + castleB.magnetReach + companionMagnet;
@@ -4983,7 +4990,15 @@ function isLevelMilestone(level){
 
 function tryDropItem(mtype){
   const chance = stats.dropChance + mtype.dropBonus;
-  if(Math.random() < chance){
+  let count = Math.floor(chance);
+  if(Math.random() < chance - count) count++;
+  count = Math.min(count, 1000);
+  let last = null;
+  for(let i=0;i<count;i++) last = dropOneItem();
+  return last;
+}
+function dropOneItem(){
+  {
     state.lifetime.totalItemsFound++;
     updateQuestProgress('items', 1);
     const base = weightedPick(ITEM_POOL);
@@ -5152,6 +5167,7 @@ function collectPickup(e){
 
 function spawnFloatingText(col, text, color){
   if(state.settings.showFloatingText===false) return;
+  text = decodeEntities(text);
   const stack = floatingTexts.filter(t=>t.col===col && t.life>0.75).length;
   floatingTexts.push({
     col, text, color,
@@ -6400,12 +6416,13 @@ function renderPrestigeTreeHtml(){
     }
     const cost = prestigeSkillCost(node);
     const canBuy = !maxed && (state.lifetime.prestigeSkillPoints||0) >= cost;
+    const resetBtn = `<button class="buy-max" style="padding:4px 8px;" data-action="prestigeSkillReset" data-id="${node.id}" ${lvl>0?'':'disabled'} title="${t('prestige.resetBtn')}">↺</button>`;
     html += `<div class="mrow stack">
-      <button class="buy-max" style="padding:4px 8px;" data-action="prestigeSkillReset" data-id="${node.id}" ${lvl>0?'':'disabled'} title="${t('prestige.resetBtn')}">↺</button>
       <div class="up-name">${L(node,'name')} <span class="lvl">Lv.${lvl}</span>
         <small>${L(node,'desc')}${prestigeTotalEffectText(node, lvl)}</small>
       </div>
-      ${maxed ? `<span class="empty-msg">${t('skills.max')}</span>` : `<span class="buy-group">
+      ${maxed ? `<span class="buy-group">${resetBtn}<span class="empty-msg">${t('skills.max')}</span></span>` : `<span class="buy-group">
+        ${resetBtn}
         <button class="buy" data-action="prestigeSkill" data-id="${node.id}" ${canBuy?'':'disabled'}>${t('prestige.costBtn',{cost})}</button>
         <button class="buy-max" data-action="prestigeSkillMax" data-id="${node.id}" ${canBuy?'':'disabled'}>${t('btn.buyMax')}</button>
       </span>`}
@@ -6531,15 +6548,21 @@ function selectNickFrame(id){
   save();
   syncLeaderboard();
 }
+function nickAnimPhase(){
+  const s = Date.now()/1000;
+  const d = p=>'-'+(s%p).toFixed(3)+'s';
+  return `--d22:${d(2.2)};--d24:${d(2.4)};--d26:${d(2.6)};--d4:${d(4)}`;
+}
 function styledNickHtml(nick, colorId, frameId){
+  const phase = nickAnimPhase();
   const safe = escapeHtml(localizeNickname(nick, lang));
   const color = NICK_COLORS.find(c=>c.id===colorId);
   let colorClass = '';
-  let colorStyle = `color:${LEADERBOARD_NICK_COLOR}`;
+  let colorStyle = `color:${LEADERBOARD_NICK_COLOR};${phase}`;
   if(color){
     if(color.rainbow){ colorClass = 'nick-color-rainbow'; }
     else{
-      colorStyle = `color:${color.color}`;
+      colorStyle = `color:${color.color};${phase}`;
       if(color.glow) colorClass = 'nick-color-glow';
     }
   }
@@ -6548,7 +6571,7 @@ function styledNickHtml(nick, colorId, frameId){
   if(frame){
     const frameClass = frame.tier==='ultra' ? 'nick-frame nick-frame-ultra' : (frame.tier==='glow' ? 'nick-frame nick-frame-glow' : 'nick-frame');
     const frameColor = frame.color || '#ffffff';
-    inner = `<span class="${frameClass}" style="--frame-color:${frameColor}">${inner}</span>`;
+    inner = `<span class="${frameClass}" style="--frame-color:${frameColor};${phase}">${inner}</span>`;
   }
   return inner;
 }
@@ -6595,7 +6618,7 @@ function renderCharacterSheet(){
   html += row(t('char.attack'), stats.attack.toFixed(1),
     `${BASE_ATTACK.toFixed(1)} ${t('char.base')} + ${(state.level-1).toFixed(0)} ${t('char.fromLevel')} + ${(state.upgrades.attack*UPGRADE_CFG.attack.inc).toFixed(1)} ${t('char.fromUpgrades')} + ${itemAtk.toFixed(1)} ${t('char.fromItems')} · ×${(1+skillB.atkPct/100).toFixed(2)} ${t('char.skills')} · ×${(1+pp*PRESTIGE_ATK_PCT/100).toFixed(2)} ${t('char.prestige')} · ×${(1+castleB.atkPct/100).toFixed(2)} ${t('char.castle')}`);
   html += row(t('char.speed'), stats.speed.toFixed(2),
-    `${BASE_SPEED.toFixed(1)} ${t('char.base')} + ${(state.upgrades.speed*UPGRADE_CFG.speed.inc).toFixed(2)} ${t('char.fromUpgrades')} + ${itemSpd.toFixed(2)} ${t('char.fromItems')} · ×${(1+skillB.spdPct/100).toFixed(2)} ${t('char.skills')}`);
+    `${(BASE_SPEED+streakBonusDays()*STREAK_BONUS_SPD_PER_DAY).toFixed(1)} ${t('char.base')} + ${(state.upgrades.speed*UPGRADE_CFG.speed.inc).toFixed(2)} ${t('char.fromUpgrades')} + ${itemSpd.toFixed(2)} ${t('char.fromItems')} · ×${(1+skillB.spdPct/100).toFixed(2)} ${t('char.skills')}`);
   html += row(t('char.atkSpeed'), stats.atkSpeed.toFixed(2)+'/s',
     `${BASE_ATKSPEED.toFixed(1)} ${t('char.base')} + ${(state.upgrades.atkSpeed*UPGRADE_CFG.atkSpeed.inc).toFixed(3)} ${t('char.fromUpgrades')} + ${itemAS.toFixed(3)} ${t('char.fromItems')} + ${skillB.atkSpeedFlat.toFixed(3)} ${t('char.skills')}`);
   html += row(t('char.critChance'), (stats.critChance*100).toFixed(1)+'%', t('char.fromSkillsOnly'));
@@ -6723,7 +6746,7 @@ function renderBestiary(){
   } else if(bestiaryTab==='milestones'){
     html += MILESTONE_TRACKS.map(track=>{
       const val = state.lifetime[track.stat]||0;
-      return `<div style="margin:10px 0 4px;color:var(--purple);font-size:12px;">${track.icon} ${L(track,'name')} — ${formatNum(val)}${track.unit}</div>` +
+      return `<div style="margin:10px 0 4px;color:var(--purple);font-size:12px;">${track.icon} ${L(track,'name')} — ${formatNum(val)}${(lang==='en'&&track.unit_en!=null)?track.unit_en:track.unit}</div>` +
         track.tiers.map(tier=>{
           const claimed = !!state.milestonesClaimed[milestoneKey(track.stat, tier.threshold)];
           const reached = val >= tier.threshold;
@@ -6732,7 +6755,7 @@ function renderBestiary(){
           if(tier.reward.crystals) rewardParts.push(`+${formatNum(tier.reward.crystals)}◆`);
           if(tier.reward.souls) rewardParts.push(`+${tier.reward.souls}👹`);
           return `<div class="mrow" style="${claimed?'':'opacity:.6;'}">
-            <div class="up-name">${formatNum(tier.threshold)}${track.unit}<small>${rewardParts.join(' ')}</small></div>
+            <div class="up-name">${formatNum(tier.threshold)}${(lang==='en'&&track.unit_en!=null)?track.unit_en:track.unit}<small>${rewardParts.join(' ')}</small></div>
             <span class="lvl" style="color:${claimed?'var(--accent)':'var(--dim)'}">${claimed?'✓':(reached?'…':'🔒')}</span>
           </div>`;
         }).join('');
@@ -6740,7 +6763,7 @@ function renderBestiary(){
   } else {
     const lt = state.lifetime;
     const recRow = (label, val)=>`<div class="mrow"><div class="up-name">${label}</div><span class="lvl">${formatNum(val)}</span></div>`;
-    html += `<div class="mrow"><div class="up-name">${t('records.bestDistance')}</div><span class="lvl">${formatNum(lt.bestDistance)} м</span></div>`;
+    html += `<div class="mrow"><div class="up-name">${t('records.bestDistance')}</div><span class="lvl">${formatNum(lt.bestDistance)} ${t('unit.m')}</span></div>`;
     html += recRow(t('records.bestLevel'), lt.bestLevel);
     html += recRow(t('records.totalKills'), lt.totalKills);
     html += recRow(t('records.bossesDefeated'), lt.bossesDefeated||0);
@@ -7057,7 +7080,7 @@ function playCastleBuildAnimation(c){
     `<div style="text-align:center;padding:34px 0;color:var(--dim);font-size:13px;">${t('castle.collecting')}<br><br>[##########..........] 50%</div>`,
     `<div style="text-align:center;padding:30px 0;color:#ffb347;font-size:20px;line-height:1.5;">.<br>...<br>.....</div>`,
     `<div style="text-align:center;padding:30px 0;color:#ffb347;font-size:20px;line-height:1.5;">###<br>#####<br>#######</div>`,
-    `<pre style="text-align:center;color:var(--accent);font-size:15px;line-height:1.3;margin:16px 0 6px;">${c.art.join('\n')}</pre><div style="text-align:center;color:var(--gold);font-size:13px;line-height:1.6;">✓ ${t('castle.buildComplete')}<br>${L(c,'name')}<br>${castleRewardText(c.reward)}</div>`
+    `<pre style="text-align:center;color:var(--accent);font-size:15px;line-height:1.3;margin:16px 0 6px;">${((lang==='en'&&c.art_en)?c.art_en:c.art).join('\n')}</pre><div style="text-align:center;color:var(--gold);font-size:13px;line-height:1.6;">✓ ${t('castle.buildComplete')}<br>${L(c,'name')}<br>${castleRewardText(c.reward)}</div>`
   ];
   let i = 0;
   modalBody.innerHTML = steps[0];
@@ -7082,7 +7105,7 @@ function showOfflineModal(summary){
     </p>
     <div class="mrow"><div class="up-name">${t('welcome.gold')}</div><span class="lvl" style="color:var(--gold)">+${summary.goldGained}$</span></div>
     <div class="mrow"><div class="up-name">${t('welcome.xp')}</div><span class="lvl" style="color:var(--accent)">+${summary.xpGained}</span></div>
-    <div class="mrow"><div class="up-name">${t('welcome.dist')}</div><span class="lvl">+${summary.distGained} м</span></div>
+    <div class="mrow"><div class="up-name">${t('welcome.dist')}</div><span class="lvl">+${summary.distGained} ${t('unit.m')}</span></div>
     ${summary.levelAfter>summary.levelBefore?`<div class="mrow"><div class="up-name">${t('welcome.level')}</div><span class="lvl" style="color:var(--gold)">${summary.levelBefore} → ${summary.levelAfter}</span></div>`:''}
     <button class="buy" data-action="closeModal" style="width:100%;margin-top:10px;padding:10px;font-size:13px;">${t('welcome.continueBtn')}</button>`;
   modalBackdrop.hidden = false;
@@ -7256,17 +7279,23 @@ let audioCtx = null, sfxGain = null;
 let musicVolume = 0.35, musicMuted = false;
 let sfxVolume = 0.5, sfxMuted = false;
 
-let wakeLock = null;
+let wakeLock = null, wakeLockPending = false;
 async function requestWakeLock(){
-  if(!('wakeLock' in navigator) || wakeLock) return;
+  if(!('wakeLock' in navigator) || wakeLock || wakeLockPending || document.visibilityState!=='visible') return;
+  wakeLockPending = true;
   try{
     wakeLock = await navigator.wakeLock.request('screen');
     wakeLock.addEventListener('release', ()=>{ wakeLock = null; });
-  }catch(err){  }
+  }catch(err){ wakeLock = null; }
+  wakeLockPending = false;
 }
 document.addEventListener('visibilitychange', ()=>{
   if(document.visibilityState==='visible') requestWakeLock();
 });
+window.addEventListener('focus', requestWakeLock);
+window.addEventListener('pageshow', requestWakeLock);
+document.addEventListener('pointerdown', requestWakeLock, true);
+setInterval(requestWakeLock, 10000);
 function ensureAudio(){
   requestWakeLock();
   if(!audioCtx){
@@ -7420,30 +7449,38 @@ function sfxKill(){
   noise.start(t);
 }
 
+function setText(el, v){
+  v = String(v);
+  if(el.textContent!==v) el.textContent = v;
+}
+function setTitle(el, v){
+  if(el.title!==v) el.title = v;
+}
 function updateHud(){
-  document.getElementById('lvl').textContent = state.level;
+  setText(document.getElementById('lvl'), state.level);
   const total = xpToNext(state.level);
   const filled = Math.max(0, Math.min(20, Math.round((state.xp/total)*20)));
 
-  document.getElementById('xpbar').textContent =
-    '['+'#'.repeat(filled)+'-'.repeat(20-filled)+`] ${Math.floor(state.xp)}/${total}`;
-  const goldEl = document.getElementById('gold'); goldEl.textContent = formatNum(state.gold); goldEl.title = formatExact(state.gold);
-  const crystalsEl = document.getElementById('crystals'); crystalsEl.textContent = formatNum(state.crystals); crystalsEl.title = formatExact(state.crystals);
-  const soulsEl = document.getElementById('souls'); soulsEl.textContent = formatNum(state.souls); soulsEl.title = formatExact(state.souls);
-  const woodEl = document.getElementById('wood'); woodEl.textContent = formatNum(state.castleResources.wood); woodEl.title = t('castle.res.wood');
-  const stoneEl = document.getElementById('stone'); stoneEl.textContent = formatNum(state.castleResources.stone); stoneEl.title = t('castle.res.stone');
-  const ironEl = document.getElementById('iron'); ironEl.textContent = formatNum(state.castleResources.iron); ironEl.title = t('castle.res.iron');
-  const distEl = document.getElementById('dist'); distEl.textContent = formatNum(distanceCols); distEl.title = formatExact(distanceCols)+' м';
-  document.getElementById('statAtk').textContent = stats.attack.toFixed(1);
-  document.getElementById('statSpd').textContent = stats.speed.toFixed(1);
-  document.getElementById('statAs').textContent = stats.atkSpeed.toFixed(2);
-  document.getElementById('biome').textContent = biomeName(getTier());
+  setText(document.getElementById('xpbar'),
+    '['+'#'.repeat(filled)+'-'.repeat(20-filled)+`] ${Math.floor(state.xp)}/${total}`);
+  const goldEl = document.getElementById('gold'); setText(goldEl, formatNum(state.gold)); setTitle(goldEl, formatExact(state.gold));
+  const crystalsEl = document.getElementById('crystals'); setText(crystalsEl, formatNum(state.crystals)); setTitle(crystalsEl, formatExact(state.crystals));
+  const soulsEl = document.getElementById('souls'); setText(soulsEl, formatNum(state.souls)); setTitle(soulsEl, formatExact(state.souls));
+  const woodEl = document.getElementById('wood'); setText(woodEl, formatNum(state.castleResources.wood)); setTitle(woodEl, t('castle.res.wood'));
+  const stoneEl = document.getElementById('stone'); setText(stoneEl, formatNum(state.castleResources.stone)); setTitle(stoneEl, t('castle.res.stone'));
+  const ironEl = document.getElementById('iron'); setText(ironEl, formatNum(state.castleResources.iron)); setTitle(ironEl, t('castle.res.iron'));
+  const distEl = document.getElementById('dist'); setText(distEl, formatNum(distanceCols)); setTitle(distEl, formatExact(distanceCols)+' '+t('unit.m'));
+  setText(document.getElementById('statAtk'), stats.attack.toFixed(1));
+  setText(document.getElementById('statSpd'), stats.speed.toFixed(1));
+  setText(document.getElementById('statAs'), stats.atkSpeed.toFixed(2));
+  setText(document.getElementById('biome'), biomeName(getTier()));
   const zoneModeTag = document.getElementById('zoneModeTag');
-  zoneModeTag.textContent = zoneTier!==null ? t('hud.zoneFixed') : t('hud.zoneFrontier');
-  zoneModeTag.title = t('hud.zoneModeTitle');
-  zoneModeTag.className = zoneTier!==null ? 'zone-tag zone-tag-fixed' : 'zone-tag zone-tag-frontier';
-  document.getElementById('skillPointsBadge').textContent = state.skillPoints;
-  document.getElementById('rankTitle').textContent = '«'+L(getRankTitle(state.level),'title')+'»';
+  setText(zoneModeTag, zoneTier!==null ? t('hud.zoneFixed') : t('hud.zoneFrontier'));
+  setTitle(zoneModeTag, t('hud.zoneModeTitle'));
+  const zoneCls = zoneTier!==null ? 'zone-tag zone-tag-fixed' : 'zone-tag zone-tag-frontier';
+  if(zoneModeTag.className!==zoneCls) zoneModeTag.className = zoneCls;
+  setText(document.getElementById('skillPointsBadge'), state.skillPoints);
+  setText(document.getElementById('rankTitle'), '«'+L(getRankTitle(state.level),'title')+'»');
 
   if(mode==='run' && distanceCols > state.lifetime.bestDistance){
     const before = state.lifetime.bestDistance;
@@ -7455,14 +7492,14 @@ function updateHud(){
   checkAchievements();
   checkMilestones();
   const achClaimed = ACHIEVEMENTS.filter(a=>state.achievements[a.id]).length;
-  document.getElementById('achBadge').textContent = `${achClaimed}/${ACHIEVEMENTS.length}`;
-  document.getElementById('prestigeBadge').textContent = state.lifetime.prestigePoints;
-  document.getElementById('streakBadge').textContent = state.lifetime.loginStreak||0;
+  setText(document.getElementById('achBadge'), `${achClaimed}/${ACHIEVEMENTS.length}`);
+  setText(document.getElementById('prestigeBadge'), state.lifetime.prestigePoints);
+  setText(document.getElementById('streakBadge'), state.lifetime.loginStreak||0);
 
   const comboWrap = document.getElementById('comboWrap');
   if(combo>=3){
     comboWrap.style.visibility = 'visible';
-    comboWrap.textContent = t('hud.comboText', {n:combo, pct:Math.round(comboMultBonus()*100)});
+    setText(comboWrap, t('hud.comboText', {n:combo, pct:Math.round(comboMultBonus()*100)}));
   } else comboWrap.style.visibility = 'hidden';
 
   const fb = document.getElementById('fightBar');
@@ -7471,7 +7508,7 @@ function updateHud(){
     const barW = isMobileViewport() ? 12 : 20;
     const ratio = Math.max(0, fightTarget.hp/fightTarget.maxHp);
     const filledF = Math.max(0, Math.min(barW, Math.round(ratio*barW)));
-    fb.textContent = `⚔ ${L(fightTarget.mtype,'name')} — ${Math.max(0,Math.ceil(fightTarget.hp))}/${fightTarget.maxHp} [${'#'.repeat(filledF)}${'-'.repeat(barW-filledF)}]`;
+    setText(fb, `⚔ ${L(fightTarget.mtype,'name')} — ${Math.max(0,Math.ceil(fightTarget.hp))}/${fightTarget.maxHp} [${'#'.repeat(filledF)}${'-'.repeat(barW-filledF)}]`);
   } else {
     fb.style.visibility = 'hidden';
     if(!fb.textContent) fb.textContent = ' ';
@@ -7480,20 +7517,20 @@ function updateHud(){
   document.getElementById('stage').classList.toggle('fury-active', abilityTimeLeft>0);
   const abilityBtn = document.getElementById('abilityBtn');
 
-  abilityBtn.title = t('ability.title', {
+  setTitle(abilityBtn, t('ability.title', {
     dur: (ABILITY_DURATION*stats.abilityDurationMult).toFixed(1),
     cd: Math.round(ABILITY_COOLDOWN*stats.abilityCooldownMult)
-  });
+  }));
   if(abilityTimeLeft>0){
-    abilityBtn.textContent = t('ability.cooldownFmt', {s:Math.max(1,Math.ceil(abilityTimeLeft))});
+    setText(abilityBtn, t('ability.cooldownFmt', {s:Math.max(1,Math.ceil(abilityTimeLeft))}));
     abilityBtn.classList.add('active');
     abilityBtn.disabled = true;
   } else if(abilityCooldownLeft>0){
-    abilityBtn.textContent = t('ability.cooldownFmt', {s:Math.max(1,Math.ceil(abilityCooldownLeft))});
+    setText(abilityBtn, t('ability.cooldownFmt', {s:Math.max(1,Math.ceil(abilityCooldownLeft))}));
     abilityBtn.classList.remove('active');
     abilityBtn.disabled = true;
   } else {
-    abilityBtn.textContent = '⚡';
+    setText(abilityBtn, '⚡');
     abilityBtn.classList.remove('active');
     abilityBtn.disabled = mode==='town';
   }
