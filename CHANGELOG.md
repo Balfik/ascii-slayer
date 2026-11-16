@@ -5,6 +5,16 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [1.11] — Full offline progress, offline auto-Rebirth
+
+### Added
+- Offline progress now covers up to 24 hours (was 8).
+- If auto-Rebirth is enabled, your character now auto-Rebirths while you're away, based on the distance covered. The Welcome Back screen lists how many Rebirths happened.
+
+### Changed
+- Offline progress now follows the same rules as playing online — your speed, attack, attack speed, monster toughness, drop chance, pits, coins, castle resources, quests and level-ups all feed into it — instead of a simple flat estimate. The Welcome Back screen shows monsters slain, items found, crystals and castle resources too.
+- Flight over the Abyss now sits first in the Automation branch.
+
 ## [1.10] — Stronger demonic duplicates, 365-day streak, Wind and Blade Spirit rework
 
 ### Added

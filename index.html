@@ -714,7 +714,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = '1.10';
+const GAME_VERSION = '1.11';
 
 const SUPABASE_URL = 'https://vfaveuenkublhxgatbcn.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_PkeJBe1KSw0ZWUSgcAIZFA_SuG8Ilyo';
@@ -1644,6 +1644,8 @@ const I18N = {
     'prestige.lockedCountSuffix':' · 🔒 після {n}-го Переродження', 'prestige.ownedTag':'✅ Куплено',
     'welcome.body':'Поки тебе не було ({time}), персонаж сам біг і бився далі.',
     'welcome.gold':'Золото', 'welcome.xp':'Досвід', 'welcome.dist':'Дистанція', 'welcome.level':'Рівень',
+    'welcome.kills':'Вбито монстрів', 'welcome.items':'Знайдено предметів', 'welcome.crystals':'Кристали', 'welcome.resources':'Ресурси замку', 'welcome.prestiges':'Автопереродженнь',
+    'log.offlinePrestiges':'♻️ Автопереродження офлайн: {n} (+{pts} Очок Слави)',
     'welcome.continueBtn':'Продовжити забіг',
     'quests.available':'Доступні квести', 'quests.activeHeader':'Активні квести',
     'quests.dailyHeader':'Щоденний бонус-квест', 'quests.dailyClaimed':'✓ Отримано, повернеться завтра',
@@ -2012,6 +2014,8 @@ const I18N = {
     'prestige.lockedCountSuffix':' · 🔒 after Rebirth #{n}', 'prestige.ownedTag':'✅ Owned',
     'welcome.body':'While you were away ({time}), your character kept running and fighting.',
     'welcome.gold':'Gold', 'welcome.xp':'XP', 'welcome.dist':'Distance', 'welcome.level':'Level',
+    'welcome.kills':'Monsters slain', 'welcome.items':'Items found', 'welcome.crystals':'Crystals', 'welcome.resources':'Castle resources', 'welcome.prestiges':'Auto-Rebirths',
+    'log.offlinePrestiges':'♻️ Offline auto-Rebirths: {n} (+{pts} Glory Points)',
     'welcome.continueBtn':'Continue the run',
     'quests.available':'Available quests', 'quests.activeHeader':'Active quests',
     'quests.dailyHeader':'Daily Bonus Quest', 'quests.dailyClaimed':'✓ Claimed, resets tomorrow',
@@ -2809,6 +2813,7 @@ const SKILL_TREE = {
   automation: {
     label: '🤖 Гілка автоматизації', label_en: '🤖 Automation Branch',
     nodes: [
+      {id:'s5', name:'Політ над прірвою', name_en:'Flight over the Abyss', desc:'Ігноруй ями — персонаж завжди пролітає їх, без стрибка', desc_en:'Ignore pits — the character always flies over them, no jump needed', baseCost:10, costStep:0, maxLevel:1, effect:{ignorePits:1}, requiresPrestige:true},
       {id:'a1', name:'Автоквести', name_en:'Auto-Quests', desc:'Автоматично бере доступні квести з дошки оголошень (окрім "Акробат" — на стрибки) і одразу здає виконані, навіть коли дошка закрита', desc_en:'Automatically accepts available quests from the board (except "Acrobat" — jumps) and instantly turns in completed ones, even while the board is closed', baseCost:20, costStep:0, maxLevel:1, effect:{autoQuest:1}},
       {id:'a2', name:'Без акробатики', name_en:'No More Acrobatics', desc:'Квести на стрибки більше не з\'являються на дошці оголошень (ефект зникає при Переродженні, як і всі звичайні навички)', desc_en:"Jump quests stop appearing on the board (effect ends on Prestige, like all regular skills)", baseCost:50, costStep:0, maxLevel:1, effect:{noJumpQuests:1}, requires:'a1'},
       {id:'a3', name:'Автоковаль', name_en:'Auto-Smith', desc:'Дозволяє увімкнути автозаточку предметів у Кузні — лише за золото (не за душі демонів), окремий перемикач у Кузні', desc_en:'Unlocks auto-enchanting items at the Forge — gold only (never demonic souls), separate on/off switch in the Forge', baseCost:50, costStep:0, maxLevel:1, effect:{autoEnchantGold:1}},
@@ -2817,7 +2822,6 @@ const SKILL_TREE = {
       {id:'a6', name:'Автострибок', name_en:'Auto-Jump', desc:'Дозволяє увімкнути безперервний автострибок (наче затиснутий пробіл) — ловить золоті символи й уникає ям без твоєї участі, але й бої з монстрами під час стрибка пропускаються — окремий перемикач у Дереві навичок (ефект навички зникає при Переродженні, як і всі звичайні навички)', desc_en:'Unlocks a continuous auto-jump (as if Space were held down) — catches golden glyphs and avoids pits without you, but fights with monsters are skipped while jumping too — separate on/off switch in the Skill Tree (effect ends on Prestige, like all regular skills)', baseCost:10, costStep:0, maxLevel:1, effect:{autoJump:1}},
       {id:'a7', name:'Автобойова Лють', name_en:'Auto Battle Fury', desc:'Дозволяє увімкнути автоматичну активацію здібності "Бойова Лють", щойно вона знову готова по кулдауну — окремий перемикач у Дереві навичок (ефект навички зникає при Переродженні, як і всі звичайні навички)', desc_en:'Unlocks automatically activating the "Battle Fury" ability the moment it comes off cooldown — separate on/off switch in the Skill Tree (effect ends on Prestige, like all regular skills)', baseCost:10, costStep:0, maxLevel:1, effect:{autoFury:1}},
 
-      {id:'s5', name:'Політ над прірвою', name_en:'Flight over the Abyss', desc:'Ігноруй ями — персонаж завжди пролітає їх, без стрибка', desc_en:'Ignore pits — the character always flies over them, no jump needed', baseCost:10, costStep:0, maxLevel:1, effect:{ignorePits:1}, requiresPrestige:true}
     ]
   }
 };
@@ -6434,13 +6438,13 @@ function renderPrestigeTreeHtml(){
   }
   return html;
 }
-function doPrestige(){
+function doPrestige(silent){
   if(distanceCols < prestigeMinDistance()) return;
   const pts = prestigePointsEarned(distanceCols);
   state.lifetime.prestigePoints += pts;
   state.lifetime.prestigeCount++;
   state.lifetime.prestigeSkillPoints = (state.lifetime.prestigeSkillPoints||0) + 1;
-  closeModal();
+  if(!silent) closeModal();
   const bonus = achievementBonuses();
   state.level = 1; state.xp = 0; state.gold = bonus.gold; state.crystals = bonus.crystals;
 
@@ -6451,6 +6455,10 @@ function doPrestige(){
   mode = 'run';
   resetWorldAfterLoad();
   recomputeStats();
+  if(PRESTIGE_MILESTONE_EVENTS.includes(state.lifetime.prestigeCount)){
+    reportEvent('prestige', {value:state.lifetime.prestigeCount});
+  }
+  if(silent) return pts;
   setupCanvas();
   renderUpgrades();
   renderInventory();
@@ -6459,10 +6467,8 @@ function doPrestige(){
   sfxLevelUp();
   updateHud();
   save();
-  if(PRESTIGE_MILESTONE_EVENTS.includes(state.lifetime.prestigeCount)){
-    reportEvent('prestige', {value:state.lifetime.prestigeCount});
-  }
   syncLeaderboard();
+  return pts;
 }
 const PRESTIGE_MILESTONE_EVENTS = [1,5,10,25,50,100,250,500,1000];
 
@@ -7103,14 +7109,22 @@ function playCastleBuildAnimation(c){
 function showOfflineModal(summary){
   modalKind = 'welcome';
   modalTitle.textContent = t('modal.welcomeTitle');
+  const row = (label, val, color)=>`<div class="mrow"><div class="up-name">${label}</div><span class="lvl"${color?` style="color:${color}"`:''}>${val}</span></div>`;
+  let rows = '';
+  rows += row(t('welcome.gold'), `+${formatNum(summary.goldGained)}$`, 'var(--gold)');
+  rows += row(t('welcome.xp'), `+${formatNum(summary.xpGained)}`, 'var(--accent)');
+  rows += row(t('welcome.dist'), `+${formatNum(summary.distGained)} ${t('unit.m')}`);
+  if(summary.kills>0) rows += row(t('welcome.kills'), `+${formatNum(summary.kills)}`);
+  if(summary.items>0) rows += row(t('welcome.items'), `+${formatNum(summary.items)}`);
+  if(summary.crystals>0) rows += row(t('welcome.crystals'), `+${formatNum(summary.crystals)}◆`, 'var(--crystal)');
+  if(summary.wood+summary.stone+summary.iron>0) rows += row(t('welcome.resources'), `+${formatNum(summary.wood)}🪵 +${formatNum(summary.stone)}🪨 +${formatNum(summary.iron)}⛏`);
+  if(summary.levelAfter>summary.levelBefore) rows += row(t('welcome.level'), `${summary.levelBefore} → ${summary.levelAfter}`, 'var(--gold)');
+  if(summary.prestiges>0) rows += row(t('welcome.prestiges'), `+${formatNum(summary.prestiges)} (+${formatNum(summary.prestigePoints)}✨)`, 'var(--purple)');
   modalBody.innerHTML = `
     <p style="font-size:13px;line-height:1.6;color:var(--text);margin-top:0;">
       ${t('welcome.body',{time:trustedHtml(`<b style="color:var(--accent)">${escapeHtml(summary.timeLabel)}</b>`)})}
     </p>
-    <div class="mrow"><div class="up-name">${t('welcome.gold')}</div><span class="lvl" style="color:var(--gold)">+${summary.goldGained}$</span></div>
-    <div class="mrow"><div class="up-name">${t('welcome.xp')}</div><span class="lvl" style="color:var(--accent)">+${summary.xpGained}</span></div>
-    <div class="mrow"><div class="up-name">${t('welcome.dist')}</div><span class="lvl">+${summary.distGained} ${t('unit.m')}</span></div>
-    ${summary.levelAfter>summary.levelBefore?`<div class="mrow"><div class="up-name">${t('welcome.level')}</div><span class="lvl" style="color:var(--gold)">${summary.levelBefore} → ${summary.levelAfter}</span></div>`:''}
+    ${rows}
     <button class="buy" data-action="closeModal" style="width:100%;margin-top:10px;padding:10px;font-size:13px;">${t('welcome.continueBtn')}</button>`;
   modalBackdrop.hidden = false;
 }
@@ -7789,34 +7803,173 @@ function applyLoadedData(d){
   lastSaveTimestamp = isNaN(ts) ? null : ts;
 }
 
-const OFFLINE_CAP_MS = 8*60*60*1000;
+const OFFLINE_CAP_MS = 24*60*60*1000;
 const OFFLINE_MIN_MS = 60*1000;
+const OFFLINE_MAX_STEPS = 3000;
+function offlineBulkDrop(n, sum){
+  if(n<=0) return;
+  state.lifetime.totalItemsFound += n;
+  updateQuestProgress('items', n);
+  const total = ITEM_POOL.reduce((s,i)=>s+i.weight,0);
+  for(const base of ITEM_POOL){
+    const exp = n*base.weight/total;
+    let k = Math.floor(exp);
+    if(Math.random() < exp-k) k++;
+    if(k<=0) continue;
+    if(base.rarity==='legendary') state.lifetime.legendaryFound = (state.lifetime.legendaryFound||0)+k;
+    const existing = state.inventory.find(it=>it.name===base.name);
+    if(existing){
+      existing.count = (existing.count||1)+k;
+    } else {
+      const inst = {name:base.name, name_en:base.name_en, rarity:base.rarity, stat:base.stat, val:base.val, count:k, enchant:0, id:Date.now()+Math.random()};
+      state.inventory.push(inst);
+      if(inst.rarity==='legendary') reportEvent('legendary_found', {targetName:L(inst,'name'), targetRarity:'legendary'});
+    }
+    sum.items += k;
+  }
+  recomputeStats();
+}
+function offlineAvgFuryMult(){
+  if(!stats.autoFury || !state.settings.autoFuryEnabled) return 1;
+  const dur = ABILITY_DURATION*stats.abilityDurationMult;
+  const cd = ABILITY_COOLDOWN*stats.abilityCooldownMult;
+  return 1 + (dur/(dur+cd))*(ABILITY_ATTACK_MULT-1);
+}
+function offlineStep(dtMax, maxCols, sum, acc){
+  const tier = getTier();
+  const rs = tierRewardScale(tier);
+  const hpScale = tierHpScale(tier);
+  const atk = stats.attack*offlineAvgFuryMult();
+  const critAvg = 1 + Math.min(1, stats.critChance);
+  const autoJumpOn = !!(stats.autoJump && state.settings.autoJumpEnabled);
+  const skipP = autoJumpOn ? 1 : 0;
+  const gm = stats.goldMult * weekendMult();
+  const monsterDens = 1/15, coinDens = 1/7.5, woodDens = 1/22, pitDens = 1/39;
+  const w = monsterWeights(tier);
+  const wTotal = w.reduce((s,x)=>s+x.weight,0);
+  let fightTime = 0, kills = 0, goldPerKill = 0, xpPerKill = 0, dropPerKill = 0;
+  const perType = [];
+  for(const x of w){
+    const pt = x.weight/wTotal;
+    const mt = x.type;
+    const hp = Math.round(mt.baseHp*hpScale);
+    const instant = Math.ceil(hp/Math.max(1,atk)) <= 1;
+    const hits = instant ? 0 : Math.ceil(hp/Math.max(1,atk*critAvg));
+    fightTime += pt*(hits/Math.max(0.1,stats.atkSpeed));
+    goldPerKill += pt*((mt.goldMin+mt.goldMax)/2)*rs*gm;
+    xpPerKill += pt*mt.xp*rs*stats.farmXpMult;
+    dropPerKill += pt*(stats.dropChance + mt.dropBonus);
+    perType.push({key:mt.key, share:pt});
+  }
+  const stumbleP = (stats.ignorePits || autoJumpOn) ? 0 : (hasRelic('jumper_talisman') ? 1-RELIC_PIT_AVOID_CHANCE : 1);
+  const killsPerCol = monsterDens*(1-skipP);
+  const tCol = 1/Math.max(1,stats.speed) + killsPerCol*fightTime + pitDens*stumbleP*STUMBLE_DURATION;
+  let cols = dtMax/tCol;
+  if(cols > maxCols) cols = Math.max(0, maxCols);
+  const dt = cols*tCol;
+  const k = cols*killsPerCol;
+  const coinGold = cols*coinDens*2*0.85*2*gm;
+  const crystals = cols*coinDens*2*0.15*1.5;
+  const wood = cols*woodDens*2*stats.castleResourceMult;
+  const stone = k*0.15*1.5*stats.castleResourceMult;
+  const iron = k*0.05*1.5*stats.castleResourceMult;
+  const stumbles = cols*pitDens*stumbleP;
+  const killGold = k*goldPerKill;
+  const killXp = k*xpPerKill;
+  const nKills = acc.take('kills', k);
+  const nGold = acc.take('gold', coinGold+killGold);
+  const nCrystals = acc.take('crystals', crystals);
+  const nWood = acc.take('wood', wood);
+  const nStone = acc.take('stone', stone);
+  const nIron = acc.take('iron', iron);
+  const nXp = acc.take('xp', killXp);
+  const nDrops = acc.take('drops', k*dropPerKill);
+  state.gold += nGold;
+  state.lifetime.totalGoldEarned += nGold;
+  sum.goldGained += nGold;
+  const lost = Math.min(state.gold, Math.round(stumbles*4));
+  state.gold -= lost;
+  state.crystals += nCrystals; sum.crystals += nCrystals;
+  state.castleResources.wood += nWood; state.lifetime.totalWoodCollected = (state.lifetime.totalWoodCollected||0)+nWood;
+  state.castleResources.stone += nStone; state.lifetime.totalStoneCollected = (state.lifetime.totalStoneCollected||0)+nStone;
+  state.castleResources.iron += nIron; state.lifetime.totalIronCollected = (state.lifetime.totalIronCollected||0)+nIron;
+  sum.wood += nWood; sum.stone += nStone; sum.iron += nIron;
+  state.lifetime.totalKills += nKills;
+  sum.kills += nKills;
+  if(!state.lifetime.monsterKills) state.lifetime.monsterKills = {};
+  for(const pt of perType){
+    const add = Math.round(nKills*pt.share);
+    if(add>0) state.lifetime.monsterKills[pt.key] = (state.lifetime.monsterKills[pt.key]||0)+add;
+  }
+  updateQuestProgress('kill', nKills);
+  updateQuestProgress('gold', nGold);
+  updateQuestProgress('distance', cols);
+  if(autoJumpOn){
+    const jumps = acc.take('jumps', cols/Math.max(1,stats.speed)/Math.max(0.05,stats.jumpDuration));
+    state.lifetime.totalJumps += jumps;
+    updateQuestProgress('jump', jumps);
+  }
+  if(hasRelic('travelers_clock')){
+    const ticks = acc.take('ticks', dt/RELIC_QUEST_TICK_SEC);
+    for(const tid of ['kill','jump','items']) updateQuestProgress(tid, ticks/3);
+  }
+  distanceCols += cols;
+  sum.distGained += cols;
+  if(distanceCols > state.lifetime.bestDistance) state.lifetime.bestDistance = distanceCols;
+  offlineBulkDrop(nDrops, sum);
+  sum.xpGained += nXp;
+  if(nXp>0) gainXp(nXp);
+  return dt;
+}
 function applyOfflineProgress(){
   if(!lastSaveTimestamp) return;
   const elapsedMs = Date.now() - lastSaveTimestamp;
   if(elapsedMs < OFFLINE_MIN_MS) return;
   const durationSec = Math.min(elapsedMs, OFFLINE_CAP_MS)/1000;
-  const tier = getTier();
-  const offlineScale = tierRewardScale(tier);
-  const goldPerSec = 1.5 * offlineScale * stats.goldMult;
-  const xpPerSec = 1 * offlineScale * stats.farmXpMult;
-  const distPerSec = stats.speed*0.22;
-  const goldGained = Math.round(goldPerSec*durationSec);
-  const xpGained = Math.round(xpPerSec*durationSec);
-  const distGained = Math.round(distPerSec*durationSec);
   const levelBefore = state.level;
-  state.gold += goldGained;
-  state.lifetime.totalGoldEarned += goldGained;
-  distanceCols += distGained;
-  gainXp(xpGained);
+  const sum = {timeLabel:'', goldGained:0, xpGained:0, distGained:0, kills:0, items:0, crystals:0, wood:0, stone:0, iron:0, prestiges:0, prestigePoints:0, levelBefore, levelAfter:levelBefore};
+  const carry = {};
+  const acc = { take(key, v){ const t = (carry[key]||0)+v; const n = Math.floor(t); carry[key] = t-n; return n; } };
+  const autoPrestige = prestigeSkillLevel('p6')>0 && !!state.settings.autoPrestigeEnabled;
+  let remaining = durationSec, steps = 0, lastCycleSec = 0, cycleAcc = 0, lastPts = 0;
+  while(remaining > 0.001 && steps < OFFLINE_MAX_STEPS){
+    steps++;
+    const base = Math.max(30, durationSec/240);
+    const dtMax = Math.min(remaining, base);
+    let maxCols = autoPrestige ? Math.max(1500, (distanceCols+300)*0.25) : Math.max(300, (distanceCols+300)*0.08);
+    if(autoPrestige){
+      const minD = prestigeMinDistance();
+      maxCols = Math.min(maxCols, Math.max(0, minD - distanceCols));
+      if(distanceCols >= minD) maxCols = 0;
+    }
+    let used = 0;
+    if(maxCols > 0 || !autoPrestige) used = offlineStep(dtMax, maxCols, sum, acc);
+    remaining -= used; cycleAcc += used;
+    if(autoPrestige && prestigeMinDistance()-distanceCols < 1e-6) distanceCols = prestigeMinDistance();
+    if(autoPrestige && distanceCols >= prestigeMinDistance()){
+      lastPts = doPrestige(true) || 0;
+      sum.prestiges++; sum.prestigePoints += lastPts;
+      lastCycleSec = Math.max(0.001, cycleAcc); cycleAcc = 0;
+    } else if(used <= 0 && !autoPrestige){
+      break;
+    }
+  }
+  if(autoPrestige && remaining > 1 && lastCycleSec > 0){
+    const extra = Math.min(1e6, Math.floor(remaining/lastCycleSec));
+    if(extra > 0){
+      state.lifetime.prestigeCount += extra;
+      state.lifetime.prestigeSkillPoints = (state.lifetime.prestigeSkillPoints||0) + extra;
+      state.lifetime.prestigePoints += extra*lastPts;
+      sum.prestiges += extra; sum.prestigePoints += extra*lastPts;
+    }
+  }
+  sum.levelAfter = state.level;
   const hours = durationSec/3600;
-  const timeLabel = hours>=1 ? t('time.hours',{n:hours.toFixed(1)}) : t('time.minutes',{n:Math.max(1,Math.round(durationSec/60))});
+  sum.timeLabel = hours>=1 ? t('time.hours',{n:hours.toFixed(1)}) : t('time.minutes',{n:Math.max(1,Math.round(durationSec/60))});
   const lvlTxt = state.level>levelBefore ? t('log.offlineLevelSuffix',{from:levelBefore, to:state.level}) : '';
-  addLog('log.offlineProgress', 'upgrade', {time:timeLabel, gold:goldGained, xp:xpGained, dist:distGained, lvl:lvlTxt});
-  showOfflineModal({
-    timeLabel, goldGained, xpGained, distGained,
-    levelBefore, levelAfter: state.level
-  });
+  addLog('log.offlineProgress', 'upgrade', {time:sum.timeLabel, gold:sum.goldGained, xp:sum.xpGained, dist:Math.round(sum.distGained), lvl:lvlTxt});
+  if(sum.prestiges>0) addLog('log.offlinePrestiges', 'levelup', {n:sum.prestiges, pts:sum.prestigePoints});
+  showOfflineModal(sum);
 }
 function resetWorldAfterLoad(){
   entities = [];
