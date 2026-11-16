@@ -714,7 +714,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = '1.09';
+const GAME_VERSION = '1.10';
 
 const SUPABASE_URL = 'https://vfaveuenkublhxgatbcn.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_PkeJBe1KSw0ZWUSgcAIZFA_SuG8Ilyo';
@@ -894,11 +894,29 @@ function escapeHtml(s){
 }
 const LEADERBOARD_NICK_COLOR = 'var(--accent)';
 function nickSpan(nick){ return `<span style="color:${LEADERBOARD_NICK_COLOR}">${escapeHtml(localizeNickname(nick, lang))}</span>`; }
+let entityNameMap = null;
+function localizeEntityName(name){
+  if(typeof name!=='string') return name;
+  if(!entityNameMap){
+    entityNameMap = {uk:{}, en:{}};
+    const pools = [ITEM_POOL, DEMONIC_ITEM_POOL, RELIC_POOL, BOSS_TIERS, COMPANION_TYPES, MONSTER_TYPES];
+    for(const pool of pools){
+      for(const o of pool){
+        if(o && o.name && o.name_en){
+          entityNameMap.en[o.name] = o.name_en;
+          entityNameMap.uk[o.name_en] = o.name;
+        }
+      }
+    }
+  }
+  const m = lang==='en' ? entityNameMap.en : entityNameMap.uk;
+  return m[name] || name;
+}
 function renderEventLine(e){
   const nick = nickSpan(e.nickname);
 
   const rarityColor = e.event_type==='relic_found' ? RARITY_COLOR.relic : (e.target_rarity ? RARITY_COLOR[e.target_rarity] : null);
-  const target = e.target_name!=null ? `«<span style="color:${rarityColor||'var(--text)'}">${escapeHtml(e.target_name)}</span>»` : '';
+  const target = e.target_name!=null ? `«<span style="color:${rarityColor||'var(--text)'}">${escapeHtml(localizeEntityName(e.target_name))}</span>»` : '';
   const uk = {
     level_milestone: `${nick} досяг ${e.value} рівня!`,
     boss_defeat: `${nick} переміг боса ${target}!`,
@@ -1186,7 +1204,6 @@ const COMPANION_BASE_COST = 300, COMPANION_COST_STEP = 200;
 const COMPANION_COST_STEP_LATE = 500;
 const COMPANION_CRYSTAL_BASE = 10, COMPANION_CRYSTAL_STEP = 5;
 const COMPANION_SOUL_BASE = 3, COMPANION_SOUL_STEP = 0.5;
-const COMPANION_ATTACK_INTERVAL = 5;
 const COMPANION_BLADE_PCT_BASE = 0.25;
 const COMPANION_BLADE_PCT_STEP = 0.015;
 const COMPANION_HOARDER_GOLD_PCT_PER_LVL = 1;
@@ -1195,7 +1212,13 @@ const COMPANION_HUNTER_XP_PCT_PER_LVL = 1;
 const COMPANION_MAGNET_BONUS = 2;
 const COMPANION_HUNTER_MAGNET_PER_LVL = 0.3;
 const COMPANION_WIND_SPEED_CAP_BONUS = 1000;
+const COMPANION_WIND_SPEED_FLAT_MAX = 500;
 const COMPANION_WIND_SPEED_CAP_PER_LVL = COMPANION_WIND_SPEED_CAP_BONUS / MAX_COMPANION_LEVEL;
+function windSpiritSpeedBonus(){
+  const a = activeCompanion();
+  if(!a || a.role!=='speed') return 0;
+  return Math.round(companionLevel('wind')*COMPANION_WIND_SPEED_FLAT_MAX/MAX_COMPANION_LEVEL);
+}
 function companionUnlocked(id){
   const c = COMPANION_TYPES.find(x=>x.id===id);
   return !!(c && state.achievements[c.unlockAch]);
@@ -1277,27 +1300,9 @@ function buyCompanionLevelMax(id){
   renderCompanionsIfOpen();
   save();
 }
-let companionTimer = 0, companionPulse = 0;
+let companionPulse = 0;
 function updateCompanion(dt){
   if(companionPulse>0) companionPulse -= dt;
-  const active = activeCompanion();
-  if(!active || active.role!=='dps') return;
-  companionTimer += dt;
-  if(companionTimer < COMPANION_ATTACK_INTERVAL) return;
-  companionTimer -= COMPANION_ATTACK_INTERVAL;
-  if(isFighting && fightTarget && fightTarget.hp>0){
-    const pct = COMPANION_BLADE_PCT_BASE + (companionLevel('blade')-1)*COMPANION_BLADE_PCT_STEP;
-    const dmg = Math.max(1, Math.round(effectiveAttack()*pct));
-    fightTarget.hp -= dmg;
-    spawnFloatingText(PLAYER_COL-1, `-${dmg}`, active.color);
-    companionPulse = 0.35;
-    if(fightTarget.hp <= 0){
-      awardKill(fightTarget, true);
-      fightTarget.state = 'done';
-      isFighting = false;
-      fightTarget = null;
-    }
-  }
 }
 
 const ABILITY_COOLDOWN = 60;
@@ -1374,10 +1379,10 @@ const I18N = {
     'modal.companionsTitle':'КОМПАНЬЙОНИ', 'btn.companions':'🐾 Компаньйони',
     'companion.locked':'Розблокується: {desc}',
     'companion.selectBtn':'Обрати', 'companion.activeBtn':'Активний', 'companion.maxLevel':'Максимальний рівень',
-    'companion.effectBlade':'+{pct}% сили атаки кожні {sec}с (лише в бою на дорозі)',
+    'companion.effectBlade':'+{pct}% сили атаки персонажа',
     'companion.effectHoarder':'+{gold}% золота, +{drop}% шанс дропу',
     'companion.effectHunter':'+{xp}% досвіду, +{magnet} радіус збору лута',
-    'companion.effectWind':'+{n} до стелі макс. швидкості (загалом до {max} на максимумі)',
+    'companion.effectWind':'+{spd} до швидкості, +{n} до стелі макс. швидкості (загалом до {max} на максимумі)',
     'log.companionSelected':'🐾 Тепер із тобою: {name}.',
     'btn.streak':'🔥 Стрик', 'modal.streakTitle':'СТРИК ВХОДІВ',
     'streak.currentLabel':'поточний стрик (днів поспіль)',
@@ -1742,10 +1747,10 @@ const I18N = {
     'modal.companionsTitle':'COMPANIONS', 'btn.companions':'🐾 Companions',
     'companion.locked':'Unlocks: {desc}',
     'companion.selectBtn':'Select', 'companion.activeBtn':'Active', 'companion.maxLevel':'Max level',
-    'companion.effectBlade':'+{pct}% attack power every {sec}s (road combat only)',
+    'companion.effectBlade':'+{pct}% character attack power',
     'companion.effectHoarder':'+{gold}% gold, +{drop}% drop chance',
     'companion.effectHunter':'+{xp}% XP, +{magnet} pickup radius',
-    'companion.effectWind':'+{n} to the max speed cap (up to {max} total at max level)',
+    'companion.effectWind':'+{spd} speed, +{n} to the max speed cap (up to {max} total at max level)',
     'log.companionSelected':'🐾 Now with you: {name}.',
     'btn.streak':'🔥 Streak', 'modal.streakTitle':'LOGIN STREAK',
     'streak.currentLabel':'current streak (days in a row)',
@@ -2396,8 +2401,8 @@ const LIBRARY_MECHANICS = [
 
 const LIBRARY_COMPANION_LORE = {
   blade: {
-    body:'Дух Клинка не пам\'ятає, кому цей клинок належав до того, як лишитись саме духом — надто вже стрімко закінчилось те, попереднє життя. Тепер він просто йде поруч, крок у крок, і час від часу сам встромляє щось гостре в те, з чим ти й так уже б\'єшся — не з ввічливості, а тому, що звичка нікуди не поділась. Поки він твій активний компаньйон: раз на 5 секунд б\'є ціль твого бою на додаткові 25% сили атаки на Lv.1, і ще +1.5% за кожен рівень понад це — можеш прокачувати його золотом хоч довіку.',
-    body_en:"The Blade Spirit doesn't remember whose blade it used to be before becoming just a spirit — that previous life ended a little too abruptly for details to stick. Now it just walks alongside you, step for step, occasionally sinking something sharp into whatever you're already fighting anyway — not out of courtesy, just old habit that never quite left. While it's your active companion: once every 5 seconds it hits your current target for an extra 25% of your attack power at Lv.1, plus 1.5% more per level beyond that — level it up with gold for as long as you like."
+    body:'Дух Клинка не пам\'ятає, кому цей клинок належав до того, як лишитись саме духом — надто вже стрімко закінчилось те, попереднє життя. Тепер він просто йде поруч, крок у крок, і від самої його присутності твоя власна зброя наче стає гострішою — не з ввічливості, а тому, що звичка нікуди не поділась. Поки він твій активний компаньйон: +25% до сили атаки на Lv.1, і ще +1.5% за кожен рівень понад це — можеш прокачувати його золотом хоч довіку.',
+    body_en:"The Blade Spirit doesn't remember whose blade it used to be before becoming just a spirit — that previous life ended a little too abruptly for details to stick. Now it just walks alongside you, step for step, and its mere presence makes your own weapon feel a little sharper — not out of courtesy, just old habit that never quite left. While it's your active companion: +25% attack power at Lv.1, plus 1.5% more per level beyond that — level it up with gold for as long as you like."
   },
   hoarder: {
     body:'Дух Скарбника був колись, судячи з усього, або дуже жадібним торговцем, або дуже нещасливим злодієм — тепер уже не з\'ясувати, яка саме версія правдива, бо сам він на цю тему мовчить і лише дзвенить монетами в кишенях, яких у нього фізично немає. Іде поруч не для бою, а для того, щоб золото саме лягало в руку трохи охочіше, а удача трохи частіше посміхалась. Поки він твій активний компаньйон: +1% золота і +0.3% шансу дропу за кожен його рівень.',
@@ -2408,8 +2413,8 @@ const LIBRARY_COMPANION_LORE = {
     body_en:"The Hunter Spirit sees the road like nobody else does — not as a straight line, but as a long list of things worth picking up before they scroll off the back edge. It reaches for every coin a little further than you would yourself, and somehow teaches you to squeeze a bit more experience out of every kill along the way. While it's your active companion: +1% XP and extra pickup radius (+0.3 per level, on top of the base +2 that simply having any companion already grants) per level."
   },
   wind: {
-    body:'Дух Вітру ніколи повністю не торкається землі — лишає по собі лише слід із пилу й пожовклого листя там, де мав би бути слід ніг. Не б\'ється і не збирає золото, натомість просто невтомно мчить слідом за тобою, ніби підганяючи — швидше, ще швидше, адже навіть коли здається, що швидше вже нікуди, вітер ще не сказав свого слова. Поки він твій активний компаньйон: піднімає саму стелю максимальної швидкості понад звичайну межу — до +1000 понад неї на максимальному рівні прокачки.',
-    body_en:"The Wind Spirit never quite touches the ground — it leaves only a trail of dust and yellowed leaves where footsteps should be. It doesn't fight or gather gold; it just races tirelessly along behind you, urging you on — faster, faster still, because even when it feels like there's nowhere left to go, the wind hasn't had its say yet. While it's your active companion: it raises the maximum speed cap itself beyond its usual limit — up to +1000 above it at max upgrade level."
+    body:'Дух Вітру ніколи повністю не торкається землі — лишає по собі лише слід із пилу й пожовклого листя там, де мав би бути слід ніг. Не б\'ється і не збирає золото, натомість просто невтомно мчить слідом за тобою, ніби підганяючи — швидше, ще швидше, адже навіть коли здається, що швидше вже нікуди, вітер ще не сказав свого слова. Поки він твій активний компаньйон: додає до швидкості персонажа до +500 на максимальному рівні прокачки (як і бонус за стрік, до множників) і піднімає саму стелю максимальної швидкості — до +1000 понад звичайну межу.',
+    body_en:"The Wind Spirit never quite touches the ground — it leaves only a trail of dust and yellowed leaves where footsteps should be. It doesn't fight or gather gold; it just races tirelessly along behind you, urging you on — faster, faster still, because even when it feels like there's nowhere left to go, the wind hasn't had its say yet. While it's your active companion: it adds up to +500 to your character's speed at max upgrade level (applied like the streak bonus, before multipliers) and raises the maximum speed cap itself — up to +1000 above its usual limit."
   }
 };
 
@@ -2544,8 +2549,8 @@ const PRESTIGE_TREE = [
   {id:'p2', name:'Відлуння Багатства',       name_en:'Echo of Wealth',         desc:'+2% золота за рівень (назавжди)', desc_en:'+2% gold per level (permanent)', baseCost:1, costStep:1, maxLevel:MAX_PRESTIGE_SKILL_LEVEL, effect:{goldPct:2}},
   {id:'p3', name:'Спадок Досвіду',           name_en:'Legacy of Experience',   desc:'+2% досвіду за рівень (назавжди)', desc_en:'+2% xp per level (permanent)', baseCost:1, costStep:1, maxLevel:MAX_PRESTIGE_SKILL_LEVEL, effect:{xpPct:2}},
   {id:'p4', name:'Благословення Долі',       name_en:'Fortune\'s Blessing',    desc:'+0.3% шанс криту за рівень (назавжди)', desc_en:'+0.3% crit chance per level (permanent)', baseCost:2, costStep:1, maxLevel:MAX_PRESTIGE_SKILL_LEVEL, effect:{critChance:0.3}},
-  {id:'p5', name:'Пришвидшене Відродження',  name_en:'Swift Rebirth',         desc:'-3% часу кулдауну босів за рівень (назавжди, максимум 60%)', desc_en:'-3% boss cooldown time per level (permanent, capped at 60%)', baseCost:2, costStep:1, maxLevel:MAX_PRESTIGE_SKILL_LEVEL, effect:{bossCooldownPct:3}},
-  {id:'p10', name:'Прискорене Сходження',    name_en:'Accelerated Ascent',     desc:'-1 в.п. до зростання потрібної дистанції переродження за рівень (назавжди; з +15%/переродження за замовчуванням до +5%/переродження на максимумі)', desc_en:'-1 pp off the required Rebirth distance growth rate per level (permanent; from +15%/Rebirth by default down to +5%/Rebirth at max)', baseCost:2, costStep:1, maxLevel:10, effect:{distGrowthReductionPct:1}},
+  {id:'p5', name:'Пришвидшене Відродження',  name_en:'Swift Rebirth',         desc:'-3% часу кулдауну босів за рівень (назавжди, максимум 90%)', desc_en:'-3% boss cooldown time per level (permanent, capped at 90%)', baseCost:2, costStep:1, maxLevel:30, effect:{bossCooldownPct:3}},
+  {id:'p10', name:'Прискорене Сходження',    name_en:'Accelerated Ascent',     desc:'-1 в.п. до зростання потрібної дистанції переродження за рівень (назавжди; з +15%/переродження за замовчуванням до +1%/переродження на максимумі)', desc_en:'-1 pp off the required Rebirth distance growth rate per level (permanent; from +15%/Rebirth by default down to +1%/Rebirth at max)', baseCost:2, costStep:1, maxLevel:14, effect:{distGrowthReductionPct:1}},
   {id:'p6', name:'Вічний Цикл',             name_en:'Eternal Cycle',          desc:'Автоматично здійснює Переродження, щойно пройдено потрібну дистанцію (перемикач з\'явиться тут же, назавжди, Переродження не скидає)', desc_en:'Automatically Prestiges the moment the required distance is reached (a toggle appears here once bought — permanent, survives Prestige)', currency:'souls', cost:PRESTIGE_AUTOMATION_SOUL_COST, maxLevel:1, unlockPrestigeCount:PRESTIGE_AUTOMATION_UNLOCK_COUNT, toggleKey:'autoPrestigeEnabled', effect:{}},
   {id:'p7', name:'Незгасний Розум',          name_en:'Undying Mind',           desc:'Автоматично вкладає Очки Перековки у це саме Дерево Переродження (вузли вище), щойно вони з\'являються — не має жодного стосунку до звичайного Дерева Навичок чи «Автостратега» (назавжди, Переродження не скидає)', desc_en:'Automatically invests Rebirth Points into this Rebirth Tree itself (the nodes above) the moment you earn them — unrelated to the regular Skill Tree or Auto-Strategist (permanent, survives Prestige)', currency:'souls', cost:PRESTIGE_AUTOMATION_SOUL_COST, maxLevel:1, unlockPrestigeCount:PRESTIGE_AUTOMATION_UNLOCK_COUNT, toggleKey:'autoPrestigeTreeSpendEnabled', effect:{}},
   {id:'p8', name:'Механічний Спадок',        name_en:'Mechanical Legacy',      desc:'Автоматично прокачує звичайними очками навичок ЛИШЕ вузли гілки «🤖 Автоматизація» в Дереві Навичок (назавжди, Переродження не скидає)', desc_en:'Automatically spends regular skill points ONLY on the "🤖 Automation" branch nodes in the Skill Tree (permanent, survives Prestige)', currency:'souls', cost:PRESTIGE_AUTOMATION_SOUL_COST, maxLevel:1, unlockPrestigeCount:PRESTIGE_AUTOMATION_UNLOCK_COUNT, toggleKey:'autoAutomationBranchEnabled', effect:{}},
@@ -3214,7 +3219,7 @@ function loginStreakReward(streak){
   return LOGIN_STREAK_REWARDS[idx];
 }
 
-const STREAK_BONUS_MAX_DAYS = 60;
+const STREAK_BONUS_MAX_DAYS = 365;
 const STREAK_BONUS_ATK_PCT_PER_DAY = 0.5;
 const STREAK_BONUS_GOLD_PCT_PER_DAY = 0.3;
 const STREAK_BONUS_DROP_PCT_PER_DAY = 0.15;
@@ -4012,7 +4017,7 @@ function endBossFight(won, retreated){
   const damageFraction = Math.min(1, Math.max(0, 1 - bf.hp/bf.maxHp));
   const cooldownSkipped = hasRelic('patience_crystal') && Math.random() < RELIC_COOLDOWN_SKIP_CHANCE;
   if(!cooldownSkipped){
-    const cdReducePct = Math.min(60, computePrestigeTreeBonuses().bossCooldownPct);
+    const cdReducePct = Math.min(90, computePrestigeTreeBonuses().bossCooldownPct);
     state.bossCooldowns[boss.id] = Date.now() + boss.cooldownHours*3600*1000*(1-cdReducePct/100)*weekendCooldownMult();
   }
   const result = {boss, won, retreated, gold:0, souls:0, xp:0, demonicName:null, relicName:null, cooldownSkipped, isEnding:false};
@@ -4151,15 +4156,11 @@ function updateBossCompanions(dt, dealDamage){
     const bc = bossCompanionTimers[c.id] || (bossCompanionTimers[c.id] = {timer:0, flash:0});
     if(bc.flash>0) bc.flash -= dt;
     bc.timer += dt;
-    const interval = c.role==='dps' ? COMPANION_ATTACK_INTERVAL : (3.5 + (c.id.charCodeAt(0)%3));
+    const interval = 3.5 + (c.id.charCodeAt(0)%3);
     if(bc.timer >= interval){
       bc.timer -= interval;
       bc.flash = 0.25;
       spawnHitParticles(BOSS_W/2, 170, c.color, 7);
-      if(c.role==='dps'){
-        const pct = COMPANION_BLADE_PCT_BASE + (companionLevel('blade')-1)*COMPANION_BLADE_PCT_STEP;
-        dealDamage(Math.max(1, Math.round(effectiveAttack()*pct)));
-      }
     }
   }
 }
@@ -4414,7 +4415,7 @@ function endGauntlet(retreated){
   state.lifetime.bestGauntletWaves = Math.max(state.lifetime.bestGauntletWaves||0, wavesCleared);
   const cooldownSkipped = hasRelic('patience_crystal') && Math.random() < RELIC_COOLDOWN_SKIP_CHANCE;
   if(!cooldownSkipped){
-    const cdReducePct = Math.min(60, computePrestigeTreeBonuses().bossCooldownPct);
+    const cdReducePct = Math.min(90, computePrestigeTreeBonuses().bossCooldownPct);
     state.gauntletCooldown = Date.now() + GAUNTLET_COOLDOWN_HOURS*3600*1000*(1-cdReducePct/100)*weekendCooldownMult();
   }
   const rw = gauntletRewards(wavesCleared);
@@ -4766,7 +4767,7 @@ function biomeTextColor(tier){
   return BIOME_ENDGAME_TEXT[(tier-lastIdx-1) % BIOME_ENDGAME_TEXT.length];
 }
 function xpToNext(level){ return Math.round(20*Math.pow(level,1.35)); }
-function effectiveVal(it){ return it.val * (1 + ((it.count||1)-1)*0.2 + (it.enchant||0)*0.15); }
+function effectiveVal(it){ return it.val * (1 + ((it.count||1)-1)*(it.rarity==='demonic' ? 1 : 0.2) + (it.enchant||0)*0.15); }
 function comboMultBonus(){ return Math.min(0.30, combo*0.02); }
 
 const DAY_CYCLE_SEC = 240;
@@ -4819,7 +4820,7 @@ function computeSkillBonuses(){
 function recomputeStats(){
   const skillB = computeSkillBonuses();
   let atk = BASE_ATTACK + (state.level-1)*1 + state.upgrades.attack*UPGRADE_CFG.attack.inc;
-  let spd = BASE_SPEED + streakBonusDays()*STREAK_BONUS_SPD_PER_DAY + state.upgrades.speed*UPGRADE_CFG.speed.inc;
+  let spd = BASE_SPEED + streakBonusDays()*STREAK_BONUS_SPD_PER_DAY + windSpiritSpeedBonus() + state.upgrades.speed*UPGRADE_CFG.speed.inc;
   let atkSpeed = BASE_ATKSPEED + state.upgrades.atkSpeed*UPGRADE_CFG.atkSpeed.inc;
   let goldMult = 1 + state.upgrades.luck*(UPGRADE_CFG.luck.goldPctInc/100);
   let dropBonus = state.upgrades.luck*(UPGRADE_CFG.luck.dropPctInc/100);
@@ -4866,6 +4867,9 @@ function recomputeStats(){
   atkSpeed += castleB.atkSpeedFlat;
 
   const companion = activeCompanion();
+  if(companion && companion.role==='dps'){
+    atk *= (1 + (COMPANION_BLADE_PCT_BASE + (companionLevel('blade')-1)*COMPANION_BLADE_PCT_STEP));
+  }
   let companionXpPct = 0, companionMagnet = hasCompanion() ? COMPANION_MAGNET_BONUS : 0;
   if(companion && companion.role==='support'){
     const lvl = companionLevel('hoarder');
@@ -6387,8 +6391,8 @@ function prestigeTotalEffectText(node, lvl){
   if(e.xpPct) parts.push(`+${(e.xpPct*lvl).toFixed(1)}% ${t('unit.xp')}`);
   if(e.critChance) parts.push(`+${(e.critChance*lvl).toFixed(1)}% ${t('unit.crit')}`);
   if(e.bossCooldownPct){
-    const capped = Math.min(60, e.bossCooldownPct*lvl);
-    parts.push(`-${capped.toFixed(1)}% ${t('prestige.cooldownUnit')}${capped>=60?` (${t('prestige.capped')})`:''}`);
+    const capped = Math.min(90, e.bossCooldownPct*lvl);
+    parts.push(`-${capped.toFixed(1)}% ${t('prestige.cooldownUnit')}${capped>=90?` (${t('prestige.capped')})`:''}`);
   }
   return parts.length ? ` · <span style="color:var(--accent)">${t('skills.together')} ${parts.join(', ')}</span>` : '';
 }
@@ -6618,7 +6622,7 @@ function renderCharacterSheet(){
   html += row(t('char.attack'), stats.attack.toFixed(1),
     `${BASE_ATTACK.toFixed(1)} ${t('char.base')} + ${(state.level-1).toFixed(0)} ${t('char.fromLevel')} + ${(state.upgrades.attack*UPGRADE_CFG.attack.inc).toFixed(1)} ${t('char.fromUpgrades')} + ${itemAtk.toFixed(1)} ${t('char.fromItems')} · ×${(1+skillB.atkPct/100).toFixed(2)} ${t('char.skills')} · ×${(1+pp*PRESTIGE_ATK_PCT/100).toFixed(2)} ${t('char.prestige')} · ×${(1+castleB.atkPct/100).toFixed(2)} ${t('char.castle')}`);
   html += row(t('char.speed'), stats.speed.toFixed(2),
-    `${(BASE_SPEED+streakBonusDays()*STREAK_BONUS_SPD_PER_DAY).toFixed(1)} ${t('char.base')} + ${(state.upgrades.speed*UPGRADE_CFG.speed.inc).toFixed(2)} ${t('char.fromUpgrades')} + ${itemSpd.toFixed(2)} ${t('char.fromItems')} · ×${(1+skillB.spdPct/100).toFixed(2)} ${t('char.skills')}`);
+    `${(BASE_SPEED+streakBonusDays()*STREAK_BONUS_SPD_PER_DAY+windSpiritSpeedBonus()).toFixed(1)} ${t('char.base')} + ${(state.upgrades.speed*UPGRADE_CFG.speed.inc).toFixed(2)} ${t('char.fromUpgrades')} + ${itemSpd.toFixed(2)} ${t('char.fromItems')} · ×${(1+skillB.spdPct/100).toFixed(2)} ${t('char.skills')}`);
   html += row(t('char.atkSpeed'), stats.atkSpeed.toFixed(2)+'/s',
     `${BASE_ATKSPEED.toFixed(1)} ${t('char.base')} + ${(state.upgrades.atkSpeed*UPGRADE_CFG.atkSpeed.inc).toFixed(3)} ${t('char.fromUpgrades')} + ${itemAS.toFixed(3)} ${t('char.fromItems')} + ${skillB.atkSpeedFlat.toFixed(3)} ${t('char.skills')}`);
   html += row(t('char.critChance'), (stats.critChance*100).toFixed(1)+'%', t('char.fromSkillsOnly'));
@@ -6794,13 +6798,13 @@ function openCompanions(){
 function companionEffectText(c, lvl){
   if(c.role==='dps'){
     const pct = Math.round((COMPANION_BLADE_PCT_BASE + (lvl-1)*COMPANION_BLADE_PCT_STEP)*100);
-    return t('companion.effectBlade', {pct, sec:COMPANION_ATTACK_INTERVAL});
+    return t('companion.effectBlade', {pct});
   }
   if(c.role==='support'){
     return t('companion.effectHoarder', {gold:(lvl*COMPANION_HOARDER_GOLD_PCT_PER_LVL).toFixed(1), drop:(lvl*COMPANION_HOARDER_DROP_PCT_PER_LVL).toFixed(1)});
   }
   if(c.role==='speed'){
-    return t('companion.effectWind', {n:Math.round(lvl*COMPANION_WIND_SPEED_CAP_PER_LVL), max:MAX_EFFECTIVE_SPEED+COMPANION_WIND_SPEED_CAP_BONUS});
+    return t('companion.effectWind', {n:Math.round(lvl*COMPANION_WIND_SPEED_CAP_PER_LVL), max:MAX_EFFECTIVE_SPEED+COMPANION_WIND_SPEED_CAP_BONUS, spd:Math.round(lvl*COMPANION_WIND_SPEED_FLAT_MAX/MAX_COMPANION_LEVEL)});
   }
   return t('companion.effectHunter', {xp:(lvl*COMPANION_HUNTER_XP_PCT_PER_LVL).toFixed(1), magnet:(COMPANION_MAGNET_BONUS+lvl*COMPANION_HUNTER_MAGNET_PER_LVL).toFixed(1)});
 }

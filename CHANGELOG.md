@@ -5,6 +5,21 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [1.10] — Stronger demonic duplicates, 365-day streak, Wind and Blade Spirit rework
+
+### Added
+- Accelerated Ascent now goes up to level 14 (down to +1% required-distance growth per Rebirth).
+- Swift Rebirth now goes up to level 30 with a 90% cooldown cap (was 60%).
+- Wind Spirit now also adds up to +500 to your base speed at max level, applied like the streak bonus.
+
+### Changed
+- Duplicate demonic items now add their full base value each, instead of a fraction.
+- The login streak bonus cap is raised from 60 to 365 days.
+- Blade Spirit now simply adds its attack percentage to your attack while active, instead of striking periodically.
+
+### Fixed
+- The activity feed now shows item, relic, boss and companion names in your own language instead of the language of the player who triggered the event.
+
 ## [1.09] — Mobile fixes, translation fixes, no drop-chance cap, streak speed bonus
 
 ### Added
