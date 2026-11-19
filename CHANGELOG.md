@@ -5,6 +5,15 @@ corresponds to a tagged [GitHub Release](https://github.com/Balfik/ascii-slayer/
 the release marked **Latest** is always what's live on the
 [played link](https://balfik.github.io/ascii-slayer/).
 
+## [1.12] — Offline boss hunting, Town button fix
+
+### Added
+- With Trophy Hunter on, offline time now includes boss and gauntlet runs: gold, XP, Demonic Souls, Demonic items and relics are earned, and the Welcome Back screen lists them.
+
+### Fixed
+- The menu "To Town" button (and the T key) now works on the boss/gauntlet result screen.
+- The Welcome Back screen is no longer skipped when Trophy Hunter is on.
+
 ## [1.11] — Full offline progress, offline auto-Rebirth
 
 ### Added

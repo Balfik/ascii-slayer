@@ -714,7 +714,7 @@
 (function(){
 "use strict";
 
-const GAME_VERSION = '1.11';
+const GAME_VERSION = '1.12';
 
 const SUPABASE_URL = 'https://vfaveuenkublhxgatbcn.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_PkeJBe1KSw0ZWUSgcAIZFA_SuG8Ilyo';
@@ -1644,7 +1644,7 @@ const I18N = {
     'prestige.lockedCountSuffix':' · 🔒 після {n}-го Переродження', 'prestige.ownedTag':'✅ Куплено',
     'welcome.body':'Поки тебе не було ({time}), персонаж сам біг і бився далі.',
     'welcome.gold':'Золото', 'welcome.xp':'Досвід', 'welcome.dist':'Дистанція', 'welcome.level':'Рівень',
-    'welcome.kills':'Вбито монстрів', 'welcome.items':'Знайдено предметів', 'welcome.crystals':'Кристали', 'welcome.resources':'Ресурси замку', 'welcome.prestiges':'Автопереродженнь',
+    'welcome.kills':'Вбито монстрів', 'welcome.items':'Знайдено предметів', 'welcome.crystals':'Кристали', 'welcome.resources':'Ресурси замку', 'welcome.prestiges':'Автопереродженнь', 'welcome.souls':'Демонічні душі', 'welcome.bosses':'Боси (перемоги / спроби)', 'welcome.gauntlets':'Гаунтлет', 'welcome.bestWave':'найкраща хвиля {n}', 'welcome.demonics':'Демонічні предмети', 'welcome.relics':'Реліквії',
     'log.offlinePrestiges':'♻️ Автопереродження офлайн: {n} (+{pts} Очок Слави)',
     'welcome.continueBtn':'Продовжити забіг',
     'quests.available':'Доступні квести', 'quests.activeHeader':'Активні квести',
@@ -2014,7 +2014,7 @@ const I18N = {
     'prestige.lockedCountSuffix':' · 🔒 after Rebirth #{n}', 'prestige.ownedTag':'✅ Owned',
     'welcome.body':'While you were away ({time}), your character kept running and fighting.',
     'welcome.gold':'Gold', 'welcome.xp':'XP', 'welcome.dist':'Distance', 'welcome.level':'Level',
-    'welcome.kills':'Monsters slain', 'welcome.items':'Items found', 'welcome.crystals':'Crystals', 'welcome.resources':'Castle resources', 'welcome.prestiges':'Auto-Rebirths',
+    'welcome.kills':'Monsters slain', 'welcome.items':'Items found', 'welcome.crystals':'Crystals', 'welcome.resources':'Castle resources', 'welcome.prestiges':'Auto-Rebirths', 'welcome.souls':'Demonic souls', 'welcome.bosses':'Bosses (won / tried)', 'welcome.gauntlets':'Gauntlet', 'welcome.bestWave':'best wave {n}', 'welcome.demonics':'Demonic items', 'welcome.relics':'Relics',
     'log.offlinePrestiges':'♻️ Offline auto-Rebirths: {n} (+{pts} Glory Points)',
     'welcome.continueBtn':'Continue the run',
     'quests.available':'Available quests', 'quests.activeHeader':'Active quests',
@@ -3709,6 +3709,7 @@ function autoManageAutomationBranchSpend(dt){
 let autoBossGauntletJustReturned = false;
 function autoManageBossGauntlet(dt){
   if(prestigeSkillLevel('p9')<=0 || !state.settings.autoBossGauntletEnabled){ autoBossGauntletJustReturned = false; return; }
+  if(modalKind==='welcome' && !modalBackdrop.hidden) return;
   if(mode==='boss'){ if(bossResult){ returnFromBoss(); autoBossGauntletJustReturned = true; } return; }
   if(mode==='gauntlet'){ if(gauntletResult){ returnFromGauntlet(); autoBossGauntletJustReturned = true; } return; }
   if(mode!=='run' && mode!=='town') return;
@@ -3955,25 +3956,29 @@ function attemptBoss(bossId){
   save();
 }
 
-function grantDemonicItem(){
+function grantDemonicItem(silent){
   state.lifetime.demonicFound = (state.lifetime.demonicFound||0)+1;
   const base = weightedPick(DEMONIC_ITEM_POOL);
   const existing = state.inventory.find(it=>it.name===base.name);
   if(existing){
     existing.count = (existing.count||1)+1;
     recomputeStats();
-    addLog('log.itemDuplicate', 'item', {name:L(existing,'name'), count:existing.count, rarity:rarityLabel(existing.rarity)});
-    sfxItem(existing.rarity);
+    if(!silent){
+      addLog('log.itemDuplicate', 'item', {name:L(existing,'name'), count:existing.count, rarity:rarityLabel(existing.rarity)});
+      sfxItem(existing.rarity);
+      renderInventory();
+    }
     reportEvent('demonic_item_found', {targetName:L(existing,'name'), targetRarity:'demonic'});
-    renderInventory();
     return L(existing,'name');
   }
   const inst = {name:base.name, name_en:base.name_en, rarity:base.rarity, stat:base.stat, val:base.val, count:1, enchant:0, id:Date.now()+Math.random()};
   state.inventory.push(inst);
   recomputeStats();
-  addLog('log.bossWinDemonic', 'item', {name:L(inst,'name')});
-  sfxItem('demonic');
-  renderInventory();
+  if(!silent){
+    addLog('log.bossWinDemonic', 'item', {name:L(inst,'name')});
+    sfxItem('demonic');
+    renderInventory();
+  }
 
   reportEvent('demonic_item_found', {targetName:L(inst,'name'), targetRarity:'demonic'});
   return L(inst,'name');
@@ -5757,7 +5762,7 @@ function renderTown(){
 
 function updateModeUiText(){
   document.getElementById('townBtn').textContent = mode==='town' ? t('btn.leaveTown') : t('btn.town');
-  document.getElementById('townBtn').disabled = (mode==='boss' || mode==='gauntlet');
+  document.getElementById('townBtn').disabled = ((mode==='boss' && !bossResult) || (mode==='gauntlet' && !gauntletResult));
   document.getElementById('termLabel').textContent = mode==='town' ? t('term.townLabel') : (mode==='boss' ? t('term.bossLabel') : (mode==='gauntlet' ? t('term.gauntletLabel') : t('term.runLabel')));
 
   document.getElementById('hintText').innerHTML = mode==='town' ? (isTouchDevice() ? '' : t('hint.town')) : ((mode==='boss'||mode==='gauntlet') ? '' : (isTouchDevice() ? '' : t('hint.run')));
@@ -5794,7 +5799,7 @@ function exitTown(){
   updateModeUiText();
   addLog('log.exitTown', 'upgrade');
 }
-function toggleTown(){ if(mode==='boss') return; mode==='town' ? exitTown() : enterTown(); }
+function toggleTown(){ if(mode==='boss'){ if(bossResult) returnFromBoss(); return; } if(mode==='gauntlet'){ if(gauntletResult) returnFromGauntlet(); return; } mode==='town' ? exitTown() : enterTown(); }
 
 const modalBackdrop = document.getElementById('modalBackdrop');
 const modalTitle = document.getElementById('modalTitle');
@@ -7119,6 +7124,11 @@ function showOfflineModal(summary){
   if(summary.crystals>0) rows += row(t('welcome.crystals'), `+${formatNum(summary.crystals)}◆`, 'var(--crystal)');
   if(summary.wood+summary.stone+summary.iron>0) rows += row(t('welcome.resources'), `+${formatNum(summary.wood)}🪵 +${formatNum(summary.stone)}🪨 +${formatNum(summary.iron)}⛏`);
   if(summary.levelAfter>summary.levelBefore) rows += row(t('welcome.level'), `${summary.levelBefore} → ${summary.levelAfter}`, 'var(--gold)');
+  if(summary.souls>0) rows += row(t('welcome.souls'), `+${formatNum(summary.souls)}👻`, 'var(--purple)');
+  if(summary.bossWins+summary.bossLosses>0) rows += row(t('welcome.bosses'), `${formatNum(summary.bossWins)} / ${formatNum(summary.bossWins+summary.bossLosses)}`);
+  if(summary.gauntlets>0) rows += row(t('welcome.gauntlets'), `${formatNum(summary.gauntlets)} (${t('welcome.bestWave',{n:summary.bestWave})})`);
+  if(summary.demonics>0) rows += row(t('welcome.demonics'), `+${formatNum(summary.demonics)}`, 'var(--purple)');
+  if(summary.relics>0) rows += row(t('welcome.relics'), `+${formatNum(summary.relics)}`, 'var(--gold)');
   if(summary.prestiges>0) rows += row(t('welcome.prestiges'), `+${formatNum(summary.prestiges)} (+${formatNum(summary.prestigePoints)}✨)`, 'var(--purple)');
   modalBody.innerHTML = `
     <p style="font-size:13px;line-height:1.6;color:var(--text);margin-top:0;">
@@ -7921,48 +7931,156 @@ function offlineStep(dtMax, maxCols, sum, acc){
   if(nXp>0) gainXp(nXp);
   return dt;
 }
+function offlineCooldownMs(hours){
+  const pct = Math.min(90, computePrestigeTreeBonuses().bossCooldownPct);
+  return hours*3600*1000*(1-pct/100)*weekendCooldownMult();
+}
+function offlineFightDps(){
+  return Math.max(1e-6, stats.attack*offlineAvgFuryMult()*(1+Math.min(1,stats.critChance))*Math.max(0.1, stats.atkSpeed));
+}
+function offlineBossFight(boss, tMs, sum){
+  const dps = offlineFightDps();
+  const hp = bossEffectiveHp(boss);
+  const need = hp/dps;
+  const won = need <= BOSS_FIGHT_TIME;
+  const fightSec = won ? need : BOSS_FIGHT_TIME;
+  const rw = bossEffectiveRewards(boss);
+  const skip = hasRelic('patience_crystal') && Math.random() < RELIC_COOLDOWN_SKIP_CHANCE;
+  if(!skip) state.bossCooldowns[boss.id] = tMs + fightSec*1000 + offlineCooldownMs(boss.cooldownHours);
+  else state.bossCooldowns[boss.id] = tMs + fightSec*1000;
+  if(won){
+    if(boss.isFinal && !state.lifetime.gameCompleted) state.lifetime.gameCompleted = true;
+    const gold = Math.round(randRange(rw.goldMin, rw.goldMax) * goldMultEff());
+    state.gold += gold; state.lifetime.totalGoldEarned = (state.lifetime.totalGoldEarned||0) + gold;
+    const souls = Math.round(rw.souls * stats.soulMult);
+    state.souls += souls;
+    state.lifetime.bossesDefeated = (state.lifetime.bossesDefeated||0) + 1;
+    if(!state.lifetime.bossKills) state.lifetime.bossKills = {};
+    state.lifetime.bossKills[boss.id] = (state.lifetime.bossKills[boss.id]||0)+1;
+    gainXp(rw.xp);
+    sum.goldGained += gold; sum.xpGained += rw.xp; sum.souls += souls; sum.bossWins++;
+    const demonicChance = boss.demonicChance * (hasRelic('hunter_medallion') ? 2 : 1);
+    if(Math.random() < demonicChance){
+      grantDemonicItem(true); sum.demonics++;
+    } else if(Math.random() < RELIC_DROP_CHANCE_BOSS){
+      if(grantRelic()) sum.relics++;
+    }
+  } else {
+    sum.bossLosses++;
+    const frac = Math.min(1, Math.max(0, 1 - hp/(dps*BOSS_FIGHT_TIME)));
+    const gold = Math.round(rw.goldMin*frac*0.5*goldMultEff());
+    if(gold>0){ state.gold += gold; state.lifetime.totalGoldEarned = (state.lifetime.totalGoldEarned||0) + gold; sum.goldGained += gold; }
+    const xp = Math.round(rw.xp*frac*0.5);
+    if(xp>0){ gainXp(xp); sum.xpGained += xp; }
+  }
+  return fightSec;
+}
+function offlineGauntlet(tMs, sum){
+  const dps = offlineFightDps();
+  const tier = getTier();
+  const w = monsterWeights(tier);
+  const wTotal = w.reduce((a,x)=>a+x.weight,0);
+  const avgBase = w.reduce((a,x)=>a+x.type.baseHp*x.weight,0)/wTotal;
+  const hs = tierHpScale(tier);
+  let used = 0, waves = 0;
+  while(waves < 5000){
+    const need = avgBase*hs*Math.pow(GAUNTLET_WAVE_SCALE, waves)/dps;
+    if(used+need > GAUNTLET_TIME) break;
+    used += need; waves++;
+  }
+  const fightSec = waves>=5000 ? used : GAUNTLET_TIME;
+  state.lifetime.bestGauntletWaves = Math.max(state.lifetime.bestGauntletWaves||0, waves);
+  const skip = hasRelic('patience_crystal') && Math.random() < RELIC_COOLDOWN_SKIP_CHANCE;
+  state.gauntletCooldown = tMs + fightSec*1000 + (skip ? 0 : offlineCooldownMs(GAUNTLET_COOLDOWN_HOURS));
+  const rw = gauntletRewards(waves);
+  const full = waves >= GAUNTLET_MIN_WAVES_FOR_FULL_REWARD;
+  const gold = Math.round((full ? rw.gold : (waves>0 ? Math.round(rw.gold*0.4) : 0)) * goldMultEff());
+  const crystals = full ? rw.crystals : 0;
+  const xp = Math.round((full ? rw.xp : (waves>0 ? Math.round(rw.xp*0.4) : 0)) * stats.farmXpMult);
+  const souls = Math.round(rw.souls*stats.soulMult);
+  if(gold>0){ state.gold += gold; state.lifetime.totalGoldEarned += gold; sum.goldGained += gold; }
+  if(crystals>0){ state.crystals += crystals; sum.crystals += crystals; }
+  if(xp>0){ gainXp(xp); sum.xpGained += xp; }
+  if(souls>0){ state.souls += souls; sum.souls += souls; }
+  if(full){
+    if(waves >= GAUNTLET_GUARANTEED_RELIC_WAVES){
+      if(grantRelic()) sum.relics++;
+    } else {
+      const rolls = 1 + Math.floor((waves - GAUNTLET_MIN_WAVES_FOR_FULL_REWARD)/10);
+      for(let i=0;i<rolls;i++){ if(Math.random() < RELIC_DROP_CHANCE_GAUNTLET){ if(grantRelic()) sum.relics++; break; } }
+    }
+  }
+  sum.gauntlets++; sum.bestWave = Math.max(sum.bestWave, waves);
+  return fightSec;
+}
+function offlineNextFight(tMs){
+  let best = null;
+  if(state.level >= GAUNTLET_MIN_LEVEL){ best = {t:Math.max(tMs, state.gauntletCooldown||0), gauntlet:true}; }
+  for(const boss of BOSS_TIERS){
+    if(!bossFullyUnlocked(boss)) continue;
+    const rt = Math.max(tMs, state.bossCooldowns[boss.id]||0);
+    if(!best || rt < best.t) best = {t:rt, boss};
+  }
+  return best;
+}
 function applyOfflineProgress(){
   if(!lastSaveTimestamp) return;
   const elapsedMs = Date.now() - lastSaveTimestamp;
   if(elapsedMs < OFFLINE_MIN_MS) return;
   const durationSec = Math.min(elapsedMs, OFFLINE_CAP_MS)/1000;
   const levelBefore = state.level;
-  const sum = {timeLabel:'', goldGained:0, xpGained:0, distGained:0, kills:0, items:0, crystals:0, wood:0, stone:0, iron:0, prestiges:0, prestigePoints:0, levelBefore, levelAfter:levelBefore};
+  const sum = {timeLabel:'', goldGained:0, xpGained:0, distGained:0, kills:0, items:0, crystals:0, wood:0, stone:0, iron:0, prestiges:0, prestigePoints:0, souls:0, bossWins:0, bossLosses:0, gauntlets:0, bestWave:0, demonics:0, relics:0, levelBefore, levelAfter:levelBefore};
   const carry = {};
   const acc = { take(key, v){ const t = (carry[key]||0)+v; const n = Math.floor(t); carry[key] = t-n; return n; } };
   const autoPrestige = prestigeSkillLevel('p6')>0 && !!state.settings.autoPrestigeEnabled;
-  let remaining = durationSec, steps = 0, lastCycleSec = 0, cycleAcc = 0, lastPts = 0;
-  while(remaining > 0.001 && steps < OFFLINE_MAX_STEPS){
-    steps++;
-    const base = Math.max(30, durationSec/240);
-    const dtMax = Math.min(remaining, base);
-    let maxCols = autoPrestige ? Math.max(1500, (distanceCols+300)*0.25) : Math.max(300, (distanceCols+300)*0.08);
-    if(autoPrestige){
-      const minD = prestigeMinDistance();
-      maxCols = Math.min(maxCols, Math.max(0, minD - distanceCols));
-      if(distanceCols >= minD) maxCols = 0;
+  let steps = 0, lastCycleSec = 0, cycleAcc = 0, lastPts = 0;
+  const runSeg = (segSec)=>{
+    let remaining = segSec;
+    while(remaining > 0.001 && steps < OFFLINE_MAX_STEPS){
+      steps++;
+      const base = Math.max(30, durationSec/240);
+      const dtMax = Math.min(remaining, base);
+      let maxCols = autoPrestige ? Math.max(1500, (distanceCols+300)*0.25) : Math.max(300, (distanceCols+300)*0.08);
+      if(autoPrestige){
+        const minD = prestigeMinDistance();
+        maxCols = Math.min(maxCols, Math.max(0, minD - distanceCols));
+        if(distanceCols >= minD) maxCols = 0;
+      }
+      let used = 0;
+      if(maxCols > 0 || !autoPrestige) used = offlineStep(dtMax, maxCols, sum, acc);
+      remaining -= used; cycleAcc += used;
+      if(autoPrestige && prestigeMinDistance()-distanceCols < 1e-6) distanceCols = prestigeMinDistance();
+      if(autoPrestige && distanceCols >= prestigeMinDistance()){
+        lastPts = doPrestige(true) || 0;
+        sum.prestiges++; sum.prestigePoints += lastPts;
+        lastCycleSec = Math.max(0.001, cycleAcc); cycleAcc = 0;
+      } else if(used <= 0 && !autoPrestige){
+        break;
+      }
     }
-    let used = 0;
-    if(maxCols > 0 || !autoPrestige) used = offlineStep(dtMax, maxCols, sum, acc);
-    remaining -= used; cycleAcc += used;
-    if(autoPrestige && prestigeMinDistance()-distanceCols < 1e-6) distanceCols = prestigeMinDistance();
-    if(autoPrestige && distanceCols >= prestigeMinDistance()){
-      lastPts = doPrestige(true) || 0;
-      sum.prestiges++; sum.prestigePoints += lastPts;
-      lastCycleSec = Math.max(0.001, cycleAcc); cycleAcc = 0;
-    } else if(used <= 0 && !autoPrestige){
-      break;
+    if(autoPrestige && remaining > 1 && lastCycleSec > 0){
+      const extra = Math.min(1e6, Math.floor(remaining/lastCycleSec));
+      if(extra > 0){
+        state.lifetime.prestigeCount += extra;
+        state.lifetime.prestigeSkillPoints = (state.lifetime.prestigeSkillPoints||0) + extra;
+        state.lifetime.prestigePoints += extra*lastPts;
+        sum.prestiges += extra; sum.prestigePoints += extra*lastPts;
+      }
     }
+  };
+  const huntOn = prestigeSkillLevel('p9')>0 && !!state.settings.autoBossGauntletEnabled;
+  const startMs = Date.now() - durationSec*1000;
+  const endMs = Date.now();
+  let tMs = startMs, fights = 0;
+  while(huntOn && fights < 400){
+    const nf = offlineNextFight(tMs);
+    if(!nf || nf.t >= endMs) break;
+    if(nf.t > tMs){ runSeg((nf.t - tMs)/1000); tMs = nf.t; }
+    const fs = nf.gauntlet ? offlineGauntlet(tMs, sum) : offlineBossFight(nf.boss, tMs, sum);
+    tMs += fs*1000; fights++;
+    if(tMs >= endMs) break;
   }
-  if(autoPrestige && remaining > 1 && lastCycleSec > 0){
-    const extra = Math.min(1e6, Math.floor(remaining/lastCycleSec));
-    if(extra > 0){
-      state.lifetime.prestigeCount += extra;
-      state.lifetime.prestigeSkillPoints = (state.lifetime.prestigeSkillPoints||0) + extra;
-      state.lifetime.prestigePoints += extra*lastPts;
-      sum.prestiges += extra; sum.prestigePoints += extra*lastPts;
-    }
-  }
+  if(endMs > tMs) runSeg((endMs - tMs)/1000);
   sum.levelAfter = state.level;
   const hours = durationSec/3600;
   sum.timeLabel = hours>=1 ? t('time.hours',{n:hours.toFixed(1)}) : t('time.minutes',{n:Math.max(1,Math.round(durationSec/60))});
